@@ -118,12 +118,26 @@ function openModal(type, price, name) {
 }
 
 function closeModal() {
-  document.getElementById('subModal').classList.remove('open');
+  var modal = document.getElementById('subModal');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.style.display = 'none';
+    setTimeout(function() { modal.style.display = ''; }, 50);
+  }
   document.body.style.overflow = '';
+  var btn = document.getElementById('payBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '💳 الدفع الآن عبر Upayment'; }
 }
 
-document.getElementById('subModal')?.addEventListener('click', (e) => {
-  if (e.target.id === 'subModal') closeModal();
+function handleOverlayClick(e) {
+  if (e.target === e.currentTarget) {
+    closeModal();
+  }
+}
+
+// ESC key closes modal
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
 });
 
 async function submitSub(e) {

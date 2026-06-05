@@ -89,7 +89,7 @@
           <div class="ring-outer"></div>
           <div class="ring-inner"></div>
           <div class="hero-logo-center">
-            <img src="images/logo-ar.png" alt="Salam Academy Logo" onerror="this.src='images/logo-en.png'"/>
+            <img src="images/logo-ar.png" alt="Salam Academy Logo" onerror="this.src='images/logo-en.png'" style="max-width:150px;max-height:150px"/>
           </div>
           <div class="hero-float-badge badge-1">
             <span>⚽</span><span>كرة القدم</span>
@@ -428,10 +428,10 @@
 </footer>
 
 <!-- SUBSCRIPTION MODAL -->
-<div class="modal-overlay" id="subModal">
-  <div class="modal-box">
+<div class="modal-overlay" id="subModal" onclick="handleOverlayClick(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()" type="button" aria-label="إغلاق">✕</button>
     <div class="modal-header">
-      <button class="modal-close" onclick="closeModal()">✕</button>
       <div class="modal-header-logo">🏆</div>
       <h2>تسجيل الاشتراك</h2>
       <p id="modalPkgName">الباقة المختارة</p>
@@ -473,6 +473,9 @@
           💬 تواصل معنا للدفع النقدي
         </a>
       </form>
+      <button onclick="closeModal()" type="button" style="width:100%;margin-top:14px;background:none;border:2px solid rgba(184,84,30,0.2);color:var(--text-mid);padding:11px;border-radius:30px;font-family:Tajawal,sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer">
+        ← إلغاء والعودة
+      </button>
     </div>
   </div>
 </div>
