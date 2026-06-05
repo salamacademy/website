@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تم الدفع بنجاح | أكاديمية سلام</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/portal.css" />
+</head>
+<body class="portal-body">
+  <div class="portal-container">
+    <div class="portal-card" style="text-align:center">
+      <div style="font-size:5rem;margin-bottom:16px">🎉</div>
+      <h1 style="color:#2e7d32;font-size:1.8rem;margin-bottom:8px">تم الدفع بنجاح!</h1>
+      <p style="color:#666;margin-bottom:24px">مرحباً بك في أكاديمية سلام. تم تسجيل اشتراكك بنجاح.</p>
+      <div id="successDetails" style="background:#e8f5e9;border-radius:12px;padding:16px;margin-bottom:24px;text-align:right">
+        جاري تحميل التفاصيل...
+      </div>
+      <p style="font-size:0.9rem;color:#666;margin-bottom:20px">
+        سيتواصل معك فريقنا قريباً عبر الواتساب لتأكيد التفاصيل.
+      </p>
+      <a href="dashboard.html" class="btn-portal-primary" style="display:block;text-decoration:none;text-align:center">
+        الذهاب لبوابة الأعضاء
+      </a>
+      <a href="https://wa.me/96593000607" target="_blank" class="btn-portal-whatsapp" style="margin-top:12px">
+        تواصل معنا
+      </a>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const subId = params.get('id');
+    if (subId) {
+      db.collection('subscriptions').doc(subId).get().then(doc => {
+        if (doc.exists) {
+          const d = doc.data();
+          document.getElementById('successDetails').innerHTML = `
+            <div style="margin-bottom:8px"><strong>اسم الطفل:</strong> ${d.childName}</div>
+            <div style="margin-bottom:8px"><strong>الباقة:</strong> ${d.packageName}</div>
+            <div><strong>المبلغ:</strong> ${d.amount} د.ك</div>
+          `;
+          // Update subscription status
+          const startDate = new Date();
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() + 30);
+          db.collection('subscriptions').doc(subId).update({
+            status: 'active',
+            subscriptionStart: firebase.firestore.Timestamp.fromDate(startDate),
+            subscriptionEnd: firebase.firestore.Timestamp.fromDate(endDate),
+            daysRemaining: 30,
+            paidAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      });
+    }
+  </script>
+</body>
+</html>

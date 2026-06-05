@@ -1,0 +1,35 @@
+// firestore.rules
+// Deploy with: firebase deploy --only firestore:rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ADMINS collection - only admins can read
+    match /admins/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Only via Firebase Console
+    }
+
+    // SUBSCRIPTIONS collection
+    match /subscriptions/{subId} {
+      // Admin can do everything
+      allow read, write: if request.auth != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+
+      // Client can read their own subscription (matched by phone or uid)
+      allow read: if request.auth != null && (
+        resource.data.uid == request.auth.uid ||
+        resource.data.phone == request.auth.token.phone_number.replace('+965', '')
+      );
+
+      // Allow creating new subscription (from payment flow)
+      allow create: if request.auth == null || request.auth != null;
+
+      // Client can update only specific fields (e.g., link their UID)
+      allow update: if request.auth != null && 
+        resource.data.phone == request.auth.token.phone_number.replace('+965', '') &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'emailLinked']);
+    }
+  }
+}

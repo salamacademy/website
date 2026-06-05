@@ -1,0 +1,14 @@
+/* Admin specific overrides */
+.admin-dash-body .client-topbar {
+  background: #1a1a2e;
+  color: white;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.admin-dash-body .client-topbar h2 {
+  color: var(--gold-light);
+}
+
+.admin-dash-body .topbar-user {
+  color: rgba(255,255,255,0.7);
+}

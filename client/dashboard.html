@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>حسابي | أكاديمية سلام</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/portal.css" />
+</head>
+<body class="portal-body">
+
+  <div class="dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="client-sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">🏆</div>
+        <span>أكاديمية سلام</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#overview" class="sidebar-link active" onclick="showSection('overview')">
+          🏠 نظرة عامة
+        </a>
+        <a href="#subscription" class="sidebar-link" onclick="showSection('subscription')">
+          📋 اشتراكي
+        </a>
+        <a href="#schedule" class="sidebar-link" onclick="showSection('schedule')">
+          📅 الجدول
+        </a>
+        <a href="#renew" class="sidebar-link" onclick="showSection('renew')">
+          🔄 تجديد الاشتراك
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="https://wa.me/96593000607" target="_blank" class="sidebar-whatsapp">
+          💬 تواصل معنا
+        </a>
+        <button onclick="logout()" class="sidebar-logout">🚪 تسجيل الخروج</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="client-main">
+
+      <!-- Header Bar -->
+      <div class="client-topbar">
+        <button class="mobile-sidebar-toggle" onclick="toggleSidebar()">☰</button>
+        <h2 id="pageTitle">نظرة عامة</h2>
+        <div class="topbar-user" id="topbarUser">
+          <span class="user-avatar">👤</span>
+          <span id="topbarName">...</span>
+        </div>
+      </div>
+
+      <!-- OVERVIEW SECTION -->
+      <section id="overview-section" class="dashboard-section">
+        <!-- Welcome Card -->
+        <div class="welcome-card">
+          <div class="welcome-text">
+            <h3>مرحباً، <span id="welcomeName">...</span>!</h3>
+            <p>هذا ملخص اشتراك طفلك في أكاديمية سلام</p>
+          </div>
+          <div class="welcome-icon">🌟</div>
+        </div>
+
+        <!-- Days Remaining - MAIN HIGHLIGHT -->
+        <div class="days-card" id="daysCard">
+          <div class="days-circle-wrap">
+            <svg class="days-circle-svg" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="54" fill="none" stroke="#e0e0e0" stroke-width="8"/>
+              <circle cx="60" cy="60" r="54" fill="none" stroke="var(--circle-color, #2E7D32)" stroke-width="8"
+                stroke-dasharray="339.3"
+                stroke-dashoffset="var(--circle-offset, 0)"
+                stroke-linecap="round"
+                transform="rotate(-90 60 60)"
+                id="daysCircle"/>
+            </svg>
+            <div class="days-center">
+              <span class="days-big" id="daysRemaining">--</span>
+              <span class="days-label">يوم متبقي</span>
+            </div>
+          </div>
+          <div class="days-info">
+            <h3 id="daysStatusTitle">جاري التحميل...</h3>
+            <p id="daysStatusDesc">يتم تحميل بيانات اشتراكك</p>
+            <div class="days-dates">
+              <div class="date-row">
+                <span class="date-icon">📅</span>
+                <div>
+                  <small>بداية الاشتراك</small>
+                  <strong id="startDate">--/--/----</strong>
+                </div>
+              </div>
+              <div class="date-row">
+                <span class="date-icon">⏳</span>
+                <div>
+                  <small>انتهاء الاشتراك</small>
+                  <strong id="endDate">--/--/----</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+          <div class="stat-box">
+            <div class="stat-box-icon">📦</div>
+            <div>
+              <span class="stat-box-val" id="packageLabel">--</span>
+              <span class="stat-box-desc">الباقة الحالية</span>
+            </div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-icon">👦</div>
+            <div>
+              <span class="stat-box-val" id="childNameDisplay">--</span>
+              <span class="stat-box-desc">اسم الطفل</span>
+            </div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-icon">💰</div>
+            <div>
+              <span class="stat-box-val" id="amountDisplay">-- د.ك</span>
+              <span class="stat-box-desc">قيمة الاشتراك</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Renewal Alert (shown if <= 7 days) -->
+        <div class="renewal-alert" id="renewalAlert" style="display:none">
+          <div class="alert-icon">⚠️</div>
+          <div class="alert-content">
+            <strong>اشتراكك على وشك الانتهاء!</strong>
+            <p>لا تفوّت تجديد اشتراكك للحفاظ على مكانك في الأكاديمية</p>
+          </div>
+          <button onclick="showSection('renew')" class="alert-btn">جدد الآن</button>
+        </div>
+      </section>
+
+      <!-- SUBSCRIPTION DETAILS SECTION -->
+      <section id="subscription-section" class="dashboard-section" style="display:none">
+        <h3 class="section-heading">تفاصيل اشتراكي</h3>
+        <div class="detail-card" id="subscriptionDetails">
+          <div class="loading-placeholder">جاري التحميل...</div>
+        </div>
+      </section>
+
+      <!-- SCHEDULE SECTION -->
+      <section id="schedule-section" class="dashboard-section" style="display:none">
+        <h3 class="section-heading">جدول التدريب</h3>
+        <div id="scheduleDisplay"></div>
+      </section>
+
+      <!-- RENEWAL SECTION -->
+      <section id="renew-section" class="dashboard-section" style="display:none">
+        <h3 class="section-heading">تجديد الاشتراك</h3>
+        <div class="renew-card">
+          <p>اشتراكك الحالي: <strong id="renewPackageName">--</strong></p>
+          <p>المبلغ: <strong id="renewAmount">-- د.ك</strong></p>
+          <br/>
+          <button class="btn-portal-primary" onclick="renewSubscription()">
+            💳 تجديد عبر Upayment
+          </button>
+          <a href="https://wa.me/96593000607" target="_blank" class="btn-portal-whatsapp" style="margin-top:12px">
+            أو تواصل معنا للدفع النقدي
+          </a>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/client-dashboard.js"></script>
+</body>
+</html>
