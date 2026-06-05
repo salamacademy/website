@@ -50,7 +50,7 @@ async function adminLogin() {
 }
 
 function showError(msg) {
-  const el = document.getElementById('errorMsg');
+  const el = document.getElementById('msgBox');
   el.textContent = msg;
   el.style.display = 'block';
   el.style.background = '#ffebee';

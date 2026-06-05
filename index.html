@@ -1,388 +1,492 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>أكاديمية سلام | Salam Academy</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Bebas+Neue&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/main.css" />
-  <link rel="icon" href="images/favicon.png" type="image/png" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>أكاديمية سلام | Salam Academy Kuwait</title>
+  <meta name="description" content="أكاديمية سلام الرياضية في الكويت — كرة القدم، بناء الثقة، والدفاع عن النفس للأطفال"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/main.css"/>
 </head>
 <body>
 
-  <!-- HERO SECTION -->
-  <header class="hero">
-    <div class="hero-bg-pattern"></div>
-    <nav class="navbar">
-      <div class="logo-wrap">
-        <img src="images/logo.png" alt="Salam Academy Logo" class="nav-logo" onerror="this.style.display='none'" />
-        <span class="nav-brand">أكاديمية سلام</span>
+<!-- Custom Cursor -->
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar" id="navbar">
+  <a href="#" class="nav-logo-wrap">
+    <img src="images/logo-ar.png" alt="Salam Academy" class="nav-logo-img" onerror="this.src='images/logo-en.png'"/>
+    <div class="nav-brand-text">
+      أكاديمية سلام
+      <small>SALAM ACADEMY</small>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="#sports">البرامج</a>
+    <a href="#packages">الباقات</a>
+    <a href="#why-us">عن الأكاديمية</a>
+    <a href="#contact">تواصل</a>
+    <a href="client/login.html" class="btn-nav-portal">دخول العضو</a>
+    <a href="#packages" class="btn-nav-cta">اشترك الآن</a>
+  </div>
+  <button class="mobile-menu-btn" onclick="toggleMobileNav()" id="mobileBtn">☰</button>
+</nav>
+<div class="mobile-nav" id="mobileNav">
+  <a href="#sports" onclick="closeMobileNav()">🏅 البرامج</a>
+  <a href="#packages" onclick="closeMobileNav()">💎 الباقات</a>
+  <a href="#why-us" onclick="closeMobileNav()">🏆 عن الأكاديمية</a>
+  <a href="#contact" onclick="closeMobileNav()">📞 تواصل معنا</a>
+  <a href="client/login.html">👤 دخول العضو</a>
+  <a href="#packages" onclick="closeMobileNav()" style="background:var(--copper);color:white;border-radius:10px;text-align:center">اشترك الآن</a>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-orb hero-orb-1"></div>
+  <div class="hero-orb hero-orb-2"></div>
+  <div class="hero-orb hero-orb-3"></div>
+
+  <div class="container">
+    <div class="hero-grid">
+      <!-- Text -->
+      <div class="hero-text">
+        <div class="hero-eyebrow">
+          <span class="eyebrow-dot"></span>
+          أكاديمية رياضية معتمدة في الكويت
+        </div>
+        <h1 class="hero-title">
+          نبني جيلاً<br/>
+          <span class="highlight">واثقاً ومميزاً</span>
+        </h1>
+        <p class="hero-subtitle">
+          أكاديمية سلام — بيئة رياضية آمنة وداعمة تُنمّي مهارات طفلك البدنية والشخصية تحت إشراف مدربين محترفين بقيم وأخلاق أصيلة.
+        </p>
+        <div class="hero-pills">
+          <span class="hero-pill">⚽ كرة القدم</span>
+          <span class="hero-pill">🥋 الدفاع عن النفس</span>
+          <span class="hero-pill">💪 بناء الثقة</span>
+          <span class="hero-pill">🏕️ معسكرات رياضية</span>
+        </div>
+        <div class="hero-ctas">
+          <a href="#packages" class="btn-primary">
+            <span>اشترك الآن</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+          <a href="https://wa.me/96593000607" target="_blank" class="btn-whatsapp-hero">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            واتساب
+          </a>
+        </div>
       </div>
-      <div class="nav-links">
-        <a href="#packages">الباقات</a>
-        <a href="#about">عن الأكاديمية</a>
+
+      <!-- Visual -->
+      <div class="hero-visual">
+        <div class="hero-logo-ring">
+          <div class="ring-outer"></div>
+          <div class="ring-inner"></div>
+          <div class="hero-logo-center">
+            <img src="images/logo-ar.png" alt="Salam Academy Logo" onerror="this.src='images/logo-en.png'"/>
+          </div>
+          <div class="hero-float-badge badge-1">
+            <span>⚽</span><span>كرة القدم</span>
+          </div>
+          <div class="hero-float-badge badge-2">
+            <span>🏅</span><span>+2,500 متابع</span>
+          </div>
+          <div class="hero-float-badge badge-3">
+            <span>✅</span><span>مدربون معتمدون</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="hero-stats-bar">
+    <div class="container">
+      <div class="stats-inner">
+        <div class="stat-item">
+          <span class="stat-num" data-count="211">0</span>
+          <span class="stat-label">منشور على إنستغرام</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num" data-count="2572">0</span>
+          <span class="stat-label">متابع نشط</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num">100%</span>
+          <span class="stat-label">إدارة كويتية</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num">3</span>
+          <span class="stat-label">باقات تدريبية</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPORTS SECTION -->
+<section class="sports-section" id="sports">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">🏅 برامجنا</div>
+      <h2 class="section-title">ماذا نُقدّم <span>لطفلك؟</span></h2>
+      <p class="section-desc">برامج رياضية متكاملة صُممت لتنمية المهارات البدنية والشخصية للأطفال</p>
+    </div>
+    <div class="sports-grid">
+      <div class="sport-card reveal reveal-delay-1">
+        <div class="sport-card-icon">⚽</div>
+        <h3>كرة القدم</h3>
+        <p>تدريب احترافي على يد مدربين معتمدين لتطوير مهارات طفلك الكروية والجماعية في بيئة محفزة</p>
+      </div>
+      <div class="sport-card reveal reveal-delay-2">
+        <div class="sport-card-icon">🥋</div>
+        <h3>بناء الثقة والدفاع عن النفس</h3>
+        <p>برامج متخصصة تبني شخصية قوية وثقة بالنفس مع مهارات الدفاع الذاتي للأطفال</p>
+      </div>
+      <div class="sport-card reveal reveal-delay-3">
+        <div class="sport-card-icon">🏕️</div>
+        <h3>المعسكرات الرياضية</h3>
+        <p>معسكرات مكثفة تجمع الرياضة والمتعة وبناء روح الفريق في بيئة آمنة ومنظمة</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PACKAGES SECTION -->
+<section class="packages-section" id="packages">
+  <div class="packages-section-bg"></div>
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-tag">💎 الاشتراكات</div>
+      <h2 class="section-title">اختر الباقة <span>المناسبة</span></h2>
+      <p class="section-desc" style="margin:0 auto 48px">جميع الباقات تشمل تعليماً احترافياً تحت إشراف كويتي متخصص</p>
+    </div>
+
+    <div class="packages-grid">
+
+      <!-- Football -->
+      <div class="pkg-card reveal reveal-delay-1">
+        <div class="pkg-head">
+          <span class="pkg-icon">⚽</span>
+          <div class="pkg-name">باقة كرة القدم</div>
+          <div class="pkg-tagline">تطوير المهارات الكروية</div>
+        </div>
+        <div class="pkg-body">
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">📅</div>
+            <div class="pkg-detail-text">
+              <strong>الأيام</strong>
+              <span>السبت — الاثنين — الأربعاء</span>
+            </div>
+          </div>
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">⏰</div>
+            <div class="pkg-detail-text">
+              <strong>الوقت</strong>
+              <span>4:00 — 5:00 مساءً</span>
+            </div>
+          </div>
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">📍</div>
+            <div class="pkg-detail-text">
+              <strong>المكان</strong>
+              <span>منطقة الروضة</span>
+            </div>
+          </div>
+          <ul class="pkg-features">
+            <li>تدريب بإشراف مدربين معتمدين</li>
+            <li>تطوير المهارات البدنية والاجتماعية</li>
+            <li>بيئة آمنة وداعمة للطفل</li>
+            <li>بناء الثقة والانضباط</li>
+          </ul>
+        </div>
+        <div class="pkg-footer">
+          <div class="pkg-price">
+            <span class="price-num">60</span>
+            <span class="price-unit">د.ك / شهر</span>
+          </div>
+          <button class="btn-subscribe" onclick="openModal('football',60,'باقة كرة القدم')">
+            اشترك الآن
+          </button>
+        </div>
+      </div>
+
+      <!-- Premium (Featured) -->
+      <div class="pkg-card featured reveal reveal-delay-2">
+        <div class="featured-label">⭐ الأكثر طلباً</div>
+        <div class="pkg-head">
+          <span class="pkg-icon">⚡</span>
+          <div class="pkg-name">الباقة المميزة</div>
+          <div class="pkg-tagline">كرة القدم + بناء الثقة</div>
+        </div>
+        <div class="pkg-body">
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">📅</div>
+            <div class="pkg-detail-text">
+              <strong>الأيام</strong>
+              <span>السبت حتى الخميس (6 أيام)</span>
+            </div>
+          </div>
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">⚽</div>
+            <div class="pkg-detail-text">
+              <strong>يشمل</strong>
+              <span>كرة القدم + الدفاع عن النفس</span>
+            </div>
+          </div>
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">📍</div>
+            <div class="pkg-detail-text">
+              <strong>المكانين</strong>
+              <span>الروضة + السلام</span>
+            </div>
+          </div>
+          <ul class="pkg-features">
+            <li>جميع مزايا الباقتين مجتمعتين</li>
+            <li>تدريب شامل 6 أيام أسبوعياً</li>
+            <li>أولوية الحجز في المعسكرات</li>
+            <li>تقارير أداء شهرية</li>
+            <li>خصومات على الفعاليات الخاصة</li>
+          </ul>
+        </div>
+        <div class="pkg-footer">
+          <div class="pkg-price">
+            <span class="price-num">120</span>
+            <span class="price-unit">د.ك / شهر</span>
+          </div>
+          <button class="btn-subscribe btn-featured" onclick="openModal('premium',120,'الباقة المميزة')">
+            اشترك الآن
+          </button>
+        </div>
+      </div>
+
+      <!-- Confidence -->
+      <div class="pkg-card reveal reveal-delay-3">
+        <div class="pkg-head">
+          <span class="pkg-icon">🥋</span>
+          <div class="pkg-name">باقة بناء الثقة</div>
+          <div class="pkg-tagline">الثقة والدفاع عن النفس</div>
+        </div>
+        <div class="pkg-body">
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">📅</div>
+            <div class="pkg-detail-text">
+              <strong>الأيام</strong>
+              <span>الأحد — الثلاثاء — الخميس</span>
+            </div>
+          </div>
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">⏰</div>
+            <div class="pkg-detail-text">
+              <strong>الوقت</strong>
+              <span>A: 4:30–6:00 | B: 6:00–7:30</span>
+            </div>
+          </div>
+          <div class="pkg-detail">
+            <div class="pkg-detail-icon">📍</div>
+            <div class="pkg-detail-text">
+              <strong>المكان</strong>
+              <span>منطقة السلام</span>
+            </div>
+          </div>
+          <ul class="pkg-features">
+            <li>تدريب الدفاع عن النفس</li>
+            <li>بناء شخصية قوية وواثقة</li>
+            <li>تطوير الانضباط الذاتي</li>
+            <li>مدربون متخصصون ومعتمدون</li>
+          </ul>
+        </div>
+        <div class="pkg-footer">
+          <div class="pkg-price">
+            <span class="price-num">70</span>
+            <span class="price-unit">د.ك / شهر</span>
+          </div>
+          <button class="btn-subscribe" onclick="openModal('confidence',70,'باقة بناء الثقة والدفاع عن النفس')">
+            اشترك الآن
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- WHY US -->
+<section class="why-section" id="why-us">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">💡 لماذا سلام؟</div>
+      <h2 class="section-title">ما يجعلنا <span>مختلفين</span></h2>
+      <p class="section-desc">أكثر من مجرد أكاديمية رياضية — نحن نبني مستقبل طفلك</p>
+    </div>
+    <div class="why-grid">
+      <div class="why-card reveal reveal-delay-1">
+        <div class="why-card-icon">👨‍🏫</div>
+        <h4>مدربون محترفون</h4>
+        <p>فريق من المدربين المعتمدين ذوي الخبرة العالية في تدريب الأطفال</p>
+      </div>
+      <div class="why-card reveal reveal-delay-2">
+        <div class="why-card-icon">🛡️</div>
+        <h4>بيئة آمنة ١٠٠٪</h4>
+        <p>نضمن سلامة وراحة طفلك في بيئة تدريبية مراقبة ومنظمة</p>
+      </div>
+      <div class="why-card reveal reveal-delay-3">
+        <div class="why-card-icon">📖</div>
+        <h4>قيم وأخلاق</h4>
+        <p>نغرس في أطفالنا القيم الإسلامية الأصيلة والأخلاق الحميدة</p>
+      </div>
+      <div class="why-card reveal reveal-delay-1">
+        <div class="why-card-icon">🇰🇼</div>
+        <h4>إدارة كويتية</h4>
+        <p>تحت إشراف وإدارة كويتية متخصصة تفهم احتياجات الطفل الكويتي</p>
+      </div>
+      <div class="why-card reveal reveal-delay-2">
+        <div class="why-card-icon">🏅</div>
+        <h4>نتائج مثبتة</h4>
+        <p>أبطالنا يحققون نتائج متميزة في البطولات والمسابقات المحلية</p>
+      </div>
+      <div class="why-card reveal reveal-delay-3">
+        <div class="why-card-icon">💪</div>
+        <h4>تطوير شامل</h4>
+        <p>نطور المهارات الجسدية والعقلية والاجتماعية لطفلك بشكل متكامل</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact-section" id="contact">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-tag">📞 تواصل</div>
+      <h2 class="section-title">نحن هنا <span>لمساعدتك</span></h2>
+      <p class="section-desc" style="margin:0 auto 48px">تواصل معنا بأي طريقة تناسبك</p>
+    </div>
+    <div class="contact-grid">
+      <a href="tel:+96593000607" class="contact-card reveal reveal-delay-1">
+        <div class="contact-card-icon">📱</div>
+        <h4>الهاتف</h4>
+        <span>93000607</span>
+      </a>
+      <a href="https://wa.me/96593000607" target="_blank" class="contact-card reveal reveal-delay-2">
+        <div class="contact-card-icon">💬</div>
+        <h4>واتساب</h4>
+        <span>راسلنا الآن</span>
+      </a>
+      <div class="contact-card reveal reveal-delay-3">
+        <div class="contact-card-icon">📍</div>
+        <h4>الموقع</h4>
+        <span>جنوب السرة — AlSalam</span>
+      </div>
+      <a href="https://www.instagram.com/salam_academy_kwt" target="_blank" class="contact-card reveal reveal-delay-4">
+        <div class="contact-card-icon">📸</div>
+        <h4>إنستغرام</h4>
+        <span>@salam_academy_kwt</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-main">
+      <div class="footer-brand">
+        <img src="images/logo-en.png" alt="Salam Academy" class="footer-logo-img" style="height:48px;width:auto;filter:none;opacity:0.9"/>
+        <p class="footer-tagline">معاً نحو بناء جيل واثق ومميز — أكاديمية رياضية كويتية تؤمن بأن الرياضة تبني الشخصية</p>
+        <div class="footer-social">
+          <a href="https://www.instagram.com/salam_academy_kwt" target="_blank" class="social-btn">📸</a>
+          <a href="https://wa.me/96593000607" target="_blank" class="social-btn">💬</a>
+          <a href="tel:+96593000607" class="social-btn">📱</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>روابط سريعة</h4>
+        <a href="#sports">البرامج الرياضية</a>
+        <a href="#packages">الباقات والاشتراكات</a>
+        <a href="#why-us">عن الأكاديمية</a>
         <a href="#contact">تواصل معنا</a>
-        <a href="client/login.html" class="btn-nav-login">دخول العضو</a>
       </div>
-      <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
-    </nav>
-    <div class="mobile-menu" id="mobileMenu">
-      <a href="#packages" onclick="toggleMobileMenu()">الباقات</a>
-      <a href="#about" onclick="toggleMobileMenu()">عن الأكاديمية</a>
-      <a href="#contact" onclick="toggleMobileMenu()">تواصل معنا</a>
-      <a href="client/login.html" class="btn-nav-login">دخول العضو</a>
-    </div>
-
-    <div class="hero-content">
-      <div class="hero-badge">🏆 أكاديمية رياضية معتمدة</div>
-      <h1 class="hero-title">
-        أكاديمية<br/><span class="gold-text">سلام</span>
-      </h1>
-      <p class="hero-subtitle">معاً نحو بناء جيل واثق ومميز</p>
-      <div class="hero-tagline">تعليم احترافي • بيئة آمنة • قيم وأخلاق</div>
-      <div class="hero-actions">
-        <a href="#packages" class="btn-primary">اشترك الآن</a>
-        <a href="https://wa.me/96593000607" target="_blank" class="btn-whatsapp">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          واتساب
-        </a>
+      <div class="footer-col">
+        <h4>البوابات</h4>
+        <a href="client/login.html">بوابة الأعضاء</a>
+        <a href="admin/login.html">لوحة الإدارة</a>
+        <a href="https://wa.me/96593000607" target="_blank">دعم فني</a>
       </div>
     </div>
-
-    <div class="hero-stats">
-      <div class="stat-item">
-        <span class="stat-num">211+</span>
-        <span class="stat-label">منشور</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item">
-        <span class="stat-num">2,572</span>
-        <span class="stat-label">متابع</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item">
-        <span class="stat-num">100%</span>
-        <span class="stat-label">احترافية</span>
-      </div>
+    <div class="footer-bottom">
+      <p>© 2025 أكاديمية سلام الكويت — جميع الحقوق محفوظة</p>
+      <p>📞 93000607</p>
     </div>
-  </header>
+  </div>
+</footer>
 
-  <!-- SPORTS OFFERINGS -->
-  <section class="sports-section">
-    <div class="container">
-      <div class="section-badge">🏅 برامجنا الرياضية</div>
-      <h2 class="section-title">نقدم لطفلك الأفضل</h2>
-      <div class="sports-grid">
-        <div class="sport-card sport-football">
-          <div class="sport-icon">⚽</div>
-          <h3>كرة القدم</h3>
-          <p>تدريب احترافي على يد مدربين معتمدين لتطوير مهارات طفلك الكروية</p>
-        </div>
-        <div class="sport-card sport-confidence">
-          <div class="sport-icon">🥋</div>
-          <h3>بناء الثقة والدفاع عن النفس</h3>
-          <p>برامج متخصصة لبناء شخصية قوية وثقة بالنفس مع مهارات الدفاع الذاتي</p>
-        </div>
-        <div class="sport-card sport-camp">
-          <div class="sport-icon">🏕️</div>
-          <h3>المعسكرات الرياضية</h3>
-          <p>معسكرات مكثفة تجمع بين الرياضة والمتعة وبناء روح الفريق</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PACKAGES SECTION -->
-  <section class="packages-section" id="packages">
-    <div class="container">
-      <div class="section-badge">💎 الباقات والاشتراكات</div>
-      <h2 class="section-title">اختر الباقة المناسبة</h2>
-      <p class="section-subtitle">جميع الباقات تشمل تعليماً احترافياً تحت إشراف مدربين معتمدين</p>
-
-      <div class="packages-grid">
-
-        <!-- Football Package -->
-        <div class="package-card package-football">
-          <div class="package-header">
-            <div class="package-icon">⚽</div>
-            <h3 class="package-name">باقة كرة القدم</h3>
-          </div>
-          <div class="package-body">
-            <div class="package-detail">
-              <span class="detail-icon">📅</span>
-              <div>
-                <strong>الأيام</strong>
-                <span>السبت - الاثنين - الأربعاء</span>
-              </div>
-            </div>
-            <div class="package-detail">
-              <span class="detail-icon">⏰</span>
-              <div>
-                <strong>الوقت</strong>
-                <span>4:00 - 5:00 مساءً</span>
-              </div>
-            </div>
-            <div class="package-detail">
-              <span class="detail-icon">📍</span>
-              <div>
-                <strong>المكان</strong>
-                <span>منطقة الروضة</span>
-              </div>
-            </div>
-            <ul class="package-features">
-              <li>✅ تدريب احترافي بإشراف مدربين معتمدين</li>
-              <li>✅ تطوير المهارات البدنية والاجتماعية</li>
-              <li>✅ بيئة آمنة وداعمة</li>
-              <li>✅ بناء الثقة والانضباط</li>
-            </ul>
-          </div>
-          <div class="package-footer">
-            <div class="package-price">
-              <span class="price-amount">60</span>
-              <span class="price-currency">د.ك / شهر</span>
-            </div>
-            <button class="btn-subscribe" onclick="startSubscription('football', 60, 'باقة كرة القدم')">
-              اشترك الآن
-            </button>
-          </div>
-        </div>
-
-        <!-- Confidence Package -->
-        <div class="package-card package-confidence">
-          <div class="package-header">
-            <div class="package-icon">🥋</div>
-            <h3 class="package-name">باقة بناء الثقة والدفاع عن النفس</h3>
-          </div>
-          <div class="package-body">
-            <div class="package-detail">
-              <span class="detail-icon">📅</span>
-              <div>
-                <strong>الأيام</strong>
-                <span>الأحد - الثلاثاء - الخميس</span>
-              </div>
-            </div>
-            <div class="package-detail">
-              <span class="detail-icon">⏰</span>
-              <div>
-                <strong>الوقت</strong>
-                <span>Class A: 4:30 - 6:00 | Class B: 6:00 - 7:30</span>
-              </div>
-            </div>
-            <div class="package-detail">
-              <span class="detail-icon">📍</span>
-              <div>
-                <strong>المكان</strong>
-                <span>منطقة السلام</span>
-              </div>
-            </div>
-            <ul class="package-features">
-              <li>✅ تدريب الدفاع عن النفس</li>
-              <li>✅ بناء شخصية قوية وواثقة</li>
-              <li>✅ تطوير الانضباط الذاتي</li>
-              <li>✅ مدربون متخصصون ومعتمدون</li>
-            </ul>
-          </div>
-          <div class="package-footer">
-            <div class="package-price">
-              <span class="price-amount">70</span>
-              <span class="price-currency">د.ك / شهر</span>
-            </div>
-            <button class="btn-subscribe" onclick="startSubscription('confidence', 70, 'باقة بناء الثقة والدفاع عن النفس')">
-              اشترك الآن
-            </button>
-          </div>
-        </div>
-
-        <!-- Premium Package -->
-        <div class="package-card package-premium featured">
-          <div class="featured-badge">⭐ الأكثر طلباً</div>
-          <div class="package-header">
-            <div class="package-icon">⚡</div>
-            <h3 class="package-name">الباقة المميزة</h3>
-          </div>
-          <div class="package-body">
-            <div class="package-detail">
-              <span class="detail-icon">📅</span>
-              <div>
-                <strong>الأيام</strong>
-                <span>6 أيام بالأسبوع (السبت - الخميس)</span>
-              </div>
-            </div>
-            <div class="package-detail">
-              <span class="detail-icon">⚽</span>
-              <div>
-                <strong>يشمل</strong>
-                <span>كرة القدم + بناء الثقة والدفاع عن النفس</span>
-              </div>
-            </div>
-            <ul class="package-features">
-              <li>✅ جميع مزايا الباقتين مدمجتين</li>
-              <li>✅ تدريب شامل 6 أيام أسبوعياً</li>
-              <li>✅ أولوية الحجز في المعسكرات</li>
-              <li>✅ تقارير أداء شهرية</li>
-              <li>✅ خصم على الفعاليات الخاصة</li>
-            </ul>
-          </div>
-          <div class="package-footer">
-            <div class="package-price">
-              <span class="price-amount">120</span>
-              <span class="price-currency">د.ك / شهر</span>
-            </div>
-            <button class="btn-subscribe btn-premium" onclick="startSubscription('premium', 120, 'الباقة المميزة')">
-              اشترك الآن
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- WHY US SECTION -->
-  <section class="why-us-section" id="about">
-    <div class="container">
-      <div class="section-badge">💡 لماذا أكاديمية سلام؟</div>
-      <h2 class="section-title">ما يميزنا</h2>
-      <div class="why-grid">
-        <div class="why-card">
-          <div class="why-icon">👨‍🏫</div>
-          <h4>مدربون محترفون</h4>
-          <p>فريق من المدربين المعتمدين ذوي الخبرة العالية في تدريب الأطفال</p>
-        </div>
-        <div class="why-card">
-          <div class="why-icon">🛡️</div>
-          <h4>بيئة آمنة</h4>
-          <p>نوفر بيئة آمنة وداعمة تضمن سلامة وراحة طفلك في كل وقت</p>
-        </div>
-        <div class="why-card">
-          <div class="why-icon">📖</div>
-          <h4>قيم وأخلاق</h4>
-          <p>نغرس في أطفالنا القيم الإسلامية الأصيلة والأخلاق الحميدة</p>
-        </div>
-        <div class="why-card">
-          <div class="why-icon">🇰🇼</div>
-          <h4>إدارة كويتية</h4>
-          <p>تحت إشراف وإدارة كويتية متخصصة تفهم احتياجات الطفل الكويتي</p>
-        </div>
-        <div class="why-card">
-          <div class="why-icon">🏅</div>
-          <h4>نتائج مثبتة</h4>
-          <p>أبطالنا يحققون نتائج متميزة في البطولات والمسابقات المحلية</p>
-        </div>
-        <div class="why-card">
-          <div class="why-icon">💪</div>
-          <h4>تطوير شامل</h4>
-          <p>نطور المهارات الجسدية والعقلية والاجتماعية لطفلك بشكل متكامل</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CONTACT SECTION -->
-  <section class="contact-section" id="contact">
-    <div class="container">
-      <div class="section-badge">📞 تواصل معنا</div>
-      <h2 class="section-title">نحن هنا لمساعدتك</h2>
-      <div class="contact-grid">
-        <div class="contact-card">
-          <div class="contact-icon">📱</div>
-          <h4>الهاتف</h4>
-          <a href="tel:+96593000607">93000607</a>
-        </div>
-        <div class="contact-card">
-          <div class="contact-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          </div>
-          <h4>واتساب</h4>
-          <a href="https://wa.me/96593000607" target="_blank">راسلنا على واتساب</a>
-        </div>
-        <div class="contact-card">
-          <div class="contact-icon">📍</div>
-          <h4>الموقع</h4>
-          <span>جنوب السرة - AlSalam</span>
-        </div>
-        <div class="contact-card">
-          <div class="contact-icon">📸</div>
-          <h4>إنستغرام</h4>
-          <a href="https://www.instagram.com/salam_academy_kwt" target="_blank">@salam_academy_kwt</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-content">
-        <div class="footer-brand">
-          <span class="footer-logo-text">أكاديمية سلام</span>
-          <p>معاً نحو بناء جيل واثق ومميز</p>
-        </div>
-        <div class="footer-links">
-          <a href="client/login.html">بوابة الأعضاء</a>
-          <a href="admin/login.html">لوحة الإدارة</a>
-          <a href="#packages">الباقات</a>
-          <a href="#contact">تواصل معنا</a>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>© 2025 أكاديمية سلام. جميع الحقوق محفوظة.</p>
-      </div>
-    </div>
-  </footer>
-
-  <!-- SUBSCRIPTION MODAL -->
-  <div class="modal-overlay" id="subscribeModal" style="display:none">
-    <div class="modal-box">
+<!-- SUBSCRIPTION MODAL -->
+<div class="modal-overlay" id="subModal">
+  <div class="modal-box">
+    <div class="modal-header">
       <button class="modal-close" onclick="closeModal()">✕</button>
-      <h2 class="modal-title">تسجيل الاشتراك</h2>
-      <p class="modal-subtitle" id="modalPackageName"></p>
-      <form id="subscribeForm" onsubmit="submitSubscription(event)">
-        <div class="form-group">
-          <label>اسم الطفل (عربي)</label>
-          <input type="text" id="childName" required placeholder="اسم الطفل الكامل" />
+      <div class="modal-header-logo">🏆</div>
+      <h2>تسجيل الاشتراك</h2>
+      <p id="modalPkgName">الباقة المختارة</p>
+    </div>
+    <div class="modal-body">
+      <form id="subForm" onsubmit="submitSub(event)">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>اسم الطفل</label>
+            <input type="text" id="fChildName" required placeholder="الاسم الكامل"/>
+          </div>
+          <div class="form-group">
+            <label>عمر الطفل</label>
+            <input type="number" id="fChildAge" required placeholder="السن" min="4" max="18"/>
+          </div>
         </div>
         <div class="form-group">
           <label>اسم ولي الأمر</label>
-          <input type="text" id="parentName" required placeholder="اسم ولي الأمر الكامل" />
+          <input type="text" id="fParentName" required placeholder="الاسم الكامل"/>
         </div>
-        <div class="form-group">
-          <label>رقم الهاتف</label>
-          <input type="tel" id="phoneNumber" required placeholder="XXXXXXXX" />
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>رقم الهاتف</label>
+            <input type="tel" id="fPhone" required placeholder="XXXXXXXX"/>
+          </div>
+          <div class="form-group">
+            <label>البريد الإلكتروني</label>
+            <input type="email" id="fEmail" required placeholder="example@mail.com"/>
+          </div>
         </div>
-        <div class="form-group">
-          <label>البريد الإلكتروني</label>
-          <input type="email" id="email" required placeholder="example@email.com" />
+        <div class="modal-price-box">
+          <small>المبلغ الشهري</small>
+          <strong id="modalPrice">-- د.ك</strong>
         </div>
-        <div class="form-group">
-          <label>عمر الطفل</label>
-          <input type="number" id="childAge" required placeholder="العمر بالسنوات" min="4" max="18" />
-        </div>
-        <div class="modal-price-display">
-          <span>المبلغ الإجمالي:</span>
-          <strong id="modalPriceDisplay"></strong>
-        </div>
-        <button type="submit" class="btn-pay" id="payBtn">
+        <button type="submit" class="btn-pay-main" id="payBtn">
           💳 الدفع الآن عبر Upayment
         </button>
-        <a href="https://wa.me/96593000607" target="_blank" class="btn-whatsapp-modal">
-          أو تواصل معنا على واتساب للدفع النقدي
+        <a href="https://wa.me/96593000607" target="_blank" class="btn-pay-wa">
+          💬 تواصل معنا للدفع النقدي
         </a>
       </form>
     </div>
   </div>
+</div>
 
-  <!-- FLOATING WHATSAPP -->
-  <a href="https://wa.me/96593000607" class="whatsapp-float" target="_blank" title="واتساب">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-  </a>
+<!-- WhatsApp Float -->
+<a href="https://wa.me/96593000607" class="wa-float" target="_blank" title="تواصل على واتساب">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="js/firebase-config.js"></script>
-  <script src="js/main.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

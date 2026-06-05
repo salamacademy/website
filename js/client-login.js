@@ -147,7 +147,7 @@ function showLoading(state) {
 }
 
 function showError(msg) {
-  const el = document.getElementById('errorMsg');
+  const el = document.getElementById('msgBox');
   el.textContent = msg;
   el.style.display = 'block';
   el.style.background = '#ffebee';
@@ -156,7 +156,7 @@ function showError(msg) {
 }
 
 function showSuccess(msg) {
-  const el = document.getElementById('errorMsg');
+  const el = document.getElementById('msgBox');
   el.textContent = msg;
   el.style.display = 'block';
   el.style.background = '#e8f5e9';
@@ -165,6 +165,15 @@ function showSuccess(msg) {
 }
 
 function hideError() {
-  const el = document.getElementById('errorMsg');
+  const el = document.getElementById('msgBox');
   if (el) el.style.display = 'none';
+}
+
+function showTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('phoneTab').style.display = tab === 'phone' ? 'block' : 'none';
+  document.getElementById('emailTab').style.display = tab === 'email' ? 'block' : 'none';
+  const msgBox = document.getElementById('msgBox');
+  if (msgBox) msgBox.style.display = 'none';
 }
