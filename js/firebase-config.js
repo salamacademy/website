@@ -21,3 +21,6 @@ const UPAYMENT_CONFIG = {
 
 // WhatsApp
 const WHATSAPP_NUMBER = "96593000607";
+
+// Web Push (FCM) — optional. Firebase Console → Project settings → Cloud Messaging → Web Push certificates → Generate key pair
+const FCM_VAPID_KEY = "PASTE_YOUR_VAPID_PUBLIC_KEY_HERE";

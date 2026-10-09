@@ -51,6 +51,7 @@ async function loadClientData(user) {
     const doc = snap.docs[0];
     currentSubscription = { id: doc.id, ...doc.data() };
     renderDashboard(currentSubscription);
+    setupClientNotifications(doc.id);
 
   } catch (err) {
     console.error(err);
@@ -140,6 +141,7 @@ function renderDashboard(sub) {
 
   // Schedule
   renderSchedule(sub.packageType);
+  renderPause(sub);
 }
 
 function renderSubscriptionDetails(sub) {
@@ -201,7 +203,8 @@ function showSection(name) {
     overview: 'نظرة عامة',
     subscription: 'اشتراكي',
     schedule: 'الجدول',
-    renew: 'تجديد الاشتراك'
+    renew: 'تجديد الاشتراك',
+    pause: 'إيقاف مؤقت'
   }[name];
   const activeLink = document.querySelector(`.sidebar-link[href="#${name}"]`);
   if (activeLink) activeLink.classList.add('active');
@@ -306,3 +309,103 @@ document.querySelector('#renewalAlert .alert-btn')?.addEventListener('click', fu
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+
+
+// ========== PAUSE (one week per subscription month) ==========
+function isPausedNow(sub) {
+  if (!sub.pauseStart || !sub.pauseEnd) return false;
+  const now = new Date(), s = sub.pauseStart.toDate(), e = sub.pauseEnd.toDate();
+  return now >= s && now <= e;
+}
+function renderPause(sub) {
+  const info = document.getElementById('pauseInfo'), act = document.getElementById('pauseActive'), used = document.getElementById('pauseUsed');
+  const banner = document.getElementById('pausedBanner');
+  if (!info) return;
+  info.style.display = act.style.display = used.style.display = 'none';
+  banner.style.display = 'none';
+  if (isPausedNow(sub)) {
+    act.style.display = 'block';
+    document.getElementById('pauseFrom').textContent = sub.pauseStart.toDate().toLocaleDateString('ar-KW');
+    document.getElementById('pauseTo').textContent = sub.pauseEnd.toDate().toLocaleDateString('ar-KW');
+    banner.style.display = 'block';
+    document.getElementById('pausedUntil').textContent = sub.pauseEnd.toDate().toLocaleDateString('ar-KW');
+    document.getElementById('daysStatusTitle').textContent = '⏸️ الاشتراك متوقف مؤقتاً';
+    document.getElementById('daysStatusDesc').textContent = 'يستأنف التدريب في ' + sub.pauseEnd.toDate().toLocaleDateString('ar-KW');
+  } else if (sub.pauseUsed || sub.pauseEnd) {
+    used.style.display = 'block';
+  } else {
+    info.style.display = 'block';
+    const inp = document.getElementById('pauseStartInput');
+    const today = new Date(); const min = today.toISOString().split('T')[0];
+    inp.min = min; if (!inp.value) inp.value = min;
+    if (sub.subscriptionEnd) inp.max = sub.subscriptionEnd.toDate().toISOString().split('T')[0];
+    inp.oninput = () => previewPause(sub);
+    previewPause(sub);
+  }
+}
+function previewPause(sub) {
+  const v = document.getElementById('pauseStartInput').value; if (!v) return;
+  const s = new Date(v); const e = new Date(s); e.setDate(e.getDate() + 7);
+  document.getElementById('pauseEndPreview').textContent = e.toLocaleDateString('ar-KW');
+  if (sub.subscriptionEnd) { const ne = new Date(sub.subscriptionEnd.toDate()); ne.setDate(ne.getDate() + 7); document.getElementById('newEndPreview').textContent = ne.toLocaleDateString('ar-KW'); }
+}
+async function requestPause() {
+  const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
+  const v = document.getElementById('pauseStartInput').value; if (!v) return alert('اختر تاريخ بداية الإيقاف');
+  const s = new Date(v); s.setHours(0,0,0,0); const e = new Date(s); e.setDate(e.getDate() + 7);
+  if (!confirm(`إيقاف اشتراك ${sub.childName} من ${s.toLocaleDateString('ar-KW')} لمدة 7 أيام؟\nلا يمكن التراجع إلا عبر الإدارة.`)) return;
+  const btn = document.getElementById('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+  const newEnd = new Date(sub.subscriptionEnd.toDate()); newEnd.setDate(newEnd.getDate() + 7);
+  try {
+    await db.collection('subscriptions').doc(sub.id).update({
+      pauseStart: firebase.firestore.Timestamp.fromDate(s),
+      pauseEnd: firebase.firestore.Timestamp.fromDate(e),
+      pauseUsed: true,
+      pauseReason: document.getElementById('pauseReason').value.trim(),
+      pauseRequestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      subscriptionEnd: firebase.firestore.Timestamp.fromDate(newEnd)
+    });
+    const msg = `مرحباً، قمت بإيقاف اشتراك ${sub.childName} مؤقتاً لمدة أسبوع\nمن: ${s.toLocaleDateString('ar-KW')}\nإلى: ${e.toLocaleDateString('ar-KW')}${document.getElementById('pauseReason').value ? '\nالسبب: ' + document.getElementById('pauseReason').value : ''}`;
+    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(msg), '_blank');
+    const doc = await db.collection('subscriptions').doc(sub.id).get();
+    currentSubscription = { id: doc.id, ...doc.data() };
+    renderDashboard(currentSubscription);
+    showSection('overview');
+  } catch (err) {
+    alert('تعذر حفظ الإيقاف: ' + err.message);
+    btn.disabled = false; btn.textContent = '⏸️ تأكيد الإيقاف لمدة أسبوع';
+  }
+}
+
+
+// ========== REALTIME NOTIFICATIONS ==========
+function setupClientNotifications(id) {
+  Notif.banner('فعّل الإشعارات لتصلك الموافقة وتذكير التجديد');
+  const saveToken = t => db.collection('subscriptions').doc(id).update({ fcmTokens: firebase.firestore.FieldValue.arrayUnion(t) });
+  if (Notif.granted()) Notif.registerPush(saveToken);
+  window.addEventListener('notif-granted', () => Notif.registerPush(saveToken));
+
+  let prevStatus = currentSubscription?.status;
+  db.collection('subscriptions').doc(id).onSnapshot(doc => {
+    if (!doc.exists) return;
+    const d = { id: doc.id, ...doc.data() };
+    if (prevStatus && d.status !== prevStatus) {
+      if (d.status === 'approved') Notif.show('🎉 تمت الموافقة على طلبك', `${d.childName} — ${d.amount} د.ك · ادفع الآن لتفعيل الاشتراك`, 'dashboard.html');
+      if (d.status === 'active') Notif.show('✅ تم تفعيل الاشتراك', `${d.childName} — ${d.packageName}`, 'dashboard.html');
+      if (d.status === 'rejected') Notif.show('طلب التسجيل', d.adminNote || 'لم يتم قبول الطلب، تواصل مع الإدارة', 'dashboard.html');
+    }
+    prevStatus = d.status;
+    currentSubscription = d; renderDashboard(d);
+  });
+
+  // Expiry reminder (once per day, local)
+  const s = currentSubscription;
+  if (s && s.status === 'active' && s.subscriptionEnd) {
+    const days = Math.ceil((s.subscriptionEnd.toDate() - new Date()) / 864e5);
+    const key = 'expNotif-' + id + '-' + new Date().toDateString();
+    if (days <= 3 && days >= 0 && !localStorage.getItem(key)) {
+      localStorage.setItem(key, '1');
+      Notif.show('⏳ اشتراكك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, 'dashboard.html');
+    }
+  }
+}

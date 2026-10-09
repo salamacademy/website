@@ -3,23 +3,38 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isAdmin() { return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
     function myPhone() { return request.auth != null && request.auth.token.phone_number != null ? request.auth.token.phone_number.replace('+965','') : ''; }
+    function isOwner() {
+      return request.auth != null && (
+        resource.data.phone == myPhone() ||
+        (request.auth.token.email != null && resource.data.email == request.auth.token.email)
+      );
+    }
 
     match /admins/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if false;
+      // admin may save own push tokens only
+      allow update: if request.auth != null && request.auth.uid == userId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens']);
+      allow create, delete: if false;
     }
 
     match /subscriptions/{subId} {
       allow read, write: if isAdmin();
-      // Anyone can submit the registration survey (status must start as pending_review)
       allow create: if request.resource.data.status == 'pending_review'
                     && request.resource.data.termsAccepted == true
                     && request.resource.data.phone is string;
-      // Parent reads their own requests by phone or email
-      allow read: if request.auth != null && (
-        resource.data.phone == myPhone() ||
-        (request.auth.token.email != null && resource.data.email == request.auth.token.email)
-      );
+      allow read: if isOwner();
+      // Parent: save push token
+      allow update: if isOwner()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens']);
+      // Parent: one-week pause, once per month, active subs only; end date must move exactly +7 days
+      allow update: if isOwner()
+                    && resource.data.status == 'active'
+                    && resource.data.pauseUsed != true
+                    && request.resource.data.pauseUsed == true
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pauseStart','pauseEnd','pauseUsed','pauseReason','pauseRequestedAt','subscriptionEnd'])
+                    && request.resource.data.pauseEnd == request.resource.data.pauseStart + duration.value(7, 'd')
+                    && request.resource.data.subscriptionEnd == resource.data.subscriptionEnd + duration.value(7, 'd');
     }
   }
 }

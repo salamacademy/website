@@ -19,7 +19,31 @@ auth.onAuthStateChanged(async (user) => {
     return;
   }
   loadAllData();
+  setupAdminNotifications(user);
 });
+
+// ========== REALTIME NOTIFICATIONS ==========
+let notifReady = false;
+function setupAdminNotifications(user) {
+  Notif.banner('فعّل الإشعارات لتصلك طلبات التسجيل والإيقافات فوراً');
+  const saveToken = t => db.collection('admins').doc(user.uid).set({ fcmTokens: firebase.firestore.FieldValue.arrayUnion(t) }, { merge: true });
+  if (Notif.granted()) Notif.registerPush(saveToken);
+  window.addEventListener('notif-granted', () => Notif.registerPush(saveToken));
+
+  db.collection('subscriptions').onSnapshot(snap => {
+    if (!notifReady) { notifReady = true; return; } // skip initial load
+    snap.docChanges().forEach(ch => {
+      const d = ch.doc.data();
+      if (ch.type === 'added' && d.status === 'pending_review')
+        Notif.show('📝 طلب تسجيل جديد', `${d.childName} — ${d.packageName}`, 'dashboard.html');
+      if (ch.type === 'modified' && d.pauseRequestedAt && d.pauseStart) {
+        const prev = allSubscriptions.find(x => x.id === ch.doc.id);
+        if (prev && !prev.pauseStart) Notif.show('⏸️ إيقاف مؤقت جديد', `${d.childName} — من ${fmtDate(d.pauseStart)} إلى ${fmtDate(d.pauseEnd)}`, 'dashboard.html');
+      }
+    });
+    loadAllData(); // keep tables fresh
+  });
+}
 
 async function loadAllData() {
   try {
@@ -33,6 +57,7 @@ async function loadAllData() {
     renderAllSubs(allSubscriptions);
     renderExpiring();
     renderReview();
+    renderPaused();
   } catch (err) {
     console.error(err);
   }
@@ -68,6 +93,7 @@ function renderDashboardStats() {
   const pendingN = allSubscriptions.filter(s => s.status === 'pending_review').length;
   document.getElementById('statPending').textContent = pendingN;
   const badge = document.getElementById('reviewBadge'); if (badge) { badge.textContent = pendingN; badge.style.display = pendingN ? 'inline-flex' : 'none'; }
+  document.getElementById('statPaused').textContent = allSubscriptions.filter(isPausedNow).length;
   document.getElementById('statActive').textContent = active.length;
   document.getElementById('statExpiring').textContent = expiring.length;
   document.getElementById('statExpired').textContent = expired.length;
@@ -83,7 +109,7 @@ function renderRow(sub, cols) {
 
   const stMap = { active:['status-active','✅ نشط'], pending_review:['status-pending','📝 مراجعة'], approved:['status-pending','💳 بانتظار الدفع'], pending_payment:['status-pending','💳 بانتظار الدفع'], rejected:['status-inactive','⛔ مرفوض'], expired:['status-inactive','❌ منتهي'], cancelled:['status-inactive','🚫 ملغي'] };
   const st = stMap[sub.status] || ['status-inactive', sub.status];
-  const statusBadge = `<span class="status-badge ${st[0]}">${st[1]}</span>`;
+  const statusBadge = `<span class="status-badge ${st[0]}">${st[1]}</span>` + (isPausedNow(sub) ? ` <span class="status-badge" style="background:#e3f2fd;color:#0d47a1">⏸️ متوقف</span>` : '');
 
   const startDate = sub.subscriptionStart ? (sub.subscriptionStart.toDate ? sub.subscriptionStart.toDate() : new Date(sub.subscriptionStart)).toLocaleDateString('ar-KW') : '--';
   const endDate = sub.subscriptionEnd ? (sub.subscriptionEnd.toDate ? sub.subscriptionEnd.toDate() : new Date(sub.subscriptionEnd)).toLocaleDateString('ar-KW') : '--';
@@ -383,7 +409,7 @@ function showAdminSection(name) {
   document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
   document.getElementById(name + '-section').style.display = 'block';
   const titles = {
-    dashboard: 'لوحة التحكم', review: 'طلبات المراجعة', subscriptions: 'الاشتراكات',
+    dashboard: 'لوحة التحكم', review: 'طلبات المراجعة', subscriptions: 'الاشتراكات', paused: 'الإيقافات المؤقتة',
     expiring: 'تنتهي قريباً', add: 'إضافة اشتراك', notifications: 'الإشعارات'
   };
   document.getElementById('adminPageTitle').textContent = titles[name] || '';
@@ -522,7 +548,8 @@ async function activateSubscription(id) {
       status: 'active',
       subscriptionStart: firebase.firestore.Timestamp.fromDate(start),
       subscriptionEnd: firebase.firestore.Timestamp.fromDate(end),
-      daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp()
+      daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(),
+      pauseUsed: false, pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete()
     });
     sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, end);
     showToast('✅ تم تفعيل الاشتراك');
@@ -531,3 +558,29 @@ async function activateSubscription(id) {
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+
+
+// ========== PAUSES ==========
+function isPausedNow(s) {
+  if (!s.pauseStart || !s.pauseEnd) return false;
+  const n = new Date(), a = s.pauseStart.toDate(), b = s.pauseEnd.toDate();
+  return n >= a && n <= b;
+}
+function renderPaused() {
+  const list = allSubscriptions.filter(s => s.pauseStart).sort((a, b) => b.pauseStart.toMillis() - a.pauseStart.toMillis());
+  const tb = document.getElementById('pausedTableBody'); if (!tb) return;
+  tb.innerHTML = list.length ? list.map(s => {
+    const now = isPausedNow(s), future = s.pauseStart.toDate() > new Date();
+    const state = now ? '<span class="status-badge" style="background:#e3f2fd;color:#0d47a1">⏸️ جارٍ</span>' : future ? '<span class="status-badge status-pending">🕒 قادم</span>' : '<span class="status-badge status-active">✔️ انتهى</span>';
+    return `<tr><td>${s.childName||'--'}</td><td>${s.parentName||'--'}</td><td dir="ltr">${s.phone||'--'}</td><td>${PKG_NAMES[s.packageType]||s.packageName||'--'}</td><td>${fmtDate(s.pauseStart)}</td><td>${fmtDate(s.pauseEnd)}</td><td>${s.pauseReason||'--'}</td><td>${state}</td>
+      <td>${(now||future) ? `<button class="btn-table-del" onclick="cancelPause('${s.id}')">إلغاء الإيقاف</button>` : ''} <button class="btn-table-wa" onclick="window.open('https://wa.me/965${s.phone}','_blank')">📲</button></td></tr>`;
+  }).join('') : '<tr><td colspan="9" style="text-align:center;padding:20px;color:#999">لا توجد إيقافات</td></tr>';
+}
+async function cancelPause(id) {
+  const s = allSubscriptions.find(x => x.id === id); if (!s) return;
+  if (!confirm(`إلغاء الإيقاف المؤقت لـ ${s.childName}؟ سيتم إرجاع تاريخ الانتهاء 7 أيام وإتاحة الإيقاف مجدداً.`)) return;
+  const end = s.subscriptionEnd ? s.subscriptionEnd.toDate() : null;
+  const upd = { pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete(), pauseUsed: false, pauseReason: firebase.firestore.FieldValue.delete() };
+  if (end) { end.setDate(end.getDate() - 7); upd.subscriptionEnd = firebase.firestore.Timestamp.fromDate(end); }
+  try { await db.collection('subscriptions').doc(id).update(upd); showToast('تم إلغاء الإيقاف'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
+}

@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="apple-touch-icon" href="../images/icon-192.png" />
 </head>
-<body class="portal-body">
+<body class="dash-body">
 
   <div class="dashboard-layout">
     <!-- Sidebar -->
@@ -35,6 +35,7 @@
         <a href="#renew" class="sidebar-link" onclick="showSection('renew')">
           🔄 تجديد / دفع
         </a>
+        <a href="#pause" class="sidebar-link" onclick="showSection('pause')">⏸️ إيقاف مؤقت</a>
         <a href="register.html" class="sidebar-link">📝 تسجيل طفل آخر</a>
       </nav>
       <div class="sidebar-footer">
@@ -61,6 +62,7 @@
 
       <!-- OVERVIEW SECTION -->
       <section id="overview-section" class="dashboard-section">
+        <div id="pausedBanner" style="display:none;background:#e3f2fd;border:2px solid #90caf9;border-radius:14px;padding:12px 16px;margin-bottom:16px;font-weight:700;color:#0d47a1">⏸️ الاشتراك متوقف مؤقتاً حتى <span id="pausedUntil"></span></div>
         <!-- Welcome Card -->
         <div class="welcome-card">
           <div class="welcome-text">
@@ -175,14 +177,51 @@
         </div>
       </section>
 
+      <!-- PAUSE SECTION -->
+      <section id="pause-section" class="dashboard-section" style="display:none">
+        <h3 class="section-heading">إيقاف الاشتراك مؤقتاً</h3>
+        <div class="renew-card" style="max-width:520px">
+          <div id="pauseInfo">
+            <p style="color:var(--text-mid);line-height:1.8;margin-bottom:14px">
+              يمكنك إيقاف اشتراك طفلك <strong>مرة واحدة لمدة أسبوع (7 أيام)</strong> خلال كل شهر اشتراك — في حال السفر أو المرض مثلاً.
+              سيتم تمديد تاريخ انتهاء الاشتراك تلقائياً 7 أيام، وستُبلّغ الإدارة.
+            </p>
+            <div class="form-group">
+              <label>تاريخ بداية الإيقاف</label>
+              <input type="date" id="pauseStartInput"/>
+            </div>
+            <div class="form-group">
+              <label>السبب (اختياري)</label>
+              <input type="text" id="pauseReason" placeholder="مثال: سفر، مرض..."/>
+            </div>
+            <div class="review-note" style="background:var(--copper-xpale);border:1.5px dashed rgba(184,84,30,0.3);border-radius:12px;padding:12px 14px;font-size:0.85rem;color:var(--text-mid);margin-bottom:14px">
+              ينتهي الإيقاف بعد 7 أيام: <strong id="pauseEndPreview">--</strong><br/>
+              تاريخ الانتهاء الجديد للاشتراك: <strong id="newEndPreview">--</strong>
+            </div>
+            <button class="btn-portal-primary" id="pauseBtn" onclick="requestPause()">⏸️ تأكيد الإيقاف لمدة أسبوع</button>
+          </div>
+          <div id="pauseActive" style="display:none">
+            <div style="text-align:center;font-size:3rem">⏸️</div>
+            <h4 style="text-align:center;color:var(--copper-dark);margin:8px 0">الاشتراك متوقف مؤقتاً</h4>
+            <p style="text-align:center;color:var(--text-mid);line-height:1.8">من <strong id="pauseFrom"></strong> إلى <strong id="pauseTo"></strong><br/>سيستأنف التدريب تلقائياً بعد انتهاء المدة.</p>
+          </div>
+          <div id="pauseUsed" style="display:none">
+            <div style="text-align:center;font-size:3rem">✅</div>
+            <p style="text-align:center;color:var(--text-mid);line-height:1.8">تم استخدام الإيقاف المؤقت لهذا الشهر.<br/>سيتاح مجدداً مع تجديد الاشتراك القادم.</p>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
   <script src="../js/firebase-config.js"></script>
   <script src="../js/pwa-install.js"></script>
+  <script src="../js/notifications.js"></script>
   <script src="../js/client-dashboard.js"></script>
 </body>
 </html>

@@ -132,6 +132,24 @@ Both portals install as apps from the browser — no App Store needed:
 - `sw.js` caches the app shell for fast launch; Firebase/Upayment requests are never cached
 - Requires HTTPS — GitHub Pages provides this automatically
 
+## ⏸️ One-Week Pause
+
+Parents can pause an **active** subscription once per month for exactly 7 days (⏸️ إيقاف مؤقت in their portal). The end date auto-extends +7 days and WhatsApp opens to inform you. Admin sees it under **⏸️ الإيقافات المؤقتة** and in the stats, with a cancel button that reverts the +7 days. `pauseUsed` resets on activation/renewal. Firestore rules enforce the exact +7-day math.
+
+## 🔔 Notifications
+
+**Layer 1 — works now, no setup:** both dashboards show a "🔔 تفعيل الإشعارات" banner. Once allowed, the app listens to Firestore in realtime and shows a notification while the app is open or in a background tab:
+- Admin: new registration, new pause
+- Parent: approved / activated / rejected, and a ≤3-days-left reminder
+
+**Layer 2 — push when the app is closed (optional, ~15 min setup):**
+1. Firebase Console → **Project settings → Cloud Messaging → Web Push certificates → Generate key pair** → copy the public key into `FCM_VAPID_KEY` in `js/firebase-config.js`
+2. Upgrade the project to the **Blaze** plan (pay-as-you-go; free tier covers this usage)
+3. `cd functions && npm install && cd ..` then `firebase deploy --only functions`
+4. Users who allowed notifications get real push even with the app closed: new requests → admin, approval/activation → parent, daily 9:00 AM expiry reminders (3 days & 1 day), and auto-expiry of overdue subscriptions.
+
+iPhone note: web push on iOS requires iOS 16.4+ and the app to be **added to the Home Screen** first.
+
 ## 📊 Firestore Data Structure
 
 ### `subscriptions` collection:

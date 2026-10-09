@@ -8,3 +8,8 @@ self.addEventListener('fetch', e => {
   if (u.origin !== location.origin || e.request.method !== 'GET') return; // never cache Firebase/Upayment
   e.respondWith(fetch(e.request).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put(e.request, cp)); return r; }).catch(() => caches.match(e.request)));
 });
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = e.notification.data?.url;
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => { if (ws.length) { const w = ws[0]; if (url) w.navigate(url); return w.focus(); } return clients.openWindow(url || './'); }));
+});

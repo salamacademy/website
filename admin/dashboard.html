@@ -31,6 +31,7 @@
         <a href="#" class="sidebar-link" onclick="showAdminSection('review')">📝 طلبات المراجعة <span class="badge-count" id="reviewBadge">0</span></a>
         <a href="#" class="sidebar-link" onclick="showAdminSection('subscriptions')">📋 الاشتراكات</a>
         <a href="#" class="sidebar-link" onclick="showAdminSection('expiring')">⚠️ تنتهي قريباً</a>
+        <a href="#" class="sidebar-link" onclick="showAdminSection('paused')">⏸️ الإيقافات المؤقتة</a>
         <a href="#" class="sidebar-link" onclick="showAdminSection('add')">➕ إضافة اشتراك</a>
         <a href="#" class="sidebar-link" onclick="showAdminSection('notifications')">📨 إشعارات واتساب</a>
       </nav>
@@ -68,6 +69,11 @@
             <div class="asc-icon">⚠️</div>
             <div class="asc-num" id="statExpiring">--</div>
             <div class="asc-label">تنتهي قريباً (7 أيام)</div>
+          </div>
+          <div class="admin-stat-card teal" onclick="showAdminSection('paused')" style="cursor:pointer">
+            <div class="asc-icon">⏸️</div>
+            <div class="asc-num" id="statPaused">--</div>
+            <div class="asc-label">متوقف مؤقتاً</div>
           </div>
           <div class="admin-stat-card red">
             <div class="asc-icon">❌</div>
@@ -189,6 +195,20 @@
               <tbody id="expiringTableBody">
                 <tr><td colspan="6" style="text-align:center;padding:20px">جاري التحميل...</td></tr>
               </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- PAUSED -->
+      <section id="paused-section" class="dashboard-section" style="display:none">
+        <div class="admin-card">
+          <div class="admin-card-header"><h3>⏸️ الإيقافات المؤقتة (أسبوع)</h3></div>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>اسم الطفل</th><th>ولي الأمر</th><th>الهاتف</th><th>الباقة</th><th>من</th><th>إلى</th><th>السبب</th><th>الحالة</th><th>إجراء</th></tr></thead>
+              <tbody id="pausedTableBody"><tr><td colspan="9" style="text-align:center;padding:20px">جاري التحميل...</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -348,8 +368,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
   <script src="../js/firebase-config.js"></script>
   <script src="../js/pwa-install.js"></script>
+  <script src="../js/notifications.js"></script>
   <script src="../js/admin-dashboard.js"></script>
 </body>
 </html>
