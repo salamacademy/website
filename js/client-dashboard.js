@@ -1,411 +1,185 @@
 // ============================
-// CLIENT DASHBOARD JS
+// CLIENT DASHBOARD JS (app UI)
 // ============================
-
 let currentSubscription = null;
 const SCHEDULES = {
-  football: { name: 'معسكر كرة القدم', days: 'كل سبت', time: '4:00 - 5:00 مساءً', location: 'منطقة الروضة', icon: '⚽' },
-  confidence: { name: 'معسكر بناء الثقة والكيوكشن', days: 'الأحد - الثلاثاء - الخميس', time: 'أشبال 4:30-6:00 | رجال 6:00-7:30', location: 'جنوب السرة', icon: '🥋' },
-  excellence: { name: 'باقة التميز', days: '4 أيام بالأسبوع', time: 'كرة القدم السبت + الكيوكشن أحد/ثلاثاء/خميس', location: 'جنوب السرة + الروضة', icon: '⚡' },
-  excellence_loyal: { name: 'باقة التميز - أسرة سلام', days: '4 أيام بالأسبوع', time: 'كرة القدم السبت + الكيوكشن أحد/ثلاثاء/خميس', location: 'جنوب السرة + الروضة', icon: '🏅' },
-  premium: { name: 'الباقة المميزة', days: '6 أيام', time: '--', location: 'الروضة + السلام', icon: '⚡' }
+  football: { name: 'معسكر كرة القدم', icon: '⚽', rows: [['📅', 'كل سبت'], ['⏰', '4:00 – 5:00 مساءً'], ['📍', 'منطقة الروضة']] },
+  confidence: { name: 'معسكر بناء الثقة والكيوكشن', icon: '🥋', rows: [['📅', 'الأحد – الثلاثاء – الخميس'], ['⏰', 'أشبال 4:30–6:00 · رجال 6:00–7:30'], ['📍', 'جنوب السرة']] },
+  excellence: { name: 'باقة التميز', icon: '⚡', rows: [['📅', '4 أيام بالأسبوع'], ['⚽', 'كرة القدم: السبت · الروضة'], ['🥋', 'الكيوكشن: أحد/ثلاثاء/خميس · جنوب السرة']] },
+  excellence_loyal: { name: 'باقة التميز – أسرة سلام', icon: '🏅', rows: [['📅', '4 أيام بالأسبوع'], ['⚽', 'كرة القدم: السبت · الروضة'], ['🥋', 'الكيوكشن: أحد/ثلاثاء/خميس · جنوب السرة']] },
+  premium: { name: 'الباقة المميزة', icon: '⚡', rows: [['📅', '6 أيام'], ['📍', 'الروضة + السلام']] }
 };
+const TITLES = { overview: 'هذا ملخص اشتراك طفلك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: 'إيقاف أسبوع واحد كل شهر', renew: 'ادفع أو جدد اشتراكك' };
+const toD = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : null;
+const fmt = ts => { const d = toD(ts); return d ? d.toLocaleDateString('ar-KW') : '--'; };
+const $ = id => document.getElementById(id);
 
-// Auth guard
-auth.onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.href = 'login.html';
-    return;
-  }
-  await loadClientData(user);
-});
 
 async function loadClientData(user) {
   try {
-    // Find subscription by phone or email (linked via UID after login)
     let snap = { empty: true, docs: [] };
     const phone = user.phoneNumber ? user.phoneNumber.replace('+965', '') : null;
-    if (phone) {
-      snap = await db.collection('subscriptions').where('phone', '==', phone).get();
-    }
-    if (snap.empty && user.email) {
-      snap = await db.collection('subscriptions').where('email', '==', user.email).get();
-    }
-    if (!snap.empty) {
-      // Prefer active, then approved, then pending, then newest
-      const rank = { active: 0, approved: 1, pending_review: 2, pending_payment: 1 };
-      const docs = snap.docs.slice().sort((a, b) => {
-        const ra = rank[a.data().status] ?? 5, rb = rank[b.data().status] ?? 5;
-        if (ra !== rb) return ra - rb;
-        const ta = a.data().createdAt?.toMillis?.() || 0, tb = b.data().createdAt?.toMillis?.() || 0;
-        return tb - ta;
-      });
-      snap = { empty: false, docs: [docs[0]] };
-    }
-
-    if (snap.empty) {
-      showNoSubscription();
-      return;
-    }
-
-    const doc = snap.docs[0];
-    currentSubscription = { id: doc.id, ...doc.data() };
+    if (phone) snap = await db.collection('subscriptions').where('phone', '==', phone).get();
+    if (snap.empty && user.email) snap = await db.collection('subscriptions').where('email', '==', user.email).get();
+    if (snap.empty) { showNoSubscription(); return; }
+    const rank = { active: 0, approved: 1, pending_payment: 1, pending_review: 2 };
+    const docs = snap.docs.slice().sort((a, b) => { const ra = rank[a.data().status] ?? 5, rb = rank[b.data().status] ?? 5; if (ra !== rb) return ra - rb; return (b.data().createdAt?.toMillis?.() || 0) - (a.data().createdAt?.toMillis?.() || 0); });
+    currentSubscription = { id: docs[0].id, ...docs[0].data() };
     renderDashboard(currentSubscription);
-    setupClientNotifications(doc.id);
-
-  } catch (err) {
-    console.error(err);
-    showError('حدث خطأ في تحميل البيانات');
-  }
+    setupClientNotifications(docs[0].id);
+  } catch (e) { console.error(e); $('daysStatusTitle').textContent = 'تعذر تحميل البيانات'; }
 }
 
+// ---------- NAV ----------
+function go(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page === page));
+  document.querySelectorAll('.tab[data-page]').forEach(t => t.classList.toggle('on', t.dataset.page === page));
+  $('pageTitle').textContent = TITLES[page] || '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function showSection(n) { go(n); }
+
+// ---------- RENDER ----------
 function renderDashboard(sub) {
+  const sch = SCHEDULES[sub.packageType] || {};
+  $('welcomeName').textContent = sub.parentName || 'العضو';
+  $('childNameDisplay').textContent = sub.childName || '--';
+  $('packageLabel').textContent = sch.name || sub.packageName || '--';
+  $('amountDisplay').textContent = (sub.amount || '--') + ' د.ك';
+  $('renewPackageName').textContent = sub.packageName || sch.name || '--';
+  $('renewAmount').textContent = (sub.amount || '--') + ' د.ك';
+  renderDetails(sub); renderSchedule(sub.packageType);
   if (sub.status !== 'active' && sub.status !== 'expired') { renderRequestState(sub); return; }
-  // Update header
-  document.getElementById('topbarName').textContent = sub.parentName || 'العضو';
-  document.getElementById('welcomeName').textContent = sub.childName || sub.parentName;
-  document.getElementById('childNameDisplay').textContent = sub.childName || '--';
-  document.getElementById('packageLabel').textContent = SCHEDULES[sub.packageType]?.name || sub.packageName;
-  document.getElementById('amountDisplay').textContent = sub.amount + ' د.ك';
 
-  // Calculate days
-  const now = new Date();
-  const endDate = sub.subscriptionEnd ? sub.subscriptionEnd.toDate() : null;
-  const startDate = sub.subscriptionStart ? sub.subscriptionStart.toDate() : null;
-
-  let daysLeft = 0;
-  let totalDays = 30;
-
-  if (endDate) {
-    const diff = endDate - now;
-    daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-    if (startDate) {
-      totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-    }
-  }
-
-  // Update days display
-  document.getElementById('daysRemaining').textContent = daysLeft;
-
-  // Circle animation
-  const circumference = 339.3;
-  const progress = totalDays > 0 ? daysLeft / totalDays : 0;
-  const offset = circumference * (1 - progress);
-  const circle = document.getElementById('daysCircle');
-  if (circle) {
-    circle.style.setProperty('--circle-offset', offset);
-    document.getElementById('daysCard').style.setProperty('--circle-offset', offset + 'px');
-    circle.style.strokeDashoffset = offset;
-    // Color based on urgency
-    if (daysLeft <= 5) circle.setAttribute('stroke', '#f44336');
-    else if (daysLeft <= 10) circle.setAttribute('stroke', '#FF9800');
-    else circle.setAttribute('stroke', '#2E7D32');
-  }
-
-  // Status text
-  let statusTitle = '';
-  let statusDesc = '';
-  if (daysLeft <= 0) {
-    statusTitle = 'انتهى الاشتراك';
-    statusDesc = 'يرجى التجديد للاستمرار في التدريب';
-  } else if (daysLeft <= 5) {
-    statusTitle = '⚠️ اشتراكك على وشك الانتهاء';
-    statusDesc = 'جدد اشتراكك الآن لتجنب الانقطاع';
-    document.getElementById('renewalAlert').style.display = 'flex';
-  } else if (daysLeft <= 10) {
-    statusTitle = 'اشتراك نشط';
-    statusDesc = 'ينتهي قريباً، فكر في التجديد المبكر';
-    document.getElementById('renewalAlert').style.display = 'flex';
-  } else {
-    statusTitle = '✅ اشتراك نشط';
-    statusDesc = 'استمتع بجلسات التدريب!';
-  }
-
-  document.getElementById('daysStatusTitle').textContent = statusTitle;
-  document.getElementById('daysStatusDesc').textContent = statusDesc;
-
-  // Dates
-  if (startDate) {
-    document.getElementById('startDate').textContent = startDate.toLocaleDateString('ar-KW');
-  }
-  if (endDate) {
-    document.getElementById('endDate').textContent = endDate.toLocaleDateString('ar-KW');
-  }
-
-  // Renewal section
-  document.getElementById('renewPackageName').textContent = sub.packageName;
-  document.getElementById('renewAmount').textContent = sub.amount + ' د.ك';
-
-  // Subscription details
-  renderSubscriptionDetails(sub);
-
-  // Schedule
-  renderSchedule(sub.packageType);
+  const end = toD(sub.subscriptionEnd), start = toD(sub.subscriptionStart);
+  let days = 0, total = 30;
+  if (end) { days = Math.max(0, Math.ceil((end - new Date()) / 864e5)); if (start) total = Math.max(1, Math.ceil((end - start) / 864e5)); }
+  setRing(days, days / total, days <= 5 ? '#C62828' : days <= 10 ? '#E65100' : '#2E7D32');
+  $('startDate').textContent = fmt(start); $('endDate').textContent = fmt(end);
+  const alert = $('renewalAlert'); alert.classList.remove('show');
+  if (days <= 0 || sub.status === 'expired') { status('انتهى الاشتراك', 'يرجى التجديد للاستمرار في التدريب'); alertSet('انتهى الاشتراك', 'جدد الآن للعودة للتدريب', '🔄 تجديد'); }
+  else if (days <= 5) { status('⚠️ اشتراكك على وشك الانتهاء', 'جدد الآن لتجنب الانقطاع'); alertSet('اشتراكك على وشك الانتهاء!', `متبقٍ ${days} أيام فقط`, 'جدد الآن'); }
+  else if (days <= 10) { status('اشتراك نشط', 'ينتهي قريباً، فكر في التجديد المبكر'); alertSet('ينتهي قريباً', `متبقٍ ${days} يوم`, 'جدد الآن'); }
+  else status('✅ اشتراك نشط', 'استمتع بجلسات التدريب!');
   renderPause(sub);
 }
+function setRing(num, ratio, color) { $('daysRemaining').textContent = num; $('daysRemaining').style.fontSize = ''; $('daysCircle').setAttribute('stroke', color); $('daysCircle').style.strokeDashoffset = 326.7 * (1 - Math.max(0, Math.min(1, ratio))); document.querySelector('.days-label').textContent = 'يوم متبقي'; }
+function status(t, d) { $('daysStatusTitle').textContent = t; $('daysStatusDesc').textContent = d; }
+function alertSet(t, d, btn) { const a = $('renewalAlert'); a.classList.add('show'); a.querySelector('strong').textContent = t; a.querySelector('p').textContent = d; a.querySelector('button').textContent = btn; }
 
-function renderSubscriptionDetails(sub) {
-  const container = document.getElementById('subscriptionDetails');
-  const sched = SCHEDULES[sub.packageType] || {};
-  container.innerHTML = `
-    <div class="detail-row"><span class="detail-label">اسم الطفل</span><strong>${sub.childName || '--'}</strong></div>
-    <div class="detail-row"><span class="detail-label">اسم ولي الأمر</span><strong>${sub.parentName || '--'}</strong></div>
-    <div class="detail-row"><span class="detail-label">رقم الهاتف</span><strong>${sub.phone || '--'}</strong></div>
-    <div class="detail-row"><span class="detail-label">الباقة</span><strong>${sub.packageName || '--'}</strong></div>
-    <div class="detail-row"><span class="detail-label">المبلغ الشهري</span><strong>${sub.amount || '--'} د.ك</strong></div>
-    <div class="detail-row"><span class="detail-label">حالة الاشتراك</span>
-      <span class="status-badge ${sub.status === 'active' ? 'status-active' : 'status-inactive'}">
-        ${sub.status === 'active' ? '✅ نشط' : '❌ منتهي'}
-      </span>
-    </div>
-  `;
-}
-
-function renderSchedule(packageType) {
-  const container = document.getElementById('scheduleDisplay');
-  const sched = SCHEDULES[packageType] || {};
-
-  if (packageType === 'premium') {
-    container.innerHTML = `
-      <div class="schedule-card">
-        <div class="sched-icon">⚽</div>
-        <h4>كرة القدم</h4>
-        <div class="sched-row"><span>📅</span><span>السبت - الاثنين - الأربعاء</span></div>
-        <div class="sched-row"><span>⏰</span><span>4:00 - 5:00 مساءً</span></div>
-        <div class="sched-row"><span>📍</span><span>منطقة الروضة</span></div>
-      </div>
-      <div class="schedule-card">
-        <div class="sched-icon">🥋</div>
-        <h4>بناء الثقة والدفاع</h4>
-        <div class="sched-row"><span>📅</span><span>الأحد - الثلاثاء - الخميس</span></div>
-        <div class="sched-row"><span>⏰</span><span>4:30-6:00 أو 6:00-7:30</span></div>
-        <div class="sched-row"><span>📍</span><span>منطقة السلام</span></div>
-      </div>
-    `;
-  } else {
-    container.innerHTML = `
-      <div class="schedule-card">
-        <div class="sched-icon">${sched.icon || '🏅'}</div>
-        <h4>${sched.name || 'جدول التدريب'}</h4>
-        <div class="sched-row"><span>📅</span><span>${sched.days || '--'}</span></div>
-        <div class="sched-row"><span>⏰</span><span>${sched.time || '--'}</span></div>
-        <div class="sched-row"><span>📍</span><span>${sched.location || '--'}</span></div>
-      </div>
-    `;
-  }
-}
-
-function showSection(name) {
-  document.querySelectorAll('.dashboard-section').forEach(s => s.style.display = 'none');
-  document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-  document.getElementById(name + '-section').style.display = 'block';
-  document.getElementById('pageTitle').textContent = {
-    overview: 'نظرة عامة',
-    subscription: 'اشتراكي',
-    schedule: 'الجدول',
-    renew: 'تجديد الاشتراك',
-    pause: 'إيقاف مؤقت'
-  }[name];
-  const activeLink = document.querySelector(`.sidebar-link[href="#${name}"]`);
-  if (activeLink) activeLink.classList.add('active');
-  // Close mobile sidebar
-  document.querySelector('.client-sidebar').classList.remove('open');
-}
-
-function toggleSidebar() {
-  document.querySelector('.client-sidebar').classList.toggle('open');
-}
-
-function showNoSubscription() {
-  document.getElementById('daysRemaining').textContent = '0';
-  document.getElementById('daysStatusTitle').textContent = 'لا يوجد اشتراك نشط';
-  document.getElementById('daysStatusDesc').textContent = 'لم نجد طلب تسجيل مرتبط برقمك. قم بتعبئة نموذج التسجيل للبدء.';
-  const a = document.getElementById('renewalAlert'); a.style.display = 'flex';
-  a.querySelector('strong').textContent = 'لا يوجد طلب تسجيل'; a.querySelector('p').textContent = 'سجّل الآن عبر النموذج';
-  const b = a.querySelector('.alert-btn'); b.textContent = '📝 نموذج التسجيل'; b.onclick = () => location.href = 'register.html';
-}
-
-function logout() {
-  auth.signOut().then(() => {
-    window.location.href = 'login.html';
-  });
-}
-
-function showError(msg) {
-  console.error(msg);
-}
-
-
-// ========== REQUEST STATE (before active) ==========
 function renderRequestState(sub) {
-  document.getElementById('topbarName').textContent = sub.parentName || 'العضو';
-  document.getElementById('welcomeName').textContent = sub.childName || sub.parentName;
-  document.getElementById('childNameDisplay').textContent = sub.childName || '--';
-  document.getElementById('packageLabel').textContent = sub.packageName || SCHEDULES[sub.packageType]?.name || '--';
-  document.getElementById('amountDisplay').textContent = sub.amount + ' د.ك';
-  document.getElementById('renewPackageName').textContent = sub.packageName;
-  document.getElementById('renewAmount').textContent = sub.amount + ' د.ك';
-  renderSubscriptionDetails(sub);
-  renderSchedule(sub.packageType);
-
-  const card = document.getElementById('daysCard');
-  const circle = document.getElementById('daysCircle');
-  const alert = document.getElementById('renewalAlert');
   const s = sub.status;
-
-  if (s === 'pending_review') {
-    document.getElementById('daysRemaining').textContent = '⏳';
-    circle.setAttribute('stroke', '#D4920A'); circle.style.strokeDashoffset = 170;
-    document.getElementById('daysStatusTitle').textContent = '📝 طلبك قيد المراجعة';
-    document.getElementById('daysStatusDesc').textContent = 'تقوم الإدارة بمراجعة نموذج التسجيل. سنتواصل معك عبر الواتساب خلال 24 ساعة.';
-    document.getElementById('startDate').textContent = '--'; document.getElementById('endDate').textContent = '--';
-  } else if (s === 'approved' || s === 'pending_payment') {
-    document.getElementById('daysRemaining').textContent = '✅';
-    circle.setAttribute('stroke', '#2e7d32'); circle.style.strokeDashoffset = 0;
-    document.getElementById('daysStatusTitle').textContent = '🎉 تمت الموافقة على طلبك!';
-    document.getElementById('daysStatusDesc').textContent = (sub.adminNote ? sub.adminNote + ' · ' : '') + 'يرجى سداد الرسوم لتفعيل الاشتراك.';
-    const ps = sub.plannedStart ? sub.plannedStart.toDate() : null, pe = sub.plannedEnd ? sub.plannedEnd.toDate() : null;
-    document.getElementById('startDate').textContent = ps ? ps.toLocaleDateString('ar-KW') : '--';
-    document.getElementById('endDate').textContent = pe ? pe.toLocaleDateString('ar-KW') : '--';
-    alert.style.display = 'flex';
-    alert.querySelector('strong').textContent = 'ادفع الآن لتفعيل اشتراك ' + sub.childName;
-    alert.querySelector('p').textContent = sub.amount + ' د.ك — عبر Upayment أو تواصل معنا للدفع النقدي / التحويل';
-    alert.querySelector('.alert-btn').textContent = '💳 الدفع الآن';
-    document.getElementById('pageTitle').textContent = 'بانتظار الدفع';
-  } else if (s === 'rejected') {
-    document.getElementById('daysRemaining').textContent = '✕';
-    circle.setAttribute('stroke', '#c62828'); circle.style.strokeDashoffset = 0;
-    document.getElementById('daysStatusTitle').textContent = 'لم يتم قبول الطلب';
-    document.getElementById('daysStatusDesc').textContent = sub.adminNote || 'للاستفسار يرجى التواصل مع الإدارة.';
+  $('startDate').textContent = '--'; $('endDate').textContent = '--'; $('renewalAlert').classList.remove('show');
+  if (s === 'pending_review') { ringIcon('⏳', '#D4920A', .5); status('📝 طلبك قيد المراجعة', 'الإدارة تراجع نموذج التسجيل وستتواصل معك عبر الواتساب خلال 24 ساعة.'); }
+  else if (s === 'approved' || s === 'pending_payment') {
+    ringIcon('✅', '#2E7D32', 1); status('🎉 تمت الموافقة على طلبك!', (sub.adminNote ? sub.adminNote + ' · ' : '') + 'يرجى سداد الرسوم لتفعيل الاشتراك.');
+    $('startDate').textContent = fmt(sub.plannedStart); $('endDate').textContent = fmt(sub.plannedEnd);
+    alertSet('ادفع الآن لتفعيل الاشتراك', `${sub.amount} د.ك — Upayment أو نقدي / تحويل`, '💳 الدفع');
   }
-  const ds = document.getElementById('daysRemaining'); ds.style.fontSize = '2rem';
-  document.querySelector('.days-label').textContent = '';
+  else if (s === 'rejected') { ringIcon('✕', '#C62828', 1); status('لم يتم قبول الطلب', sub.adminNote || 'للاستفسار يرجى التواصل مع الإدارة.'); }
+  else { ringIcon('•', '#A07050', 0); status('حالة غير معروفة', s); }
+  ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح بعد تفعيل الاشتراك.';
+}
+function ringIcon(ch, color, ratio) { $('daysRemaining').textContent = ch; $('daysRemaining').style.fontSize = '1.8rem'; $('daysCircle').setAttribute('stroke', color); $('daysCircle').style.strokeDashoffset = 326.7 * (1 - ratio); document.querySelector('.days-label').textContent = ''; }
+
+function renderDetails(sub) {
+  const ST = { active: ['ok', '✅ نشط'], pending_review: ['gold', '📝 قيد المراجعة'], approved: ['info', '💳 بانتظار الدفع'], pending_payment: ['info', '💳 بانتظار الدفع'], rejected: ['bad', '⛔ مرفوض'], expired: ['bad', '❌ منتهي'] }[sub.status] || ['copper', sub.status];
+  const row = (k, v) => `<div class="sched"><span style="width:auto;color:var(--text-light);font-size:0.8rem;min-width:90px">${k}</span><b>${v || '--'}</b></div>`;
+  $('subscriptionDetails').innerHTML = row('اسم الطفل', sub.childName) + row('ولي الأمر', sub.parentName) + row('الهاتف', `<span dir="ltr">${sub.phone || ''}</span>`) + row('الباقة', sub.packageName) + row('الرسوم الشهرية', (sub.amount || '--') + ' د.ك') + row('الحالة', `<span class="chip ${ST[0]}">${ST[1]}</span>`) + (sub.subscriptionStart ? row('بداية الاشتراك', fmt(sub.subscriptionStart)) + row('نهاية الاشتراك', fmt(sub.subscriptionEnd)) : '') + (sub.loyaltyMember ? row('العضوية', '<span class="chip gold">🏅 أسرة سلام</span>') : '');
+}
+function renderSchedule(type) {
+  const s = SCHEDULES[type]; if (!s) { $('scheduleDisplay').innerHTML = '<div class="empty">لا يوجد جدول</div>'; $('scheduleMini').innerHTML = ''; return; }
+  const rows = s.rows.map(r => `<div class="sched"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('');
+  $('scheduleDisplay').innerHTML = `<div class="card"><div class="card-h"><h4>${s.icon} ${s.name}</h4></div>${rows}</div>`;
+  $('scheduleMini').innerHTML = rows;
+}
+function showNoSubscription() {
+  ringIcon('0', '#A07050', 0); status('لا يوجد طلب تسجيل', 'لم نجد طلباً مرتبطاً برقمك. عبّئ نموذج التسجيل للبدء.');
+  $('welcomeName').textContent = 'بك'; alertSet('لا يوجد اشتراك', 'سجّل الآن عبر النموذج', '📝 التسجيل');
+}
+function alertAction() {
+  const s = currentSubscription;
+  if (!s) return location.href = 'register.html';
+  if (s.status === 'active' || s.status === 'expired') return go('renew');
+  payNow(s, 'تفعيل');
 }
 
-function renewSubscription() {
-  if (!currentSubscription) return;
-  payNow(currentSubscription, currentSubscription.status === 'active' ? 'تجديد' : 'تفعيل');
-}
-
+// ---------- PAY ----------
+function renewSubscription() { if (!currentSubscription) return location.href = 'register.html'; payNow(currentSubscription, currentSubscription.status === 'active' ? 'تجديد' : 'تفعيل'); }
 async function payNow(sub, kind) {
-  // Try Upayment (requires server-side proxy in production); fall back to WhatsApp
   try {
-    const res = await fetch('https://sandboxapi.upayments.com/api/v1/charge', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + UPAYMENT_CONFIG.apiKey },
-      body: JSON.stringify({ totalPrice: sub.amount, currency: 'KWD', customerName: sub.parentName, customerEmail: sub.email || 'noemail@salam.kw', customerMobileNumber: '+965' + sub.phone, title: sub.packageName + ' — أكاديمية سلام', orderId: sub.id, returnUrl: location.origin + '/client/payment-success.html?id=' + sub.id, cancelUrl: location.href, language: 'ar' })
-    });
-    const r = await res.json();
-    if (r.status === true && r.data?.link) { location.href = r.data.link; return; }
-    throw new Error('no link');
-  } catch (e) {
-    const msg = `مرحباً، أريد ${kind} اشتراك ${sub.childName} 🏆\nالباقة: ${sub.packageName}\nالمبلغ: ${sub.amount} د.ك\nيرجى تزويدي بطريقة الدفع.`;
-    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(msg), '_blank');
+    const res = await fetch('https://sandboxapi.upayments.com/api/v1/charge', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + UPAYMENT_CONFIG.apiKey }, body: JSON.stringify({ totalPrice: sub.amount, currency: 'KWD', customerName: sub.parentName, customerEmail: sub.email || 'noemail@salam.kw', customerMobileNumber: '+965' + sub.phone, title: sub.packageName + ' — أكاديمية سلام', orderId: sub.id, returnUrl: location.origin + '/client/payment-success.html?id=' + sub.id, cancelUrl: location.href, language: 'ar' }) });
+    const r = await res.json(); if (r.status === true && r.data?.link) { location.href = r.data.link; return; } throw 0;
+  } catch (_) {
+    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أريد ${kind} اشتراك ${sub.childName} 🏆\nالباقة: ${sub.packageName}\nالمبلغ: ${sub.amount} د.ك\nيرجى تزويدي بطريقة الدفع.`), '_blank');
   }
 }
 
-// Renewal alert button → pay / renew
-document.querySelector('#renewalAlert .alert-btn')?.addEventListener('click', function (e) {
-  if (currentSubscription && currentSubscription.status !== 'active') { e.stopPropagation(); payNow(currentSubscription, 'تفعيل'); }
-});
-
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
-
-
-// ========== PAUSE (one week per subscription month) ==========
-function isPausedNow(sub) {
-  if (!sub.pauseStart || !sub.pauseEnd) return false;
-  const now = new Date(), s = sub.pauseStart.toDate(), e = sub.pauseEnd.toDate();
-  return now >= s && now <= e;
-}
+// ---------- PAUSE ----------
+function isPausedNow(s) { const a = toD(s.pauseStart), b = toD(s.pauseEnd); if (!a || !b) return false; const n = new Date(); return n >= a && n <= b; }
 function renderPause(sub) {
-  const info = document.getElementById('pauseInfo'), act = document.getElementById('pauseActive'), used = document.getElementById('pauseUsed');
-  const banner = document.getElementById('pausedBanner');
-  if (!info) return;
-  info.style.display = act.style.display = used.style.display = 'none';
-  banner.style.display = 'none';
+  ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pausedBanner').style.display = 'none';
   if (isPausedNow(sub)) {
-    act.style.display = 'block';
-    document.getElementById('pauseFrom').textContent = sub.pauseStart.toDate().toLocaleDateString('ar-KW');
-    document.getElementById('pauseTo').textContent = sub.pauseEnd.toDate().toLocaleDateString('ar-KW');
-    banner.style.display = 'block';
-    document.getElementById('pausedUntil').textContent = sub.pauseEnd.toDate().toLocaleDateString('ar-KW');
-    document.getElementById('daysStatusTitle').textContent = '⏸️ الاشتراك متوقف مؤقتاً';
-    document.getElementById('daysStatusDesc').textContent = 'يستأنف التدريب في ' + sub.pauseEnd.toDate().toLocaleDateString('ar-KW');
-  } else if (sub.pauseUsed || sub.pauseEnd) {
-    used.style.display = 'block';
+    $('pauseActive').style.display = 'block'; $('pauseFrom').textContent = fmt(sub.pauseStart); $('pauseTo').textContent = fmt(sub.pauseEnd);
+    $('pausedBanner').style.display = 'flex'; $('pausedUntil').textContent = fmt(sub.pauseEnd);
+    status('⏸️ الاشتراك متوقف مؤقتاً', 'يستأنف التدريب في ' + fmt(sub.pauseEnd));
+  } else if (sub.pauseUsed || sub.pauseEnd || sub.status !== 'active') {
+    $('pauseUsed').style.display = 'block'; if (sub.status !== 'active') $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.';
   } else {
-    info.style.display = 'block';
-    const inp = document.getElementById('pauseStartInput');
-    const today = new Date(); const min = today.toISOString().split('T')[0];
-    inp.min = min; if (!inp.value) inp.value = min;
-    if (sub.subscriptionEnd) inp.max = sub.subscriptionEnd.toDate().toISOString().split('T')[0];
-    inp.oninput = () => previewPause(sub);
-    previewPause(sub);
+    $('pauseInfo').style.display = 'block';
+    const inp = $('pauseStartInput'), today = new Date().toISOString().split('T')[0];
+    inp.min = today; if (!inp.value) inp.value = today; const e = toD(sub.subscriptionEnd); if (e) inp.max = e.toISOString().split('T')[0];
+    inp.oninput = () => previewPause(sub); previewPause(sub);
   }
 }
 function previewPause(sub) {
-  const v = document.getElementById('pauseStartInput').value; if (!v) return;
-  const s = new Date(v); const e = new Date(s); e.setDate(e.getDate() + 7);
-  document.getElementById('pauseEndPreview').textContent = e.toLocaleDateString('ar-KW');
-  if (sub.subscriptionEnd) { const ne = new Date(sub.subscriptionEnd.toDate()); ne.setDate(ne.getDate() + 7); document.getElementById('newEndPreview').textContent = ne.toLocaleDateString('ar-KW'); }
+  const v = $('pauseStartInput').value; if (!v) return;
+  const s = new Date(v), e = new Date(s); e.setDate(e.getDate() + 7); $('pauseEndPreview').textContent = e.toLocaleDateString('ar-KW');
+  const ne = toD(sub.subscriptionEnd); if (ne) { ne.setDate(ne.getDate() + 7); $('newEndPreview').textContent = ne.toLocaleDateString('ar-KW'); }
 }
 async function requestPause() {
   const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
-  const v = document.getElementById('pauseStartInput').value; if (!v) return alert('اختر تاريخ بداية الإيقاف');
-  const s = new Date(v); s.setHours(0,0,0,0); const e = new Date(s); e.setDate(e.getDate() + 7);
-  if (!confirm(`إيقاف اشتراك ${sub.childName} من ${s.toLocaleDateString('ar-KW')} لمدة 7 أيام؟\nلا يمكن التراجع إلا عبر الإدارة.`)) return;
-  const btn = document.getElementById('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
-  const newEnd = new Date(sub.subscriptionEnd.toDate()); newEnd.setDate(newEnd.getDate() + 7);
+  const v = $('pauseStartInput').value; if (!v) return alert('اختر تاريخ بداية الإيقاف');
+  const s = new Date(v); s.setHours(0, 0, 0, 0); const e = new Date(s); e.setDate(e.getDate() + 7);
+  if (!confirm(`إيقاف اشتراك ${sub.childName} من ${s.toLocaleDateString('ar-KW')} لمدة 7 أيام؟`)) return;
+  const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+  const ne = toD(sub.subscriptionEnd); ne.setDate(ne.getDate() + 7);
   try {
-    await db.collection('subscriptions').doc(sub.id).update({
-      pauseStart: firebase.firestore.Timestamp.fromDate(s),
-      pauseEnd: firebase.firestore.Timestamp.fromDate(e),
-      pauseUsed: true,
-      pauseReason: document.getElementById('pauseReason').value.trim(),
-      pauseRequestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      subscriptionEnd: firebase.firestore.Timestamp.fromDate(newEnd)
-    });
-    const msg = `مرحباً، قمت بإيقاف اشتراك ${sub.childName} مؤقتاً لمدة أسبوع\nمن: ${s.toLocaleDateString('ar-KW')}\nإلى: ${e.toLocaleDateString('ar-KW')}${document.getElementById('pauseReason').value ? '\nالسبب: ' + document.getElementById('pauseReason').value : ''}`;
-    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(msg), '_blank');
-    const doc = await db.collection('subscriptions').doc(sub.id).get();
-    currentSubscription = { id: doc.id, ...doc.data() };
-    renderDashboard(currentSubscription);
-    showSection('overview');
-  } catch (err) {
-    alert('تعذر حفظ الإيقاف: ' + err.message);
-    btn.disabled = false; btn.textContent = '⏸️ تأكيد الإيقاف لمدة أسبوع';
-  }
+    await db.collection('subscriptions').doc(sub.id).update({ pauseStart: firebase.firestore.Timestamp.fromDate(s), pauseEnd: firebase.firestore.Timestamp.fromDate(e), pauseUsed: true, pauseReason: $('pauseReason').value.trim(), pauseRequestedAt: firebase.firestore.FieldValue.serverTimestamp(), subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne) });
+    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، قمت بإيقاف اشتراك ${sub.childName} مؤقتاً لمدة أسبوع\nمن: ${s.toLocaleDateString('ar-KW')}\nإلى: ${e.toLocaleDateString('ar-KW')}${$('pauseReason').value ? '\nالسبب: ' + $('pauseReason').value : ''}`), '_blank');
+    go('overview');
+  } catch (err) { alert('تعذر حفظ الإيقاف: ' + err.message); btn.disabled = false; btn.textContent = '⏸️ تأكيد الإيقاف لمدة أسبوع'; }
 }
 
-
-// ========== REALTIME NOTIFICATIONS ==========
+// ---------- NOTIFICATIONS ----------
 function setupClientNotifications(id) {
-  Notif.banner('فعّل الإشعارات لتصلك الموافقة وتذكير التجديد');
   const saveToken = t => db.collection('subscriptions').doc(id).update({ fcmTokens: firebase.firestore.FieldValue.arrayUnion(t) });
+  if (window.Notification && Notification.permission === 'default') {
+    const b = document.createElement('div'); b.className = 'banner notif';
+    b.innerHTML = `<span>🔔 فعّل الإشعارات لتصلك الموافقة وتذكير التجديد</span><button id="notifOn">تفعيل</button><button class="x" onclick="this.parentElement.remove()">✕</button>`;
+    document.querySelector('.app-head').insertAdjacentElement('afterend', b);
+    b.querySelector('#notifOn').onclick = async () => { const ok = await Notif.ask(); b.remove(); if (ok) { Notif.show('تم تفعيل الإشعارات ✅', 'ستصلك تنبيهات أكاديمية سلام هنا'); Notif.registerPush(saveToken); } };
+  }
   if (Notif.granted()) Notif.registerPush(saveToken);
-  window.addEventListener('notif-granted', () => Notif.registerPush(saveToken));
-
-  let prevStatus = currentSubscription?.status;
+  let prev = currentSubscription?.status;
   db.collection('subscriptions').doc(id).onSnapshot(doc => {
-    if (!doc.exists) return;
-    const d = { id: doc.id, ...doc.data() };
-    if (prevStatus && d.status !== prevStatus) {
+    if (!doc.exists) return; const d = { id: doc.id, ...doc.data() };
+    if (prev && d.status !== prev) {
       if (d.status === 'approved') Notif.show('🎉 تمت الموافقة على طلبك', `${d.childName} — ${d.amount} د.ك · ادفع الآن لتفعيل الاشتراك`, 'dashboard.html');
       if (d.status === 'active') Notif.show('✅ تم تفعيل الاشتراك', `${d.childName} — ${d.packageName}`, 'dashboard.html');
       if (d.status === 'rejected') Notif.show('طلب التسجيل', d.adminNote || 'لم يتم قبول الطلب، تواصل مع الإدارة', 'dashboard.html');
     }
-    prevStatus = d.status;
-    currentSubscription = d; renderDashboard(d);
+    prev = d.status; currentSubscription = d; renderDashboard(d);
   });
-
-  // Expiry reminder (once per day, local)
   const s = currentSubscription;
   if (s && s.status === 'active' && s.subscriptionEnd) {
-    const days = Math.ceil((s.subscriptionEnd.toDate() - new Date()) / 864e5);
-    const key = 'expNotif-' + id + '-' + new Date().toDateString();
-    if (days <= 3 && days >= 0 && !localStorage.getItem(key)) {
-      localStorage.setItem(key, '1');
-      Notif.show('⏳ اشتراكك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, 'dashboard.html');
-    }
+    const days = Math.ceil((toD(s.subscriptionEnd) - new Date()) / 864e5), key = 'expNotif-' + id + '-' + new Date().toDateString();
+    if (days <= 3 && days >= 0 && !localStorage.getItem(key)) { localStorage.setItem(key, '1'); Notif.show('⏳ اشتراكك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, 'dashboard.html'); }
   }
 }
+
+function logout() { if (confirm('تسجيل الخروج؟')) auth.signOut().then(() => location.href = 'login.html'); }
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+
+// ---------- AUTH + LOAD ----------
+auth.onAuthStateChanged(async user => { if (!user) { location.href = 'login.html'; return; } await loadClientData(user); });

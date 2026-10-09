@@ -16,8 +16,9 @@ salam-academy/
 ├── manifest.json / manifest-admin.json / sw.js  ← PWA (mobile app)
 ├── css/
 │   ├── main.css            ← Main styles
-│   ├── portal.css          ← Dashboard & login styles
-│   └── admin.css           ← Admin overrides
+│   ├── portal.css          ← Login / register styles
+│   ├── register.css        ← Survey form
+│   └── app.css             ← Mobile-app shell for both dashboards (bottom tabs, cards, sheets)
 ├── js/
 │   ├── firebase-config.js  ← ⚠️ FILL IN YOUR FIREBASE CONFIG
 │   ├── main.js             ← Landing page JS
@@ -124,6 +125,8 @@ const UPAYMENT_CONFIG = {
 Statuses: `pending_review` → `approved` → `active` → `expired` (or `rejected` / `cancelled`)
 
 ## 📱 Mobile App (PWA)
+
+Both dashboards are built as a phone app: bottom tab bar, a floating ➕ button, card lists (no tables), bottom-sheet dialogs, and a centred 430px phone frame on desktop. Admin tabs: الرئيسية · المراجعة · ➕ إضافة · الأعضاء · رسائل (plus تنتهي قريباً / الإيقافات via the home tiles). Member tabs: الرئيسية · الجدول · 💳 الدفع · إيقاف · اشتراكي.
 
 Both portals install as apps from the browser — no App Store needed:
 - **Android (Chrome):** a "تثبيت" banner appears in the dashboard → tap it

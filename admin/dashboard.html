@@ -1,377 +1,196 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>لوحة الإدارة | أكاديمية سلام</title>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/main.css" />
-  <link rel="stylesheet" href="../css/portal.css" />
-  <link rel="stylesheet" href="../css/admin.css" />
-  <link rel="manifest" href="../manifest-admin.json" />
-  <meta name="theme-color" content="#1C0F06" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="../images/icon-admin-192.png" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover,maximum-scale=1"/>
+  <title>إدارة سلام</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/app.css"/>
+  <link rel="manifest" href="../manifest-admin.json"/>
+  <meta name="theme-color" content="#140A04"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="apple-touch-icon" href="../images/icon-admin-192.png"/>
 </head>
-<body class="admin-dash-body">
+<body class="app-body admin">
+<div class="app">
 
-  <div class="dashboard-layout">
-    <!-- Admin Sidebar -->
-    <aside class="client-sidebar admin-sidebar">
-      <div class="sidebar-brand">
-        <img src="../images/logo-en.png" alt="logo" class="sidebar-brand-img" onerror="this.style.display='none'">
-        <div>
-          <span>أكاديمية سلام</span>
-          <small style="display:block;color:rgba(255,255,255,0.5);font-size:0.7rem">لوحة الإدارة</small>
-        </div>
+  <!-- HEADER -->
+  <header class="app-head">
+    <div class="head-row">
+      <div class="head-brand">
+        <div class="head-logo"><img src="../images/logo-ar.png" alt=""/></div>
+        <div class="head-title">إدارة سلام<small>ADMIN</small></div>
       </div>
-      <nav class="sidebar-nav">
-        <a href="#" class="sidebar-link active" onclick="showAdminSection('dashboard')">📊 لوحة التحكم</a>
-        <a href="#" class="sidebar-link" onclick="showAdminSection('review')">📝 طلبات المراجعة <span class="badge-count" id="reviewBadge">0</span></a>
-        <a href="#" class="sidebar-link" onclick="showAdminSection('subscriptions')">📋 الاشتراكات</a>
-        <a href="#" class="sidebar-link" onclick="showAdminSection('expiring')">⚠️ تنتهي قريباً</a>
-        <a href="#" class="sidebar-link" onclick="showAdminSection('paused')">⏸️ الإيقافات المؤقتة</a>
-        <a href="#" class="sidebar-link" onclick="showAdminSection('add')">➕ إضافة اشتراك</a>
-        <a href="#" class="sidebar-link" onclick="showAdminSection('notifications')">📨 إشعارات واتساب</a>
-      </nav>
-      <div class="sidebar-footer">
-        <a href="../index.html" class="sidebar-link" style="font-size:0.85rem">🌐 الموقع</a>
-        <button onclick="adminLogout()" class="sidebar-logout">🚪 خروج</button>
+      <div class="head-actions">
+        <button class="icon-btn" onclick="go('review')" title="طلبات المراجعة">📝<span class="dot" id="reviewBadge">0</span></button>
+        <button class="icon-btn" onclick="loadAllData();showToast('تم التحديث')" title="تحديث">🔄</button>
+        <button class="icon-btn" onclick="adminLogout()" title="خروج">⏻</button>
       </div>
-    </aside>
-
-    <!-- Main -->
-    <main class="client-main">
-      <div id="installBanner" class="install-banner" style="display:none"><span>📲 أضف لوحة الإدارة إلى الشاشة الرئيسية</span><button id="installBtn">تثبيت</button><button class="ib-close" onclick="this.parentElement.style.display='none'">✕</button></div>
-      <div class="client-topbar">
-        <button class="mobile-sidebar-toggle" onclick="toggleSidebar()">☰</button>
-        <h2 id="adminPageTitle">لوحة التحكم</h2>
-        <div class="topbar-user">
-          <span>مرحباً، المدير</span>
-        </div>
-      </div>
-
-      <!-- DASHBOARD OVERVIEW -->
-      <section id="dashboard-section" class="dashboard-section">
-        <div class="admin-stats-row">
-          <div class="admin-stat-card gold" onclick="showAdminSection('review')" style="cursor:pointer">
-            <div class="asc-icon">📝</div>
-            <div class="asc-num" id="statPending">--</div>
-            <div class="asc-label">طلب بانتظار المراجعة</div>
-          </div>
-          <div class="admin-stat-card green">
-            <div class="asc-icon">✅</div>
-            <div class="asc-num" id="statActive">--</div>
-            <div class="asc-label">اشتراك نشط</div>
-          </div>
-          <div class="admin-stat-card orange">
-            <div class="asc-icon">⚠️</div>
-            <div class="asc-num" id="statExpiring">--</div>
-            <div class="asc-label">تنتهي قريباً (7 أيام)</div>
-          </div>
-          <div class="admin-stat-card teal" onclick="showAdminSection('paused')" style="cursor:pointer">
-            <div class="asc-icon">⏸️</div>
-            <div class="asc-num" id="statPaused">--</div>
-            <div class="asc-label">متوقف مؤقتاً</div>
-          </div>
-          <div class="admin-stat-card red">
-            <div class="asc-icon">❌</div>
-            <div class="asc-num" id="statExpired">--</div>
-            <div class="asc-label">منتهية الصلاحية</div>
-          </div>
-          <div class="admin-stat-card blue">
-            <div class="asc-icon">💰</div>
-            <div class="asc-num" id="statRevenue">--</div>
-            <div class="asc-label">إيراد الشهر (د.ك)</div>
-          </div>
-        </div>
-
-        <!-- Recent Subscriptions -->
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <h3>آخر الاشتراكات</h3>
-            <button onclick="showAdminSection('subscriptions')" class="btn-small-green">عرض الكل</button>
-          </div>
-          <div class="table-wrap">
-            <table class="admin-table" id="recentTable">
-              <thead>
-                <tr>
-                  <th>اسم الطفل</th>
-                  <th>ولي الأمر</th>
-                  <th>الباقة</th>
-                  <th>الأيام المتبقية</th>
-                  <th>الحالة</th>
-                  <th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody id="recentTableBody">
-                <tr><td colspan="6" style="text-align:center;padding:20px">جاري التحميل...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-
-      <!-- REVIEW QUEUE -->
-      <section id="review-section" class="dashboard-section" style="display:none">
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <h3>📝 طلبات التسجيل بانتظار المراجعة</h3>
-            <span id="reviewCount" style="font-size:0.85rem;color:var(--text-light)"></span>
-          </div>
-          <div id="reviewList" class="review-list">
-            <div style="padding:30px;text-align:center;color:#999">جاري التحميل...</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ALL SUBSCRIPTIONS -->
-      <section id="subscriptions-section" class="dashboard-section" style="display:none">
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <h3>جميع الاشتراكات</h3>
-            <div class="admin-filters">
-              <select id="filterStatus" onchange="filterSubscriptions()">
-                <option value="all">الكل</option>
-                <option value="active">نشط</option>
-                <option value="expired">منتهي</option>
-                <option value="pending_review">قيد المراجعة</option>
-                <option value="approved">موافق عليه - بانتظار الدفع</option>
-                <option value="rejected">مرفوض</option>
-              </select>
-              <select id="filterPackage" onchange="filterSubscriptions()">
-                <option value="all">كل الباقات</option>
-                <option value="football">كرة القدم</option>
-                <option value="confidence">بناء الثقة</option>
-                <option value="excellence">باقة التميز</option>
-              </select>
-              <input type="text" id="searchInput" placeholder="بحث..." oninput="filterSubscriptions()" style="padding:6px 12px;border:1px solid #ddd;border-radius:8px;font-family:Tajawal,sans-serif" />
-            </div>
-          </div>
-          <div class="table-wrap">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>اسم الطفل</th>
-                  <th>ولي الأمر</th>
-                  <th>الهاتف</th>
-                  <th>الباقة</th>
-                  <th>البداية</th>
-                  <th>النهاية</th>
-                  <th>الأيام المتبقية</th>
-                  <th>الحالة</th>
-                  <th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody id="allSubsTableBody">
-                <tr><td colspan="9" style="text-align:center;padding:20px">جاري التحميل...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- EXPIRING SOON -->
-      <section id="expiring-section" class="dashboard-section" style="display:none">
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <h3>⚠️ اشتراكات تنتهي خلال 7 أيام</h3>
-            <button onclick="sendBulkWhatsApp()" class="btn-whatsapp-admin">📲 إرسال تذكير للجميع</button>
-          </div>
-          <div class="table-wrap">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>اسم الطفل</th>
-                  <th>ولي الأمر</th>
-                  <th>الهاتف</th>
-                  <th>الباقة</th>
-                  <th>أيام متبقية</th>
-                  <th>إشعار واتساب</th>
-                </tr>
-              </thead>
-              <tbody id="expiringTableBody">
-                <tr><td colspan="6" style="text-align:center;padding:20px">جاري التحميل...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-
-      <!-- PAUSED -->
-      <section id="paused-section" class="dashboard-section" style="display:none">
-        <div class="admin-card">
-          <div class="admin-card-header"><h3>⏸️ الإيقافات المؤقتة (أسبوع)</h3></div>
-          <div class="table-wrap">
-            <table class="admin-table">
-              <thead><tr><th>اسم الطفل</th><th>ولي الأمر</th><th>الهاتف</th><th>الباقة</th><th>من</th><th>إلى</th><th>السبب</th><th>الحالة</th><th>إجراء</th></tr></thead>
-              <tbody id="pausedTableBody"><tr><td colspan="9" style="text-align:center;padding:20px">جاري التحميل...</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ADD SUBSCRIPTION -->
-      <section id="add-section" class="dashboard-section" style="display:none">
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <h3>➕ إضافة / تجديد اشتراك</h3>
-          </div>
-          <form onsubmit="saveSubscription(event)" style="max-width:560px">
-            <div class="form-row">
-              <div class="form-group">
-                <label>اسم الطفل</label>
-                <input type="text" id="newChildName" required placeholder="اسم الطفل" />
-              </div>
-              <div class="form-group">
-                <label>عمر الطفل</label>
-                <input type="number" id="newChildAge" required placeholder="العمر" min="4" max="18" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>اسم ولي الأمر</label>
-                <input type="text" id="newParentName" required placeholder="اسم ولي الأمر" />
-              </div>
-              <div class="form-group">
-                <label>رقم الهاتف</label>
-                <input type="tel" id="newPhone" required placeholder="XXXXXXXX" />
-              </div>
-            </div>
-            <div class="form-group">
-              <label>البريد الإلكتروني</label>
-              <input type="email" id="newEmail" placeholder="اختياري" />
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>الباقة</label>
-                <select id="newPackage" onchange="updatePackagePrice()" required>
-                  <option value="">-- اختر الباقة --</option>
-                  <option value="football" data-price="25" data-name="معسكر كرة القدم">كرة القدم (كل سبت) - 25 د.ك</option>
-                  <option value="confidence" data-price="70" data-name="معسكر بناء الثقة والكيوكشن">بناء الثقة والكيوكشن - 70 د.ك</option>
-                  <option value="excellence" data-price="85" data-name="باقة التميز">باقة التميز (4 أيام) - 85 د.ك</option>
-                  <option value="excellence_loyal" data-price="100" data-name="باقة التميز - أسرة سلام">أسرة سلام - 100 د.ك</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>المبلغ (د.ك)</label>
-                <input type="number" id="newAmount" required placeholder="المبلغ" step="0.5" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>تاريخ بداية الاشتراك</label>
-                <input type="date" id="newStartDate" required />
-              </div>
-              <div class="form-group">
-                <label>طريقة الدفع</label>
-                <select id="newPaymentMethod">
-                  <option value="cash">نقدي</option>
-                  <option value="upayment">Upayment</option>
-                  <option value="bank">تحويل بنكي</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>ملاحظات</label>
-              <textarea id="newNotes" rows="2" placeholder="ملاحظات اختيارية" style="width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:10px;font-family:Tajawal,sans-serif;resize:vertical"></textarea>
-            </div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-              <button type="submit" class="btn-portal-primary" style="flex:1">💾 حفظ الاشتراك</button>
-              <button type="button" class="btn-portal-ghost" onclick="clearAddForm()" style="flex:0 0 auto">مسح</button>
-            </div>
-          </form>
-        </div>
-      </section>
-
-      <!-- NOTIFICATIONS -->
-      <section id="notifications-section" class="dashboard-section" style="display:none">
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <h3>📨 إشعارات واتساب</h3>
-          </div>
-          <div class="notif-options">
-            <div class="notif-card">
-              <div class="notif-icon">⚠️</div>
-              <h4>تذكير انتهاء الاشتراك</h4>
-              <p>أرسل تذكيراً لجميع المشتركين الذين تنتهي اشتراكاتهم خلال 7 أيام</p>
-              <button onclick="sendBulkWhatsApp()" class="btn-portal-primary">إرسال للجميع</button>
-            </div>
-            <div class="notif-card">
-              <h4>رسالة مخصصة</h4>
-              <p>أرسل رسالة مخصصة لمشترك بعينه</p>
-              <input type="tel" id="customPhone" placeholder="رقم الهاتف" style="margin-bottom:10px;width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:10px;font-family:Tajawal,sans-serif" />
-              <textarea id="customMsg" rows="4" placeholder="اكتب رسالتك هنا..." style="width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:10px;font-family:Tajawal,sans-serif;resize:vertical;margin-bottom:10px"></textarea>
-              <button onclick="sendCustomWhatsApp()" class="btn-portal-primary">إرسال</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    </main>
-  </div>
-
-  <!-- EDIT MODAL -->
-  <div class="modal-overlay" id="editModal" style="display:none">
-    <div class="modal-box">
-      <button class="modal-close" onclick="closeEditModal()">✕</button>
-      <h2 class="modal-title">تعديل الاشتراك</h2>
-      <input type="hidden" id="editSubId" />
-      <div class="form-group">
-        <label>حالة الاشتراك</label>
-        <select id="editStatus">
-          <option value="active">نشط</option>
-          <option value="expired">منتهي</option>
-          <option value="pending_review">قيد المراجعة</option>
-                <option value="approved">موافق عليه - بانتظار الدفع</option>
-                <option value="rejected">مرفوض</option>
-          <option value="cancelled">ملغي</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>تاريخ البداية</label>
-        <input type="date" id="editStartDate" />
-      </div>
-      <div class="form-group">
-        <label>تاريخ النهاية</label>
-        <input type="date" id="editEndDate" />
-      </div>
-      <div class="form-group">
-        <label>ملاحظات</label>
-        <textarea id="editNotes" rows="2" style="width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:10px;font-family:Tajawal,sans-serif"></textarea>
-      </div>
-      <button onclick="saveEdit()" class="btn-portal-primary">حفظ التغييرات</button>
     </div>
-  </div>
-
-
-  <!-- APPROVE MODAL -->
-  <div class="modal-overlay" id="approveModal" style="display:none">
-    <div class="modal-box">
-      <button class="modal-close" onclick="closeApprove()">✕</button>
-      <h2 class="modal-title">✅ الموافقة على الطلب</h2>
-      <p class="modal-subtitle" id="apName"></p>
-      <input type="hidden" id="apId"/>
-      <div class="form-row">
-        <div class="form-group"><label>المبلغ الشهري (د.ك)</label><input type="number" id="apAmount" step="0.5"/></div>
-        <div class="form-group"><label>تاريخ بداية الاشتراك</label><input type="date" id="apStart"/></div>
-      </div>
-      <div class="form-group"><label>ملاحظة للأهل (اختياري)</label><input type="text" id="apNote" placeholder="مثال: الحصة الأولى الأحد القادم"/></div>
-      <button onclick="confirmApprove()" class="btn-portal-primary">✅ موافقة وإرسال واتساب</button>
-      <p style="font-size:0.8rem;color:var(--text-light);text-align:center;margin-top:10px">سيُفتح واتساب برسالة الموافقة وتفاصيل الدفع. بعد استلام الدفع فعّل الاشتراك من زر "تفعيل".</p>
+    <div class="head-greet">
+      <h2 id="adminPageTitle">لوحة التحكم</h2>
+      <p id="headSub">نظرة سريعة على الأكاديمية اليوم</p>
     </div>
-  </div>
+  </header>
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
-  <script src="../js/firebase-config.js"></script>
-  <script src="../js/pwa-install.js"></script>
-  <script src="../js/notifications.js"></script>
-  <script src="../js/admin-dashboard.js"></script>
+  <div id="installBanner" class="banner install" style="display:none"><span>📲 أضف لوحة الإدارة إلى الشاشة الرئيسية</span><button id="installBtn">تثبيت</button><button class="x" onclick="this.parentElement.style.display='none'">✕</button></div>
+
+  <!-- ===== HOME ===== -->
+  <section class="page active" data-page="dashboard">
+    <div class="tiles">
+      <div class="tile c-gold" onclick="go('review')"><div class="t-ico">📝</div><div class="t-num" id="statPending">–</div><div class="t-lbl">بانتظار المراجعة</div></div>
+      <div class="tile c-ok" onclick="go('members');setFilter('active')"><div class="t-ico">✅</div><div class="t-num" id="statActive">–</div><div class="t-lbl">اشتراك نشط</div></div>
+      <div class="tile c-warn" onclick="go('expiring')"><div class="t-ico">⚠️</div><div class="t-num" id="statExpiring">–</div><div class="t-lbl">تنتهي خلال 7 أيام</div></div>
+      <div class="tile c-info" onclick="go('paused')"><div class="t-ico">⏸️</div><div class="t-num" id="statPaused">–</div><div class="t-lbl">متوقف مؤقتاً</div></div>
+      <div class="tile c-bad" onclick="go('members');setFilter('expired')"><div class="t-ico">❌</div><div class="t-num" id="statExpired">–</div><div class="t-lbl">منتهي</div></div>
+      <div class="tile c-copper"><div class="t-ico">💰</div><div class="t-num" id="statRevenue">–</div><div class="t-lbl">إيراد الشهر (د.ك)</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h4>آخر الاشتراكات</h4><button class="link" onclick="go('members')">عرض الكل</button></div>
+      <div id="recentList"><div class="empty">جاري التحميل...</div></div>
+    </div>
+  </section>
+
+  <!-- ===== REVIEW ===== -->
+  <section class="page" data-page="review">
+    <div class="page-title"><h3>📝 طلبات التسجيل</h3><span id="reviewCount"></span></div>
+    <div id="reviewList"><div class="empty">جاري التحميل...</div></div>
+  </section>
+
+  <!-- ===== MEMBERS ===== -->
+  <section class="page" data-page="members">
+    <div class="searchbar"><input type="text" id="searchInput" placeholder="🔍 ابحث بالاسم أو الهاتف..." oninput="filterSubscriptions()"/></div>
+    <div class="segs" id="statusSegs">
+      <button class="seg on" data-v="all" onclick="setFilter('all')">الكل</button>
+      <button class="seg" data-v="active" onclick="setFilter('active')">نشط</button>
+      <button class="seg" data-v="approved" onclick="setFilter('approved')">بانتظار الدفع</button>
+      <button class="seg" data-v="pending_review" onclick="setFilter('pending_review')">مراجعة</button>
+      <button class="seg" data-v="expired" onclick="setFilter('expired')">منتهي</button>
+      <button class="seg" data-v="rejected" onclick="setFilter('rejected')">مرفوض</button>
+    </div>
+    <div class="segs" id="pkgSegs">
+      <button class="seg on" data-v="all" onclick="setPkg('all')">كل الباقات</button>
+      <button class="seg" data-v="football" onclick="setPkg('football')">⚽ كرة القدم</button>
+      <button class="seg" data-v="confidence" onclick="setPkg('confidence')">🥋 بناء الثقة</button>
+      <button class="seg" data-v="excellence" onclick="setPkg('excellence')">⚡ التميز</button>
+    </div>
+    <input type="hidden" id="filterStatus" value="all"/><input type="hidden" id="filterPackage" value="all"/>
+    <div id="allSubsList"><div class="empty">جاري التحميل...</div></div>
+  </section>
+
+  <!-- ===== EXPIRING ===== -->
+  <section class="page" data-page="expiring">
+    <div class="page-title"><h3>⚠️ تنتهي خلال 7 أيام</h3><button class="link" onclick="sendBulkWhatsApp()">📲 تذكير للجميع</button></div>
+    <div id="expiringList"><div class="empty">جاري التحميل...</div></div>
+  </section>
+
+  <!-- ===== PAUSED ===== -->
+  <section class="page" data-page="paused">
+    <div class="page-title"><h3>⏸️ الإيقافات المؤقتة</h3></div>
+    <div id="pausedList"><div class="empty">جاري التحميل...</div></div>
+  </section>
+
+  <!-- ===== ADD ===== -->
+  <section class="page" data-page="add">
+    <div class="page-title"><h3>➕ إضافة اشتراك يدوي</h3></div>
+    <form class="card" onsubmit="saveSubscription(event)">
+      <div class="fg2">
+        <div class="fg"><label>اسم الطفل</label><input type="text" id="newChildName" required placeholder="الاسم"/></div>
+        <div class="fg"><label>العمر</label><input type="number" id="newChildAge" required min="4" max="18" placeholder="السن"/></div>
+      </div>
+      <div class="fg2">
+        <div class="fg"><label>ولي الأمر</label><input type="text" id="newParentName" required placeholder="الاسم"/></div>
+        <div class="fg"><label>الهاتف</label><input type="tel" id="newPhone" required placeholder="XXXXXXXX" maxlength="8" inputmode="numeric"/></div>
+      </div>
+      <div class="fg"><label>البريد (اختياري)</label><input type="email" id="newEmail"/></div>
+      <div class="fg2">
+        <div class="fg"><label>الباقة</label>
+          <select id="newPackage" onchange="updatePackagePrice()" required>
+            <option value="">— اختر —</option>
+            <option value="football" data-price="25" data-name="معسكر كرة القدم">⚽ كرة القدم — 25</option>
+            <option value="confidence" data-price="70" data-name="معسكر بناء الثقة والكيوكشن">🥋 بناء الثقة — 70</option>
+            <option value="excellence" data-price="85" data-name="باقة التميز">⚡ التميز — 85</option>
+            <option value="excellence_loyal" data-price="100" data-name="باقة التميز - أسرة سلام">🏅 أسرة سلام — 100</option>
+          </select></div>
+        <div class="fg"><label>المبلغ (د.ك)</label><input type="number" id="newAmount" required step="0.5"/></div>
+      </div>
+      <div class="fg2">
+        <div class="fg"><label>بداية الاشتراك</label><input type="date" id="newStartDate" required/></div>
+        <div class="fg"><label>طريقة الدفع</label><select id="newPaymentMethod"><option value="cash">نقدي</option><option value="upayment">Upayment</option><option value="bank">تحويل</option></select></div>
+      </div>
+      <div class="fg"><label>ملاحظات</label><textarea id="newNotes" rows="2"></textarea></div>
+      <button type="submit" class="btn primary">💾 حفظ وتفعيل الاشتراك</button>
+      <button type="button" class="btn ghost" onclick="clearAddForm()">مسح</button>
+    </form>
+  </section>
+
+  <!-- ===== NOTIFY ===== -->
+  <section class="page" data-page="notify">
+    <div class="page-title"><h3>📨 إرسال رسالة</h3></div>
+    <div class="card">
+      <div class="card-h"><h4>⚠️ تذكير انتهاء الاشتراك</h4></div>
+      <p class="note" style="margin-bottom:12px">يفتح واتساب لكل مشترك ينتهي اشتراكه خلال 7 أيام برسالة تذكير جاهزة.</p>
+      <button class="btn wa" onclick="sendBulkWhatsApp()">📲 إرسال للجميع</button>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>💬 رسالة مخصصة</h4></div>
+      <div class="fg"><label>رقم الهاتف</label><input type="tel" id="customPhone" placeholder="XXXXXXXX" maxlength="8" inputmode="numeric"/></div>
+      <div class="fg"><label>الرسالة</label><textarea id="customMsg" rows="4" placeholder="اكتب رسالتك..."></textarea></div>
+      <button class="btn wa" onclick="sendCustomWhatsApp()">إرسال عبر واتساب</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- BOTTOM TAB BAR -->
+<nav class="tabbar"><div class="tabbar-in">
+  <button class="tab on" data-page="dashboard" onclick="go('dashboard')"><i>🏠</i>الرئيسية</button>
+  <button class="tab" data-page="review" onclick="go('review')"><i>📝</i>المراجعة<span class="dot" id="tabReviewDot">0</span></button>
+  <div class="tab fab-slot"><button class="fab" onclick="go('add')" title="إضافة اشتراك">+</button></div>
+  <button class="tab" data-page="members" onclick="go('members')"><i>👥</i>الأعضاء</button>
+  <button class="tab" data-page="notify" onclick="go('notify')"><i>📨</i>رسائل</button>
+</div></nav>
+
+<!-- EDIT SHEET -->
+<div class="sheet-bg" id="editModal" onclick="if(event.target===this)closeEditModal()">
+  <div class="sheet"><div class="sheet-grip"></div>
+    <h3>✏️ تعديل الاشتراك</h3><p class="sub" id="editName"></p>
+    <input type="hidden" id="editSubId"/>
+    <div class="fg"><label>الحالة</label><select id="editStatus">
+      <option value="active">✅ نشط</option><option value="approved">💳 موافق عليه - بانتظار الدفع</option><option value="pending_review">📝 قيد المراجعة</option><option value="expired">❌ منتهي</option><option value="rejected">⛔ مرفوض</option><option value="cancelled">🚫 ملغي</option></select></div>
+    <div class="fg2"><div class="fg"><label>البداية</label><input type="date" id="editStartDate"/></div><div class="fg"><label>النهاية</label><input type="date" id="editEndDate"/></div></div>
+    <div class="fg"><label>ملاحظات</label><textarea id="editNotes" rows="2"></textarea></div>
+    <button onclick="saveEdit()" class="btn primary">حفظ التغييرات</button>
+    <button onclick="closeEditModal()" class="btn ghost">إلغاء</button>
+  </div>
+</div>
+
+<!-- APPROVE SHEET -->
+<div class="sheet-bg" id="approveModal" onclick="if(event.target===this)closeApprove()">
+  <div class="sheet"><div class="sheet-grip"></div>
+    <h3>✅ الموافقة على الطلب</h3><p class="sub" id="apName"></p>
+    <input type="hidden" id="apId"/>
+    <div class="fg2"><div class="fg"><label>المبلغ الشهري (د.ك)</label><input type="number" id="apAmount" step="0.5"/></div><div class="fg"><label>بداية الاشتراك</label><input type="date" id="apStart"/></div></div>
+    <div class="fg"><label>ملاحظة للأهل (اختياري)</label><input type="text" id="apNote" placeholder="مثال: الحصة الأولى الأحد القادم"/></div>
+    <button onclick="confirmApprove()" class="btn ok">✅ موافقة وإرسال واتساب</button>
+    <p class="note" style="margin-top:10px">بعد استلام الدفع اضغط "تفعيل" من بطاقة العضو.</p>
+  </div>
+</div>
+
+<!-- DETAILS SHEET -->
+<div class="sheet-bg" id="detailModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="sheet"><div class="sheet-grip"></div><div id="detailBody"></div></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script src="../js/pwa-install.js"></script>
+<script src="../js/notifications.js"></script>
+<script src="../js/admin-dashboard.js"></script>
 </body>
 </html>
