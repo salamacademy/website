@@ -1,6 +1,7 @@
 // ============================
 // ADMIN DASHBOARD JS
 // ============================
+const PKG_NAMES = { football: 'كرة القدم', confidence: 'بناء الثقة والكيوكشن', excellence: 'التميز', excellence_loyal: 'التميز (أسرة سلام)', premium: 'المميزة (قديم)' };
 
 let allSubscriptions = [];
 
@@ -31,6 +32,7 @@ async function loadAllData() {
     renderRecentTable(allSubscriptions.slice(0, 10));
     renderAllSubs(allSubscriptions);
     renderExpiring();
+    renderReview();
   } catch (err) {
     console.error(err);
   }
@@ -63,6 +65,9 @@ function renderDashboardStats() {
     })
     .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
 
+  const pendingN = allSubscriptions.filter(s => s.status === 'pending_review').length;
+  document.getElementById('statPending').textContent = pendingN;
+  const badge = document.getElementById('reviewBadge'); if (badge) { badge.textContent = pendingN; badge.style.display = pendingN ? 'inline-flex' : 'none'; }
   document.getElementById('statActive').textContent = active.length;
   document.getElementById('statExpiring').textContent = expiring.length;
   document.getElementById('statExpired').textContent = expired.length;
@@ -76,14 +81,14 @@ function renderRow(sub, cols) {
     days <= 7 ? `<span style="color:#e65100;font-weight:700">${days} يوم ⚠️</span>` :
     `<span style="color:#2e7d32">${days} يوم</span>`;
 
-  const statusBadge = `<span class="status-badge ${sub.status === 'active' ? 'status-active' : sub.status === 'pending_payment' ? 'status-pending' : 'status-inactive'}">
-    ${sub.status === 'active' ? '✅ نشط' : sub.status === 'pending_payment' ? '⏳ انتظار' : '❌ منتهي'}
-  </span>`;
+  const stMap = { active:['status-active','✅ نشط'], pending_review:['status-pending','📝 مراجعة'], approved:['status-pending','💳 بانتظار الدفع'], pending_payment:['status-pending','💳 بانتظار الدفع'], rejected:['status-inactive','⛔ مرفوض'], expired:['status-inactive','❌ منتهي'], cancelled:['status-inactive','🚫 ملغي'] };
+  const st = stMap[sub.status] || ['status-inactive', sub.status];
+  const statusBadge = `<span class="status-badge ${st[0]}">${st[1]}</span>`;
 
   const startDate = sub.subscriptionStart ? (sub.subscriptionStart.toDate ? sub.subscriptionStart.toDate() : new Date(sub.subscriptionStart)).toLocaleDateString('ar-KW') : '--';
   const endDate = sub.subscriptionEnd ? (sub.subscriptionEnd.toDate ? sub.subscriptionEnd.toDate() : new Date(sub.subscriptionEnd)).toLocaleDateString('ar-KW') : '--';
 
-  const packageNames = { football: 'كرة القدم', confidence: 'بناء الثقة', premium: 'المميزة' };
+  const packageNames = PKG_NAMES;
 
   if (cols === 'recent') {
     return `<tr>
@@ -109,6 +114,8 @@ function renderRow(sub, cols) {
     <td>${daysDisplay}</td>
     <td>${statusBadge}</td>
     <td>
+      ${sub.status === 'approved' ? `<button onclick="activateSubscription('${sub.id}')" class="btn-table-edit" style="background:#e8f5e9;color:#2e7d32">▶️ تفعيل</button>` : ''}
+      <button onclick="viewSurvey('${sub.id}')" class="btn-table-edit">👁️</button>
       <button onclick="openEditModal('${sub.id}')" class="btn-table-edit">✏️</button>
       <button onclick="sendWhatsAppReminder('${sub.phone}','${sub.childName}',${days})" class="btn-table-wa">📲</button>
       <button onclick="deleteSubscription('${sub.id}')" class="btn-table-del">🗑️</button>
@@ -137,7 +144,7 @@ function renderExpiring() {
   }).sort((a, b) => calcDaysLeft(a) - calcDaysLeft(b));
 
   const tbody = document.getElementById('expiringTableBody');
-  const packageNames = { football: 'كرة القدم', confidence: 'بناء الثقة', premium: 'المميزة' };
+  const packageNames = PKG_NAMES;
 
   tbody.innerHTML = expiring.length === 0
     ? '<tr><td colspan="6" style="text-align:center;padding:20px;color:#4caf50">✅ لا توجد اشتراكات تنتهي قريباً</td></tr>'
@@ -376,11 +383,11 @@ function showAdminSection(name) {
   document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
   document.getElementById(name + '-section').style.display = 'block';
   const titles = {
-    dashboard: 'لوحة التحكم', subscriptions: 'الاشتراكات',
+    dashboard: 'لوحة التحكم', review: 'طلبات المراجعة', subscriptions: 'الاشتراكات',
     expiring: 'تنتهي قريباً', add: 'إضافة اشتراك', notifications: 'الإشعارات'
   };
   document.getElementById('adminPageTitle').textContent = titles[name] || '';
-  event.target.classList.add('active');
+  if (window.event && window.event.target && window.event.target.closest) { const l = window.event.target.closest('.sidebar-link'); if (l) l.classList.add('active'); }
   document.querySelector('.client-sidebar').classList.remove('open');
 }
 
@@ -405,3 +412,122 @@ function showToast(msg) {
   document.body.appendChild(div);
   setTimeout(() => div.remove(), 4000);
 }
+
+
+// ========== REVIEW QUEUE ==========
+function fmtDate(ts) { if (!ts) return '--'; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('ar-KW'); }
+
+function surveyCard(s, full) {
+  const created = fmtDate(s.createdAt);
+  return `
+  <div class="review-card" id="rc-${s.id}">
+    <div class="rc-head">
+      <div>
+        <div class="rc-name">${s.childName || '--'} <small>${s.childAge ? s.childAge + ' سنة' : ''}</small></div>
+        <div class="rc-sub">ولي الأمر: <strong>${s.parentName || '--'}</strong> · ${created}</div>
+      </div>
+      <div class="rc-pkg">${s.packageName || PKG_NAMES[s.packageType] || '--'} · <strong>${s.amount || '--'} د.ك</strong>${s.loyaltyMember ? ' <span class="rc-loyal">🏅 أسرة سلام</span>' : ''}</div>
+    </div>
+    <div class="rc-grid">
+      <div><label>📱 الهاتف</label><a href="https://wa.me/965${s.phone}" target="_blank" dir="ltr">${s.phone || '--'}</a>${s.phone2 ? ` · <a href="https://wa.me/965${s.phone2}" target="_blank" dir="ltr">${s.phone2}</a>` : ''}</div>
+      <div><label>📧 البريد</label>${s.email || '--'}</div>
+      <div><label>🎂 تاريخ الميلاد</label><span dir="ltr">${s.birthDate || '--'}</span></div>
+      <div><label>🏆 البطولات</label>${s.tournamentsConsent || '--'}</div>
+      <div class="rc-wide"><label>🩺 مشاكل صحية</label>${s.healthIssues || '--'}</div>
+      <div class="rc-wide"><label>🤧 حساسية</label>${s.allergies || '--'}</div>
+      <div class="rc-wide"><label>🎯 سبب التسجيل</label>${s.reason || '--'}</div>
+      ${s.adminNote ? `<div class="rc-wide"><label>📝 ملاحظة الإدارة</label>${s.adminNote}</div>` : ''}
+    </div>
+    ${full ? `
+    <div class="rc-actions">
+      <button class="btn-approve" onclick="openApprove('${s.id}')">✅ موافقة</button>
+      <button class="btn-reject" onclick="rejectRequest('${s.id}')">⛔ رفض</button>
+      <a class="btn-table-wa" style="padding:10px 16px" href="https://wa.me/965${s.phone}?text=${encodeURIComponent('مرحباً ' + (s.parentName||'') + '، بخصوص طلب تسجيل ' + (s.childName||'') + ' في أكاديمية سلام')}" target="_blank">💬 استفسار</a>
+    </div>` : ''}
+  </div>`;
+}
+
+function renderReview() {
+  const list = allSubscriptions.filter(s => s.status === 'pending_review');
+  document.getElementById('reviewCount').textContent = list.length ? list.length + ' طلب' : '';
+  document.getElementById('reviewList').innerHTML = list.length
+    ? list.map(s => surveyCard(s, true)).join('')
+    : '<div style="padding:40px;text-align:center;color:#4caf50">✅ لا توجد طلبات بانتظار المراجعة</div>';
+}
+
+function viewSurvey(id) {
+  const s = allSubscriptions.find(x => x.id === id); if (!s) return;
+  const w = document.createElement('div');
+  w.className = 'modal-overlay'; w.style.display = 'flex';
+  w.innerHTML = `<div class="modal-box" style="max-width:640px"><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button><h2 class="modal-title">بيانات الطلب</h2>${surveyCard(s, false)}</div>`;
+  w.addEventListener('click', e => { if (e.target === w) w.remove(); });
+  document.body.appendChild(w);
+}
+
+function openApprove(id) {
+  const s = allSubscriptions.find(x => x.id === id); if (!s) return;
+  document.getElementById('apId').value = id;
+  document.getElementById('apName').textContent = `${s.childName} — ${s.packageName}`;
+  document.getElementById('apAmount').value = s.loyaltyMember && s.packageType === 'excellence' ? 100 : (s.amount || '');
+  document.getElementById('apStart').value = new Date().toISOString().split('T')[0];
+  document.getElementById('apNote').value = '';
+  document.getElementById('approveModal').style.display = 'flex';
+}
+function closeApprove() { document.getElementById('approveModal').style.display = 'none'; }
+
+async function confirmApprove() {
+  const id = document.getElementById('apId').value;
+  const s = allSubscriptions.find(x => x.id === id); if (!s) return;
+  const amount = parseFloat(document.getElementById('apAmount').value) || s.amount;
+  const startVal = document.getElementById('apStart').value;
+  const note = document.getElementById('apNote').value.trim();
+  const start = new Date(startVal); const end = new Date(start); end.setDate(end.getDate() + 30);
+  try {
+    await db.collection('subscriptions').doc(id).update({
+      status: 'approved', amount, adminNote: note,
+      approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      plannedStart: firebase.firestore.Timestamp.fromDate(start),
+      plannedEnd: firebase.firestore.Timestamp.fromDate(end)
+    });
+    closeApprove();
+    const msg = `السلام عليكم ${s.parentName} 👋\n\nيسعدنا إبلاغكم بالموافقة على تسجيل ${s.childName} في أكاديمية سلام 🏆\n\nالباقة: ${s.packageName}\nالرسوم الشهرية: ${amount} د.ك\nبداية الاشتراك: ${start.toLocaleDateString('ar-KW')}${note ? '\n' + note : ''}\n\nلإتمام التسجيل يرجى سداد الرسوم عبر الرابط في بوابة الأعضاء أو التحويل، وسيتم تفعيل الاشتراك فور استلام الدفع.\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
+    window.open('https://wa.me/965' + s.phone + '?text=' + encodeURIComponent(msg), '_blank');
+    showToast('✅ تمت الموافقة وفتح واتساب');
+    await loadAllData();
+  } catch (err) { showToast('❌ ' + err.message); }
+}
+
+async function rejectRequest(id) {
+  const s = allSubscriptions.find(x => x.id === id); if (!s) return;
+  const reason = prompt('سبب الرفض (سيُرسل للأهل عبر واتساب، اتركه فارغاً لعدم الإرسال):', '');
+  if (reason === null) return;
+  try {
+    await db.collection('subscriptions').doc(id).update({ status: 'rejected', adminNote: reason, rejectedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    if (reason) {
+      const msg = `السلام عليكم ${s.parentName}،\n\nنشكركم على اهتمامكم بأكاديمية سلام. للأسف لا يمكننا قبول طلب تسجيل ${s.childName} حالياً.\n\nالسبب: ${reason}\n\nللاستفسار: 93000607`;
+      window.open('https://wa.me/965' + s.phone + '?text=' + encodeURIComponent(msg), '_blank');
+    }
+    showToast('تم رفض الطلب');
+    await loadAllData();
+  } catch (err) { showToast('❌ ' + err.message); }
+}
+
+async function activateSubscription(id) {
+  const s = allSubscriptions.find(x => x.id === id); if (!s) return;
+  if (!confirm(`تأكيد استلام الدفع وتفعيل اشتراك ${s.childName}؟`)) return;
+  const start = s.plannedStart ? s.plannedStart.toDate() : new Date();
+  const end = new Date(start); end.setDate(end.getDate() + 30);
+  try {
+    await db.collection('subscriptions').doc(id).update({
+      status: 'active',
+      subscriptionStart: firebase.firestore.Timestamp.fromDate(start),
+      subscriptionEnd: firebase.firestore.Timestamp.fromDate(end),
+      daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, end);
+    showToast('✅ تم تفعيل الاشتراك');
+    await loadAllData();
+  } catch (err) { showToast('❌ ' + err.message); }
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});

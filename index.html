@@ -8,6 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="css/main.css"/>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#B8541E"/>
+  <link rel="icon" href="images/icon-192.png"/>
+  <link rel="apple-touch-icon" href="images/icon-192.png"/>
 </head>
 <body>
 
@@ -30,7 +34,7 @@
     <a href="#why-us">عن الأكاديمية</a>
     <a href="#contact">تواصل</a>
     <a href="client/login.html" class="btn-nav-portal">دخول العضو</a>
-    <a href="#packages" class="btn-nav-cta">اشترك الآن</a>
+    <a href="client/register.html" class="btn-nav-cta">سجّل الآن</a>
   </div>
   <button class="mobile-menu-btn" onclick="toggleMobileNav()" id="mobileBtn">☰</button>
 </nav>
@@ -40,7 +44,7 @@
   <a href="#why-us" onclick="closeMobileNav()">🏆 عن الأكاديمية</a>
   <a href="#contact" onclick="closeMobileNav()">📞 تواصل معنا</a>
   <a href="client/login.html">👤 دخول العضو</a>
-  <a href="#packages" onclick="closeMobileNav()" style="background:var(--copper);color:white;border-radius:10px;text-align:center">اشترك الآن</a>
+  <a href="client/register.html" style="background:var(--copper);color:white;border-radius:10px;text-align:center">سجّل الآن</a>
 </div>
 
 <!-- HERO -->
@@ -72,8 +76,8 @@
           <span class="hero-pill">🏕️ معسكرات رياضية</span>
         </div>
         <div class="hero-ctas">
-          <a href="#packages" class="btn-primary">
-            <span>اشترك الآن</span>
+          <a href="client/register.html" class="btn-primary">
+            <span>سجّل الآن</span>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </a>
           <a href="https://wa.me/96593000607" target="_blank" class="btn-whatsapp-hero">
@@ -165,7 +169,7 @@
     <div class="reveal" style="text-align:center">
       <div class="section-tag">💎 الاشتراكات</div>
       <h2 class="section-title">اختر الباقة <span>المناسبة</span></h2>
-      <p class="section-desc" style="margin:0 auto 48px">جميع الباقات تشمل تعليماً احترافياً تحت إشراف كويتي متخصص</p>
+      <p class="section-desc" style="margin:0 auto 48px">جميع الباقات تشمل تعليماً احترافياً تحت إشراف كويتي متخصص · التسجيل يخضع لمراجعة الإدارة</p>
     </div>
 
     <div class="packages-grid">
@@ -180,24 +184,15 @@
         <div class="pkg-body">
           <div class="pkg-detail">
             <div class="pkg-detail-icon">📅</div>
-            <div class="pkg-detail-text">
-              <strong>الأيام</strong>
-              <span>السبت — الاثنين — الأربعاء</span>
-            </div>
+            <div class="pkg-detail-text"><strong>الأيام</strong><span>كل سبت</span></div>
           </div>
           <div class="pkg-detail">
             <div class="pkg-detail-icon">⏰</div>
-            <div class="pkg-detail-text">
-              <strong>الوقت</strong>
-              <span>4:00 — 5:00 مساءً</span>
-            </div>
+            <div class="pkg-detail-text"><strong>الوقت</strong><span>4:00 — 5:00 مساءً</span></div>
           </div>
           <div class="pkg-detail">
             <div class="pkg-detail-icon">📍</div>
-            <div class="pkg-detail-text">
-              <strong>المكان</strong>
-              <span>منطقة الروضة</span>
-            </div>
+            <div class="pkg-detail-text"><strong>المكان</strong><span>منطقة الروضة</span></div>
           </div>
           <ul class="pkg-features">
             <li>تدريب بإشراف مدربين معتمدين</li>
@@ -207,62 +202,42 @@
           </ul>
         </div>
         <div class="pkg-footer">
-          <div class="pkg-price">
-            <span class="price-num">60</span>
-            <span class="price-unit">د.ك / شهر</span>
-          </div>
-          <button class="btn-subscribe" onclick="openModal('football',60,'باقة كرة القدم')">
-            اشترك الآن
-          </button>
+          <div class="pkg-price"><span class="price-num">25</span><span class="price-unit">د.ك / شهر</span></div>
+          <a class="btn-subscribe" href="client/register.html?pkg=football" style="display:block;text-align:center">سجّل الآن</a>
         </div>
       </div>
 
-      <!-- Premium (Featured) -->
+      <!-- Excellence (Featured) -->
       <div class="pkg-card featured reveal reveal-delay-2">
         <div class="featured-label">⭐ الأكثر طلباً</div>
         <div class="pkg-head">
           <span class="pkg-icon">⚡</span>
-          <div class="pkg-name">الباقة المميزة</div>
-          <div class="pkg-tagline">كرة القدم + بناء الثقة</div>
+          <div class="pkg-name">باقة التميز</div>
+          <div class="pkg-tagline">كرة القدم + بناء الثقة والكيوكشن</div>
         </div>
         <div class="pkg-body">
           <div class="pkg-detail">
             <div class="pkg-detail-icon">📅</div>
-            <div class="pkg-detail-text">
-              <strong>الأيام</strong>
-              <span>السبت حتى الخميس (6 أيام)</span>
-            </div>
+            <div class="pkg-detail-text"><strong>الأيام</strong><span>4 أيام بالأسبوع</span></div>
           </div>
           <div class="pkg-detail">
             <div class="pkg-detail-icon">⚽</div>
-            <div class="pkg-detail-text">
-              <strong>يشمل</strong>
-              <span>كرة القدم + الدفاع عن النفس</span>
-            </div>
+            <div class="pkg-detail-text"><strong>يشمل</strong><span>كرة القدم + بناء الثقة والكيوكشن</span></div>
           </div>
           <div class="pkg-detail">
             <div class="pkg-detail-icon">📍</div>
-            <div class="pkg-detail-text">
-              <strong>المكانين</strong>
-              <span>الروضة + السلام</span>
-            </div>
+            <div class="pkg-detail-text"><strong>المكان</strong><span>جنوب السرة + الروضة</span></div>
           </div>
           <ul class="pkg-features">
             <li>جميع مزايا الباقتين مجتمعتين</li>
-            <li>تدريب شامل 6 أيام أسبوعياً</li>
             <li>أولوية الحجز في المعسكرات</li>
             <li>تقارير أداء شهرية</li>
             <li>خصومات على الفعاليات الخاصة</li>
           </ul>
         </div>
         <div class="pkg-footer">
-          <div class="pkg-price">
-            <span class="price-num">120</span>
-            <span class="price-unit">د.ك / شهر</span>
-          </div>
-          <button class="btn-subscribe btn-featured" onclick="openModal('premium',120,'الباقة المميزة')">
-            اشترك الآن
-          </button>
+          <div class="pkg-price"><span class="price-num">85</span><span class="price-unit">د.ك / شهر</span></div>
+          <a class="btn-subscribe btn-featured" href="client/register.html?pkg=excellence" style="display:block;text-align:center">سجّل الآن</a>
         </div>
       </div>
 
@@ -270,49 +245,47 @@
       <div class="pkg-card reveal reveal-delay-3">
         <div class="pkg-head">
           <span class="pkg-icon">🥋</span>
-          <div class="pkg-name">باقة بناء الثقة</div>
+          <div class="pkg-name">باقة بناء الثقة والكيوكشن</div>
           <div class="pkg-tagline">الثقة والدفاع عن النفس</div>
         </div>
         <div class="pkg-body">
           <div class="pkg-detail">
             <div class="pkg-detail-icon">📅</div>
-            <div class="pkg-detail-text">
-              <strong>الأيام</strong>
-              <span>الأحد — الثلاثاء — الخميس</span>
-            </div>
+            <div class="pkg-detail-text"><strong>الأيام</strong><span>الأحد — الثلاثاء — الخميس</span></div>
           </div>
           <div class="pkg-detail">
             <div class="pkg-detail-icon">⏰</div>
-            <div class="pkg-detail-text">
-              <strong>الوقت</strong>
-              <span>A: 4:30–6:00 | B: 6:00–7:30</span>
-            </div>
+            <div class="pkg-detail-text"><strong>الوقت</strong><span>أشبال: 4:30–6:00 | رجال: 6:00–7:30</span></div>
           </div>
           <div class="pkg-detail">
             <div class="pkg-detail-icon">📍</div>
-            <div class="pkg-detail-text">
-              <strong>المكان</strong>
-              <span>منطقة السلام</span>
-            </div>
+            <div class="pkg-detail-text"><strong>المكان</strong><span>جنوب السرة</span></div>
           </div>
           <ul class="pkg-features">
-            <li>تدريب الدفاع عن النفس</li>
+            <li>تدريب الدفاع عن النفس والكيوكشن</li>
             <li>بناء شخصية قوية وواثقة</li>
             <li>تطوير الانضباط الذاتي</li>
             <li>مدربون متخصصون ومعتمدون</li>
           </ul>
         </div>
         <div class="pkg-footer">
-          <div class="pkg-price">
-            <span class="price-num">70</span>
-            <span class="price-unit">د.ك / شهر</span>
-          </div>
-          <button class="btn-subscribe" onclick="openModal('confidence',70,'باقة بناء الثقة والدفاع عن النفس')">
-            اشترك الآن
-          </button>
+          <div class="pkg-price"><span class="price-num">70</span><span class="price-unit">د.ك / شهر</span></div>
+          <a class="btn-subscribe" href="client/register.html?pkg=confidence" style="display:block;text-align:center">سجّل الآن</a>
         </div>
       </div>
 
+    </div>
+
+    <!-- Loyalty banner -->
+    <div class="reveal" style="margin-top:28px;background:linear-gradient(135deg,var(--copper-dark),var(--copper));border-radius:18px;padding:22px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;color:white;box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="font-size:2.2rem">🏅</div>
+        <div>
+          <div style="font-size:1.15rem;font-weight:900">أنا من أسرة سلام</div>
+          <div style="font-size:0.9rem;opacity:0.85">خصم خاص للأعضاء المستمرين أكثر من سنة دون انقطاع — حدّد "أسرة سلام" في نموذج التسجيل وستحدد الإدارة خصمك عند الموافقة</div>
+        </div>
+      </div>
+      <a href="client/register.html?pkg=excellence&loyal=1" style="background:white;color:var(--copper-dark);padding:11px 24px;border-radius:30px;font-weight:800;white-space:nowrap">سجّل كعضو قديم</a>
     </div>
   </div>
 </section>
@@ -426,59 +399,6 @@
     </div>
   </div>
 </footer>
-
-<!-- SUBSCRIPTION MODAL -->
-<div class="modal-overlay" id="subModal" onclick="handleOverlayClick(event)">
-  <div class="modal-box" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeModal()" type="button" aria-label="إغلاق">✕</button>
-    <div class="modal-header">
-      <div class="modal-header-logo">🏆</div>
-      <h2>تسجيل الاشتراك</h2>
-      <p id="modalPkgName">الباقة المختارة</p>
-    </div>
-    <div class="modal-body">
-      <form id="subForm" onsubmit="submitSub(event)">
-        <div class="form-row-2">
-          <div class="form-group">
-            <label>اسم الطفل</label>
-            <input type="text" id="fChildName" required placeholder="الاسم الكامل"/>
-          </div>
-          <div class="form-group">
-            <label>عمر الطفل</label>
-            <input type="number" id="fChildAge" required placeholder="السن" min="4" max="18"/>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>اسم ولي الأمر</label>
-          <input type="text" id="fParentName" required placeholder="الاسم الكامل"/>
-        </div>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label>رقم الهاتف</label>
-            <input type="tel" id="fPhone" required placeholder="XXXXXXXX"/>
-          </div>
-          <div class="form-group">
-            <label>البريد الإلكتروني</label>
-            <input type="email" id="fEmail" required placeholder="example@mail.com"/>
-          </div>
-        </div>
-        <div class="modal-price-box">
-          <small>المبلغ الشهري</small>
-          <strong id="modalPrice">-- د.ك</strong>
-        </div>
-        <button type="submit" class="btn-pay-main" id="payBtn">
-          💳 الدفع الآن عبر Upayment
-        </button>
-        <a href="https://wa.me/96593000607" target="_blank" class="btn-pay-wa">
-          💬 تواصل معنا للدفع النقدي
-        </a>
-      </form>
-      <button onclick="closeModal()" type="button" style="width:100%;margin-top:14px;background:none;border:2px solid rgba(184,84,30,0.2);color:var(--text-mid);padding:11px;border-radius:30px;font-family:Tajawal,sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer">
-        ← إلغاء والعودة
-      </button>
-    </div>
-  </div>
-</div>
 
 <!-- WhatsApp Float -->
 <a href="https://wa.me/96593000607" class="wa-float" target="_blank" title="تواصل على واتساب">

@@ -13,6 +13,7 @@
 ```
 salam-academy/
 ├── index.html              ← Landing page (homepage)
+├── manifest.json / manifest-admin.json / sw.js  ← PWA (mobile app)
 ├── css/
 │   ├── main.css            ← Main styles
 │   ├── portal.css          ← Dashboard & login styles
@@ -23,8 +24,11 @@ salam-academy/
 │   ├── client-login.js     ← Client OTP/email login
 │   ├── client-dashboard.js ← Client portal JS
 │   ├── admin-login.js      ← Admin login
-│   └── admin-dashboard.js  ← Admin CRUD panel
+│   ├── register.js         ← Survey logic
+│   ├── pwa-install.js      ← Install-to-home-screen banner
+│   └── admin-dashboard.js  ← Admin CRUD + review queue
 ├── client/
+│   ├── register.html       ← Registration survey (replaces Google Form)
 │   ├── login.html          ← Client login page
 │   ├── dashboard.html      ← Client portal (days remaining etc.)
 │   └── payment-success.html← After Upayment redirect
@@ -110,6 +114,24 @@ const UPAYMENT_CONFIG = {
 
 ---
 
+## 🔄 Registration & Approval Flow (NEW)
+
+1. Parent fills the survey at `client/register.html` (same questions as the Google Form) → saved with `status: pending_review`
+2. Admin → **📝 طلبات المراجعة** sees all answers (health, allergies, reason, tournaments consent, package, loyalty) → **✅ موافقة** (set amount/start date) or **⛔ رفض** (reason) → WhatsApp opens automatically
+3. Approved → `status: approved`. Parent sees "تمت الموافقة — ادفع الآن" in their portal
+4. After payment received → admin clicks **▶️ تفعيل** → `status: active`, 30-day countdown starts, welcome WhatsApp opens
+
+Statuses: `pending_review` → `approved` → `active` → `expired` (or `rejected` / `cancelled`)
+
+## 📱 Mobile App (PWA)
+
+Both portals install as apps from the browser — no App Store needed:
+- **Android (Chrome):** a "تثبيت" banner appears in the dashboard → tap it
+- **iPhone (Safari):** tap Share ⬆️ → "Add to Home Screen" (a hint banner shows once)
+- Member app → `manifest.json` (copper icon) · Admin app → `manifest-admin.json` (dark icon)
+- `sw.js` caches the app shell for fast launch; Firebase/Upayment requests are never cached
+- Requires HTTPS — GitHub Pages provides this automatically
+
 ## 📊 Firestore Data Structure
 
 ### `subscriptions` collection:
@@ -121,11 +143,20 @@ const UPAYMENT_CONFIG = {
   "phone": "99999999",
   "email": "parent@email.com",
   "uid": "firebase-auth-uid",
-  "packageType": "football",
-  "packageName": "باقة كرة القدم",
-  "amount": 60,
+  "birthDate": "2016-03-12",
+  "phone2": "66666666",
+  "healthIssues": "لا يوجد",
+  "allergies": "لا يوجد",
+  "reason": "بناء الثقة",
+  "tournamentsConsent": "لا أمانع",
+  "loyaltyMember": false,
+  "termsAccepted": true,
+  "adminNote": "",
+  "packageType": "football | confidence | excellence",
+  "packageName": "معسكر كرة القدم",
+  "amount": 25,
   "paymentMethod": "upayment",
-  "status": "active",
+  "status": "pending_review | approved | active | expired | rejected",
   "subscriptionStart": "Timestamp",
   "subscriptionEnd": "Timestamp",
   "daysRemaining": 30,

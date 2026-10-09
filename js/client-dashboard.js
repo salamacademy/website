@@ -4,27 +4,11 @@
 
 let currentSubscription = null;
 const SCHEDULES = {
-  football: {
-    name: 'باقة كرة القدم',
-    days: 'السبت - الاثنين - الأربعاء',
-    time: '4:00 - 5:00 مساءً',
-    location: 'منطقة الروضة',
-    icon: '⚽'
-  },
-  confidence: {
-    name: 'باقة بناء الثقة والدفاع عن النفس',
-    days: 'الأحد - الثلاثاء - الخميس',
-    time: 'Class A: 4:30-6:00 | Class B: 6:00-7:30',
-    location: 'منطقة السلام',
-    icon: '🥋'
-  },
-  premium: {
-    name: 'الباقة المميزة',
-    days: 'السبت - الخميس (6 أيام)',
-    time: 'كرة القدم 4:00-5:00 + الدفاع عن النفس 4:30-7:30',
-    location: 'الروضة + السلام',
-    icon: '⚡'
-  }
+  football: { name: 'معسكر كرة القدم', days: 'كل سبت', time: '4:00 - 5:00 مساءً', location: 'منطقة الروضة', icon: '⚽' },
+  confidence: { name: 'معسكر بناء الثقة والكيوكشن', days: 'الأحد - الثلاثاء - الخميس', time: 'أشبال 4:30-6:00 | رجال 6:00-7:30', location: 'جنوب السرة', icon: '🥋' },
+  excellence: { name: 'باقة التميز', days: '4 أيام بالأسبوع', time: 'كرة القدم السبت + الكيوكشن أحد/ثلاثاء/خميس', location: 'جنوب السرة + الروضة', icon: '⚡' },
+  excellence_loyal: { name: 'باقة التميز - أسرة سلام', days: '4 أيام بالأسبوع', time: 'كرة القدم السبت + الكيوكشن أحد/ثلاثاء/خميس', location: 'جنوب السرة + الروضة', icon: '🏅' },
+  premium: { name: 'الباقة المميزة', days: '6 أيام', time: '--', location: 'الروضة + السلام', icon: '⚡' }
 };
 
 // Auth guard
@@ -39,22 +23,24 @@ auth.onAuthStateChanged(async (user) => {
 async function loadClientData(user) {
   try {
     // Find subscription by phone or email (linked via UID after login)
-    let snap = await db.collection('subscriptions')
-      .where('uid', '==', user.uid)
-      .where('status', '==', 'active')
-      .orderBy('createdAt', 'desc')
-      .limit(1)
-      .get();
-
-    // Fallback: search by phone
-    if (snap.empty && user.phoneNumber) {
-      const phone = user.phoneNumber.replace('+965', '');
-      snap = await db.collection('subscriptions')
-        .where('phone', '==', phone)
-        .where('status', '==', 'active')
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get();
+    let snap = { empty: true, docs: [] };
+    const phone = user.phoneNumber ? user.phoneNumber.replace('+965', '') : null;
+    if (phone) {
+      snap = await db.collection('subscriptions').where('phone', '==', phone).get();
+    }
+    if (snap.empty && user.email) {
+      snap = await db.collection('subscriptions').where('email', '==', user.email).get();
+    }
+    if (!snap.empty) {
+      // Prefer active, then approved, then pending, then newest
+      const rank = { active: 0, approved: 1, pending_review: 2, pending_payment: 1 };
+      const docs = snap.docs.slice().sort((a, b) => {
+        const ra = rank[a.data().status] ?? 5, rb = rank[b.data().status] ?? 5;
+        if (ra !== rb) return ra - rb;
+        const ta = a.data().createdAt?.toMillis?.() || 0, tb = b.data().createdAt?.toMillis?.() || 0;
+        return tb - ta;
+      });
+      snap = { empty: false, docs: [docs[0]] };
     }
 
     if (snap.empty) {
@@ -73,6 +59,7 @@ async function loadClientData(user) {
 }
 
 function renderDashboard(sub) {
+  if (sub.status !== 'active' && sub.status !== 'expired') { renderRequestState(sub); return; }
   // Update header
   document.getElementById('topbarName').textContent = sub.parentName || 'العضو';
   document.getElementById('welcomeName').textContent = sub.childName || sub.parentName;
@@ -229,20 +216,10 @@ function toggleSidebar() {
 function showNoSubscription() {
   document.getElementById('daysRemaining').textContent = '0';
   document.getElementById('daysStatusTitle').textContent = 'لا يوجد اشتراك نشط';
-  document.getElementById('daysStatusDesc').textContent = 'قم بالاشتراك في أحد باقاتنا للبدء';
-  document.getElementById('renewalAlert').style.display = 'flex';
-}
-
-async function renewSubscription() {
-  if (!currentSubscription) return;
-  // Trigger Upayment for renewal
-  const msg = `مرحباً، أريد تجديد اشتراكي
-  
-الباقة: ${currentSubscription.packageName}
-اسم الطفل: ${currentSubscription.childName}
-المبلغ: ${currentSubscription.amount} د.ك`;
-
-  window.open('https://wa.me/96593000607?text=' + encodeURIComponent(msg), '_blank');
+  document.getElementById('daysStatusDesc').textContent = 'لم نجد طلب تسجيل مرتبط برقمك. قم بتعبئة نموذج التسجيل للبدء.';
+  const a = document.getElementById('renewalAlert'); a.style.display = 'flex';
+  a.querySelector('strong').textContent = 'لا يوجد طلب تسجيل'; a.querySelector('p').textContent = 'سجّل الآن عبر النموذج';
+  const b = a.querySelector('.alert-btn'); b.textContent = '📝 نموذج التسجيل'; b.onclick = () => location.href = 'register.html';
 }
 
 function logout() {
@@ -254,3 +231,78 @@ function logout() {
 function showError(msg) {
   console.error(msg);
 }
+
+
+// ========== REQUEST STATE (before active) ==========
+function renderRequestState(sub) {
+  document.getElementById('topbarName').textContent = sub.parentName || 'العضو';
+  document.getElementById('welcomeName').textContent = sub.childName || sub.parentName;
+  document.getElementById('childNameDisplay').textContent = sub.childName || '--';
+  document.getElementById('packageLabel').textContent = sub.packageName || SCHEDULES[sub.packageType]?.name || '--';
+  document.getElementById('amountDisplay').textContent = sub.amount + ' د.ك';
+  document.getElementById('renewPackageName').textContent = sub.packageName;
+  document.getElementById('renewAmount').textContent = sub.amount + ' د.ك';
+  renderSubscriptionDetails(sub);
+  renderSchedule(sub.packageType);
+
+  const card = document.getElementById('daysCard');
+  const circle = document.getElementById('daysCircle');
+  const alert = document.getElementById('renewalAlert');
+  const s = sub.status;
+
+  if (s === 'pending_review') {
+    document.getElementById('daysRemaining').textContent = '⏳';
+    circle.setAttribute('stroke', '#D4920A'); circle.style.strokeDashoffset = 170;
+    document.getElementById('daysStatusTitle').textContent = '📝 طلبك قيد المراجعة';
+    document.getElementById('daysStatusDesc').textContent = 'تقوم الإدارة بمراجعة نموذج التسجيل. سنتواصل معك عبر الواتساب خلال 24 ساعة.';
+    document.getElementById('startDate').textContent = '--'; document.getElementById('endDate').textContent = '--';
+  } else if (s === 'approved' || s === 'pending_payment') {
+    document.getElementById('daysRemaining').textContent = '✅';
+    circle.setAttribute('stroke', '#2e7d32'); circle.style.strokeDashoffset = 0;
+    document.getElementById('daysStatusTitle').textContent = '🎉 تمت الموافقة على طلبك!';
+    document.getElementById('daysStatusDesc').textContent = (sub.adminNote ? sub.adminNote + ' · ' : '') + 'يرجى سداد الرسوم لتفعيل الاشتراك.';
+    const ps = sub.plannedStart ? sub.plannedStart.toDate() : null, pe = sub.plannedEnd ? sub.plannedEnd.toDate() : null;
+    document.getElementById('startDate').textContent = ps ? ps.toLocaleDateString('ar-KW') : '--';
+    document.getElementById('endDate').textContent = pe ? pe.toLocaleDateString('ar-KW') : '--';
+    alert.style.display = 'flex';
+    alert.querySelector('strong').textContent = 'ادفع الآن لتفعيل اشتراك ' + sub.childName;
+    alert.querySelector('p').textContent = sub.amount + ' د.ك — عبر Upayment أو تواصل معنا للدفع النقدي / التحويل';
+    alert.querySelector('.alert-btn').textContent = '💳 الدفع الآن';
+    document.getElementById('pageTitle').textContent = 'بانتظار الدفع';
+  } else if (s === 'rejected') {
+    document.getElementById('daysRemaining').textContent = '✕';
+    circle.setAttribute('stroke', '#c62828'); circle.style.strokeDashoffset = 0;
+    document.getElementById('daysStatusTitle').textContent = 'لم يتم قبول الطلب';
+    document.getElementById('daysStatusDesc').textContent = sub.adminNote || 'للاستفسار يرجى التواصل مع الإدارة.';
+  }
+  const ds = document.getElementById('daysRemaining'); ds.style.fontSize = '2rem';
+  document.querySelector('.days-label').textContent = '';
+}
+
+function renewSubscription() {
+  if (!currentSubscription) return;
+  payNow(currentSubscription, currentSubscription.status === 'active' ? 'تجديد' : 'تفعيل');
+}
+
+async function payNow(sub, kind) {
+  // Try Upayment (requires server-side proxy in production); fall back to WhatsApp
+  try {
+    const res = await fetch('https://sandboxapi.upayments.com/api/v1/charge', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + UPAYMENT_CONFIG.apiKey },
+      body: JSON.stringify({ totalPrice: sub.amount, currency: 'KWD', customerName: sub.parentName, customerEmail: sub.email || 'noemail@salam.kw', customerMobileNumber: '+965' + sub.phone, title: sub.packageName + ' — أكاديمية سلام', orderId: sub.id, returnUrl: location.origin + '/client/payment-success.html?id=' + sub.id, cancelUrl: location.href, language: 'ar' })
+    });
+    const r = await res.json();
+    if (r.status === true && r.data?.link) { location.href = r.data.link; return; }
+    throw new Error('no link');
+  } catch (e) {
+    const msg = `مرحباً، أريد ${kind} اشتراك ${sub.childName} 🏆\nالباقة: ${sub.packageName}\nالمبلغ: ${sub.amount} د.ك\nيرجى تزويدي بطريقة الدفع.`;
+    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(msg), '_blank');
+  }
+}
+
+// Renewal alert button → pay / renew
+document.querySelector('#renewalAlert .alert-btn')?.addEventListener('click', function (e) {
+  if (currentSubscription && currentSubscription.status !== 'active') { e.stopPropagation(); payNow(currentSubscription, 'تفعيل'); }
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});

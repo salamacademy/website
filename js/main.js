@@ -106,116 +106,6 @@ const statsObserver = new IntersectionObserver((entries) => {
 const statsBar = document.querySelector('.hero-stats-bar');
 if (statsBar) statsObserver.observe(statsBar);
 
-// ─── MODAL ───
-let currentPkg = null;
-
-function openModal(type, price, name) {
-  currentPkg = { type, price, name };
-  document.getElementById('modalPkgName').textContent = name;
-  document.getElementById('modalPrice').textContent = price + ' د.ك / شهر';
-  document.getElementById('subModal').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeModal() {
-  var modal = document.getElementById('subModal');
-  if (modal) {
-    modal.classList.remove('open');
-    modal.style.display = 'none';
-    setTimeout(function() { modal.style.display = ''; }, 50);
-  }
-  document.body.style.overflow = '';
-  var btn = document.getElementById('payBtn');
-  if (btn) { btn.disabled = false; btn.textContent = '💳 الدفع الآن عبر Upayment'; }
-}
-
-function handleOverlayClick(e) {
-  if (e.target === e.currentTarget) {
-    closeModal();
-  }
-}
-
-// ESC key closes modal
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeModal();
-});
-
-async function submitSub(e) {
-  e.preventDefault();
-  const btn = document.getElementById('payBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ جاري المعالجة...';
-
-  const data = {
-    childName: document.getElementById('fChildName').value.trim(),
-    childAge: parseInt(document.getElementById('fChildAge').value),
-    parentName: document.getElementById('fParentName').value.trim(),
-    phone: document.getElementById('fPhone').value.trim(),
-    email: document.getElementById('fEmail').value.trim(),
-    packageType: currentPkg.type,
-    packageName: currentPkg.name,
-    amount: currentPkg.price,
-    status: 'pending_payment',
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    subscriptionStart: null,
-    subscriptionEnd: null,
-    daysRemaining: 0,
-    source: 'website'
-  };
-
-  try {
-    const docRef = await db.collection('subscriptions').add(data);
-    // Try Upayment
-    await initiateUpayment(docRef.id, data);
-  } catch (err) {
-    console.error(err);
-    // Fallback to WhatsApp
-    sendWAFallback(data);
-    btn.disabled = false;
-    btn.textContent = '💳 الدفع الآن عبر Upayment';
-  }
-}
-
-async function initiateUpayment(id, data) {
-  const payload = {
-    totalPrice: data.amount,
-    currency: "KWD",
-    customerName: data.parentName,
-    customerEmail: data.email,
-    customerMobileNumber: "+965" + data.phone.replace(/\D/g,''),
-    title: data.packageName + " — أكاديمية سلام",
-    description: "اشتراك شهري: " + data.packageName,
-    orderId: id,
-    returnUrl: window.location.origin + "/client/payment-success.html?id=" + id,
-    cancelUrl: window.location.origin + "/?cancelled=1",
-    language: "ar"
-  };
-
-  const res = await fetch("https://sandboxapi.upayments.com/api/v1/charge", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + UPAYMENT_CONFIG.apiKey
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const result = await res.json();
-  if (result.status === true && result.data?.link) {
-    window.location.href = result.data.link;
-  } else {
-    sendWAFallback(data);
-  }
-}
-
-function sendWAFallback(data) {
-  const msg = `مرحباً، أريد الاشتراك في أكاديمية سلام 🏆\n\nالباقة: ${data.packageName}\nاسم الطفل: ${data.childName} (${data.childAge} سنة)\nولي الأمر: ${data.parentName}\nالمبلغ: ${data.amount} د.ك`;
-  window.open('https://wa.me/96593000607?text=' + encodeURIComponent(msg), '_blank');
-  closeModal();
-  showToast('✅ سيتواصل معك فريقنا قريباً!');
-  document.getElementById('subForm').reset();
-}
-
 function showToast(msg) {
   const t = document.createElement('div');
   t.style.cssText = `
@@ -232,4 +122,9 @@ function showToast(msg) {
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.4s'; setTimeout(()=>t.remove(),400); }, 4000);
+}
+
+// PWA service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
 }

@@ -1,0 +1,46 @@
+.reg-body {
+  min-height: 100vh;
+  background: linear-gradient(160deg, var(--copper-deep) 0%, var(--copper-dark) 45%, var(--dark) 100%);
+  padding: 24px 16px 40px;
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
+}
+.reg-wrap { max-width: 640px; margin: 0 auto; }
+.reg-header { text-align: center; color: white; margin-bottom: 20px; }
+.reg-logo { width: 84px; height: 84px; object-fit: contain; background: white; border-radius: 50%; padding: 6px; margin-bottom: 10px; box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+.reg-header h1 { font-size: 1.5rem; font-weight: 900; }
+.reg-header p { font-size: 0.9rem; opacity: 0.8; margin-top: 4px; line-height: 1.6; }
+.reg-steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-top: 18px; }
+.reg-steps .step { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; transition: all .25s; }
+.reg-steps .step.active { background: white; color: var(--copper-dark); border-color: white; }
+.reg-steps .step.done { background: #4caf50; border-color: #4caf50; color: white; }
+.reg-steps i { width: 44px; height: 2px; background: rgba(255,255,255,0.25); }
+.reg-card { background: white; border-radius: 22px; padding: 26px 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+.reg-step h2 { font-size: 1.15rem; font-weight: 900; color: var(--copper-dark); margin-bottom: 18px; padding-bottom: 10px; border-bottom: 2px solid var(--copper-pale); }
+.form-group label b { color: #d32f2f; }
+.form-group textarea { width: 100%; padding: 12px 16px; border: 2px solid rgba(184,84,30,0.15); border-radius: 12px; font-family: 'Tajawal', sans-serif; font-size: 0.95rem; background: var(--copper-xpale); resize: vertical; }
+.form-group textarea:focus { outline: none; border-color: var(--copper); background: white; box-shadow: 0 0 0 4px rgba(184,84,30,0.1); }
+.radio-row { display: flex; gap: 10px; }
+.radio-pill { flex: 1; cursor: pointer; }
+.radio-pill input { display: none; }
+.radio-pill span { display: block; text-align: center; padding: 12px; border: 2px solid rgba(184,84,30,0.15); border-radius: 12px; font-weight: 700; background: var(--copper-xpale); transition: all .2s; }
+.radio-pill input:checked + span { background: var(--copper); color: white; border-color: var(--copper); }
+.pkg-options { display: flex; flex-direction: column; gap: 10px; }
+.pkg-opt { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 2px solid rgba(184,84,30,0.15); border-radius: 14px; background: var(--copper-xpale); cursor: pointer; transition: all .2s; }
+.pkg-opt:has(input:checked) { border-color: var(--copper); background: var(--copper-pale); box-shadow: 0 0 0 3px rgba(184,84,30,0.12); }
+.pkg-opt input { margin-top: 4px; accent-color: var(--copper); width: 18px; height: 18px; }
+.pkg-opt strong { display: block; font-size: 1rem; color: var(--dark); }
+.pkg-opt span { font-size: 0.82rem; color: var(--text-mid); line-height: 1.6; }
+.pkg-opt em { font-style: normal; color: var(--copper-dark); font-weight: 800; }
+.check-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 0.88rem; color: var(--text-body); line-height: 1.6; }
+.check-row:hover { background: var(--copper-xpale); }
+.check-row input { margin-top: 4px; accent-color: var(--copper); width: 18px; height: 18px; flex-shrink: 0; }
+.check-row a { color: var(--copper); font-weight: 700; }
+.loyal-row { background: linear-gradient(135deg,#fff8e1,#fff3cd); border: 2px solid rgba(212,146,10,0.35); }
+.review-note { background: var(--copper-xpale); border: 1.5px dashed rgba(184,84,30,0.3); border-radius: 12px; padding: 12px 14px; font-size: 0.85rem; color: var(--text-mid); line-height: 1.7; margin-top: 16px; }
+.reg-nav { display: flex; gap: 10px; margin-top: 22px; }
+.reg-nav .btn-portal-primary { flex: 1; }
+.error-msg { display: none; }
+@media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } .reg-card { padding: 20px 16px; } }
+.reg-nav > * { width: auto !important; margin: 0 !important; }
+.reg-nav .btn-portal-primary { flex: 1 1 auto; }
+.reg-nav .btn-portal-ghost { flex: 0 0 auto; padding-left: 18px; padding-right: 18px; white-space: nowrap; }

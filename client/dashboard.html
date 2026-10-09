@@ -2,11 +2,16 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>حسابي | أكاديمية سلام</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/main.css" />
   <link rel="stylesheet" href="../css/portal.css" />
+  <link rel="manifest" href="../manifest.json" />
+  <meta name="theme-color" content="#B8541E" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="../images/icon-192.png" />
 </head>
 <body class="portal-body">
 
@@ -28,8 +33,9 @@
           📅 الجدول
         </a>
         <a href="#renew" class="sidebar-link" onclick="showSection('renew')">
-          🔄 تجديد الاشتراك
+          🔄 تجديد / دفع
         </a>
+        <a href="register.html" class="sidebar-link">📝 تسجيل طفل آخر</a>
       </nav>
       <div class="sidebar-footer">
         <a href="https://wa.me/96593000607" target="_blank" class="sidebar-whatsapp">
@@ -41,6 +47,7 @@
 
     <!-- Main Content -->
     <main class="client-main">
+      <div id="installBanner" class="install-banner" style="display:none"><span>📲 أضف التطبيق إلى الشاشة الرئيسية لتجربة أسرع</span><button id="installBtn">تثبيت</button><button class="ib-close" onclick="this.parentElement.style.display='none'">✕</button></div>
 
       <!-- Header Bar -->
       <div class="client-topbar">
@@ -134,7 +141,7 @@
             <strong>اشتراكك على وشك الانتهاء!</strong>
             <p>لا تفوّت تجديد اشتراكك للحفاظ على مكانك في الأكاديمية</p>
           </div>
-          <button onclick="showSection('renew')" class="alert-btn">جدد الآن</button>
+          <button onclick="if(currentSubscription&&currentSubscription.status==='active')showSection('renew')" class="alert-btn">جدد الآن</button>
         </div>
       </section>
 
@@ -160,7 +167,7 @@
           <p>المبلغ: <strong id="renewAmount">-- د.ك</strong></p>
           <br/>
           <button class="btn-portal-primary" onclick="renewSubscription()">
-            💳 تجديد عبر Upayment
+            💳 الدفع / التجديد عبر Upayment
           </button>
           <a href="https://wa.me/96593000607" target="_blank" class="btn-portal-whatsapp" style="margin-top:12px">
             أو تواصل معنا للدفع النقدي
@@ -175,6 +182,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="../js/firebase-config.js"></script>
+  <script src="../js/pwa-install.js"></script>
   <script src="../js/client-dashboard.js"></script>
 </body>
 </html>

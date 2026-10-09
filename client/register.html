@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+  <title>نموذج التسجيل | أكاديمية سلام</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/portal.css"/>
+  <link rel="stylesheet" href="../css/register.css"/>
+  <link rel="manifest" href="../manifest.json"/>
+  <meta name="theme-color" content="#B8541E"/>
+  <link rel="apple-touch-icon" href="../images/icon-192.png"/>
+</head>
+<body class="reg-body">
+
+<div class="reg-wrap">
+  <header class="reg-header">
+    <img src="../images/logo-ar.png" alt="Salam Academy" class="reg-logo"/>
+    <h1>Salam Academy family</h1>
+    <p>💐🕊️ نموذج التسجيل الخاص بأكاديمية سلام، والتي تهدف إلى بناء جيل واثق متميز</p>
+    <div class="reg-steps">
+      <span class="step active" data-step="1">1</span><i></i>
+      <span class="step" data-step="2">2</span><i></i>
+      <span class="step" data-step="3">3</span>
+    </div>
+  </header>
+
+  <form id="regForm" class="reg-card" novalidate>
+
+    <!-- STEP 1: Child & contact -->
+    <section class="reg-step" data-step="1">
+      <h2>👦 بيانات الطفل وولي الأمر</h2>
+
+      <div class="form-group">
+        <label>الاسم الثلاثي للطفل <b>*</b></label>
+        <input type="text" id="childName" required placeholder="الاسم الأول — اسم الأب — اسم الجد"/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>تاريخ الميلاد <b>*</b></label>
+          <input type="date" id="birthDate" required/>
+        </div>
+        <div class="form-group">
+          <label>العمر</label>
+          <input type="text" id="ageDisplay" readonly placeholder="يُحسب تلقائياً"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>اسم ولي الأمر <b>*</b></label>
+        <input type="text" id="parentName" required placeholder="الاسم الكامل"/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>رقم الهاتف <b>*</b></label>
+          <input type="tel" id="phone" required placeholder="XXXXXXXX" maxlength="8" inputmode="numeric"/>
+        </div>
+        <div class="form-group">
+          <label>رقم آخر للتواصل</label>
+          <input type="tel" id="phone2" placeholder="XXXXXXXX" maxlength="8" inputmode="numeric"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="email" placeholder="example@mail.com"/>
+      </div>
+
+      <div class="reg-nav">
+        <a href="../index.html" class="btn-portal-ghost" style="flex:0 0 auto;margin:0">← الرئيسية</a>
+        <button type="button" class="btn-portal-primary" onclick="goStep(2)" style="margin:0">التالي ←</button>
+      </div>
+    </section>
+
+    <!-- STEP 2: Health & reasons -->
+    <section class="reg-step" data-step="2" hidden>
+      <h2>🩺 الصحة والأهداف</h2>
+
+      <div class="form-group">
+        <label>هل يعاني ابنكم من أي مشاكل ترغب في ذكرها؟</label>
+        <textarea id="healthIssues" rows="3" placeholder="اكتب (لا يوجد) إن لم يكن هناك شيء"></textarea>
+      </div>
+      <div class="form-group">
+        <label>هل يعاني ابنكم من أي حساسية تُذكر؟</label>
+        <textarea id="allergies" rows="2" placeholder="اكتب (لا يوجد) إن لم يكن هناك شيء"></textarea>
+      </div>
+      <div class="form-group">
+        <label>يرجى ذكر السبب من تسجيل ابنكم في الأكاديمية</label>
+        <textarea id="reason" rows="3" placeholder="مثال: بناء الثقة، اللياقة، تعلم الدفاع عن النفس..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>هل تسمح بمشاركة ابنكم بالبطولات الداخلية والخارجية؟ <b>*</b></label>
+        <div class="radio-row">
+          <label class="radio-pill"><input type="radio" name="tournaments" value="لا أمانع" required/><span>✅ لا أمانع</span></label>
+          <label class="radio-pill"><input type="radio" name="tournaments" value="أمانع"/><span>❌ أمانع</span></label>
+        </div>
+      </div>
+
+      <div class="reg-nav">
+        <button type="button" class="btn-portal-ghost" onclick="goStep(1)" style="margin:0;flex:0 0 auto">→ السابق</button>
+        <button type="button" class="btn-portal-primary" onclick="goStep(3)" style="margin:0">التالي ←</button>
+      </div>
+    </section>
+
+    <!-- STEP 3: Package & terms -->
+    <section class="reg-step" data-step="3" hidden>
+      <h2>💎 الباقة والشروط</h2>
+
+      <div class="form-group">
+        <label>باقات الاشتراك <b>*</b></label>
+        <div class="pkg-options">
+          <label class="pkg-opt">
+            <input type="radio" name="pkg" value="football" data-price="25" data-name="معسكر كرة القدم" required/>
+            <div><strong>⚽ معسكر كرة القدم</strong><span>كل سبت · الروضة · <em>25 د.ك</em> شهرياً</span></div>
+          </label>
+          <label class="pkg-opt">
+            <input type="radio" name="pkg" value="confidence" data-price="70" data-name="معسكر بناء الثقة والكيوكشن"/>
+            <div><strong>🥋 معسكر بناء الثقة والكيوكشن</strong><span>أحد · ثلاثاء · خميس · جنوب السرة · ساعة ونصف · <em>70 د.ك</em> شهرياً</span></div>
+          </label>
+          <label class="pkg-opt">
+            <input type="radio" name="pkg" value="excellence" data-price="85" data-name="باقة التميز"/>
+            <div><strong>⚡ باقة التميز</strong><span>4 أيام بالأسبوع للمعسكرين · جنوب السرة والروضة · <em>85 د.ك</em> شهرياً</span></div>
+          </label>
+        </div>
+      </div>
+
+      <label class="check-row loyal-row">
+        <input type="checkbox" id="loyal"/>
+        <span>🏅 <strong>أنا من أسرة سلام</strong> — مستمر أكثر من سنة في الأكاديمية دون انقطاع وأتميز بخصم خاص (تحدده الإدارة عند الموافقة)</span>
+      </label>
+
+      <div class="form-group" style="margin-top:18px">
+        <label>شروط الأكاديمية <b>*</b> — يرجى الموافقة على جميع البنود</label>
+        <label class="check-row"><input type="checkbox" class="term" required/><span>يجب الالتزام بالزي الخاص بالأكاديمية</span></label>
+        <label class="check-row"><input type="checkbox" class="term" required/><span>الأكاديمية غير مسؤولة عن فقدان الطفل للأغراض الشخصية سواء داخل الأكاديمية أو أثناء الرحلات التي تنظمها الأكاديمية</span></label>
+        <label class="check-row"><input type="checkbox" class="term" required/><span>لا مانع من تصوير ابني بوسائل التواصل الاجتماعي أو الصور الخاصة بالأكاديمية</span></label>
+        <label class="check-row"><input type="checkbox" class="term" required/><span>أفهم أن الرياضات تنطوي على بعض مخاطر الإصابة وأن الأكاديمية غير مسؤولة عن الإصابات التي قد يتعرض لها اللاعب نتيجة المشاركة الرياضية</span></label>
+        <label class="check-row"><input type="checkbox" class="term" required/><span>متابعة حساب الإنستغرام الخاص بأكاديمية سلام <a href="https://www.instagram.com/salam_academy_kwt" target="_blank">@salam_academy_kwt</a> لمتابعة الإعلانات وجميع المستجدات</span></label>
+      </div>
+
+      <div class="review-note">
+        ℹ️ بعد الإرسال سيتم مراجعة طلبك من قبل إدارة الأكاديمية، وسنتواصل معك عبر الواتساب للموافقة وتفاصيل الدفع.
+      </div>
+
+      <div class="reg-nav">
+        <button type="button" class="btn-portal-ghost" onclick="goStep(2)" style="margin:0;flex:0 0 auto">→ السابق</button>
+        <button type="submit" class="btn-portal-primary" id="submitBtn" style="margin:0">📩 إرسال طلب التسجيل</button>
+      </div>
+    </section>
+
+    <div id="msgBox" class="error-msg"></div>
+  </form>
+
+  <!-- SUCCESS -->
+  <div id="successView" class="reg-card" hidden style="text-align:center">
+    <div style="font-size:4rem">🎉</div>
+    <h2 style="color:var(--copper-dark);margin:10px 0 6px">تم استلام طلبك!</h2>
+    <p style="color:var(--text-mid);line-height:1.8">شكراً لثقتكم بأكاديمية سلام. طلبك الآن <strong>قيد المراجعة</strong> من قبل الإدارة.<br/>سنتواصل معك على <strong id="succPhone"></strong> عبر الواتساب خلال 24 ساعة.</p>
+    <div class="review-note" style="margin:18px 0">رقم الطلب: <strong id="succId" style="direction:ltr;display:inline-block"></strong></div>
+    <a id="succWa" href="#" target="_blank" class="btn-portal-whatsapp">💬 إرسال نسخة للإدارة عبر واتساب</a>
+    <a href="login.html" class="btn-portal-ghost" style="display:block;text-decoration:none;text-align:center;margin-top:10px">متابعة حالة الطلب (بوابة الأعضاء)</a>
+  </div>
+
+  <p class="portal-footer-note" style="color:rgba(255,255,255,0.6)">أكاديمية سلام · 93000607 · <a href="../index.html" style="color:white">الرئيسية</a></p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script src="../js/register.js"></script>
+</body>
+</html>
