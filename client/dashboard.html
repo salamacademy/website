@@ -29,8 +29,11 @@
     <div class="head-greet">
       <h2>مرحباً، <span id="welcomeName">...</span> 👋</h2>
       <p id="pageTitle">هذا ملخص اشتراك طفلك في أكاديمية سلام</p>
+      <p style="font-size:0.72rem;opacity:.6;margin-top:2px;direction:ltr;text-align:right">📱 <span id="topPhone"></span></p>
     </div>
   </header>
+
+  <div class="kids" id="kidSwitch" style="display:none"></div>
 
   <div id="installBanner" class="banner install" style="display:none"><span>📲 أضف التطبيق إلى الشاشة الرئيسية</span><button id="installBtn">تثبيت</button><button class="x" onclick="this.parentElement.style.display='none'">✕</button></div>
 
@@ -104,9 +107,9 @@
       <div style="font-size:0.85rem;color:var(--text-light)">الباقة</div>
       <div style="font-size:1.1rem;font-weight:900;color:var(--copper-dark)" id="renewPackageName">--</div>
       <div style="font-size:2.4rem;font-weight:900;color:var(--copper);margin:6px 0" id="renewAmount">-- د.ك</div>
-      <button class="btn primary" onclick="renewSubscription()">💳 الدفع عبر Upayment</button>
+      <button class="btn upay" onclick="renewSubscription()"><img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span></button>
       <a class="btn wa" href="https://wa.me/96593000607?text=%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%AF%D9%81%D8%B9%20%D8%A7%D9%84%D9%86%D9%82%D8%AF%D9%8A" target="_blank">💬 الدفع النقدي / التحويل</a>
-      <a class="btn ghost" href="register.html">📝 تسجيل طفل آخر</a>
+      <a class="btn ghost" href="register.html" id="addKidLink">📝 تسجيل طفل آخر</a>
     </div>
   </section>
 
@@ -115,14 +118,13 @@
 <nav class="tabbar"><div class="tabbar-in">
   <button class="tab on" data-page="overview" onclick="go('overview')"><i>🏠</i>الرئيسية</button>
   <button class="tab" data-page="schedule" onclick="go('schedule')"><i>📅</i>الجدول</button>
-  <div class="tab fab-slot"><button class="fab" onclick="go('renew')" title="الدفع">💳</button></div>
+  <div class="tab fab-slot"><button class="fab pay" onclick="go('renew')" title="الدفع">ادفع</button></div>
   <button class="tab" data-page="pause" onclick="go('pause')"><i>⏸️</i>إيقاف</button>
   <button class="tab" data-page="subscription" onclick="go('subscription')"><i>📋</i>اشتراكي</button>
 </div></nav>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script src="../js/firebase-config.js"></script>
 <script src="../js/pwa-install.js"></script>

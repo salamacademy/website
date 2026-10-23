@@ -50,7 +50,7 @@ function renderTxList() {
   const byDay = {}; tx.forEach(t => (byDay[t.date] = byDay[t.date] || []).push(t));
   el.innerHTML = Object.keys(byDay).sort().reverse().map(day => {
     const d = new Date(day); const lbl = isNaN(d) ? day : d.toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
-    return `<div style="font-size:0.75rem;font-weight:800;color:var(--text-light);margin:10px 4px 6px">${lbl}</div>` + byDay[day].map(t => `<div class="tx ${t.type === 'income' ? 'in' : ''}" onclick="openTx('${t.id}')"><div class="ic">${CAT_ICON[t.category] || '📦'}</div><div class="m"><b>${t.note || t.category || '--'}</b><small>${t.category || ''}${t.createdBy === 'telegram' ? ' · 🤖' : ''}${t.recurring ? ' · 🔁' : ''}${t.method === 'knet' ? ' · كي نت' : t.method === 'upayment' ? ' · Upayment' : ''}</small></div><div class="a">${KD(t.amount)}</div><button class="more">›</button></div>`).join('');
+    return `<div style="font-size:0.75rem;font-weight:800;color:var(--text-light);margin:10px 4px 6px">${lbl}</div>` + byDay[day].map(t => `<div class="tx ${t.type === 'income' ? 'in' : ''}" onclick="openTx('${t.id}')"><div class="ic">${CAT_ICON[t.category] || '📦'}</div><div class="m"><b>${t.note || t.category || '--'}</b><small>${t.category || ''}${t.createdBy === 'telegram' ? ' · 🤖' : ''}${t.recurring ? ' · 🔁' : ''}${t.method === 'knet' ? ' · كي نت' : t.method === 'upayment' ? ' · UPayment' : ''}</small></div><div class="a">${KD(t.amount)}</div><button class="more">›</button></div>`).join('');
   }).join('');
 }
 function renderRecurring() {

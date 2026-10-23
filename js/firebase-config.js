@@ -11,7 +11,7 @@ const firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const auth = firebase.auth();
+const auth = firebase.auth ? firebase.auth() : null;
 
 // Upayment Configuration
 const UPAYMENT_CONFIG = {

@@ -9,6 +9,10 @@ let currentStep = 1;
   const pkg = p.get('pkg');
   if (pkg) { const r = document.querySelector(`input[name="pkg"][value="${pkg}"]`); if (r) r.checked = true; }
   if (p.get('loyal') === '1') document.getElementById('loyal').checked = true;
+  if (p.get('parent')) document.getElementById('parentName').value = p.get('parent');
+  if (p.get('phone')) document.getElementById('phone').value = p.get('phone');
+  if (p.get('email')) document.getElementById('email').value = p.get('email');
+  if (p.get('parent') || p.get('phone')) { const h = document.querySelector('.reg-header p'); if (h) h.textContent = '👦 تسجيل طفل آخر لنفس ولي الأمر — بيانات التواصل معبّأة مسبقاً'; }
 })();
 
 // Age auto-calc

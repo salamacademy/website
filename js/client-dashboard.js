@@ -1,7 +1,7 @@
 // ============================
 // CLIENT DASHBOARD JS (app UI)
 // ============================
-let currentSubscription = null;
+let currentSubscription = null, kids = [], kidIdx = 0, kidUnsub = null;
 const SCHEDULES = {
   football: { name: 'معسكر كرة القدم', icon: '⚽', rows: [['📅', 'كل سبت'], ['⏰', '4:00 – 5:00 مساءً'], ['📍', 'منطقة الروضة']] },
   confidence: { name: 'معسكر بناء الثقة والكيوكشن', icon: '🥋', rows: [['📅', 'الأحد – الثلاثاء – الخميس'], ['⏰', 'أشبال 4:30–6:00 · رجال 6:00–7:30'], ['📍', 'جنوب السرة']] },
@@ -15,19 +15,30 @@ const fmt = ts => { const d = toD(ts); return d ? d.toLocaleDateString('ar-KW') 
 const $ = id => document.getElementById(id);
 
 
-async function loadClientData(user) {
-  try {
-    let snap = { empty: true, docs: [] };
-    const phone = user.phoneNumber ? user.phoneNumber.replace('+965', '') : null;
-    if (phone) snap = await db.collection('subscriptions').where('phone', '==', phone).get();
-    if (snap.empty && user.email) snap = await db.collection('subscriptions').where('email', '==', user.email).get();
-    if (snap.empty) { showNoSubscription(); return; }
+const PHONE = localStorage.getItem('salamPhone') || '';
+if (!/^\d{8}$/.test(PHONE)) location.replace('login.html');
+let portalDoc = null, portalUnsub = null;
+
+function loadClientData() {
+  document.getElementById('topPhone') && (document.getElementById('topPhone').textContent = PHONE);
+  portalUnsub = db.collection('portal').doc(PHONE).onSnapshot(doc => {
+    if (!doc.exists) { portalDoc = null; kids = []; showNoSubscription(); return; }
+    portalDoc = doc.data();
     const rank = { active: 0, approved: 1, pending_payment: 1, pending_review: 2 };
-    const docs = snap.docs.slice().sort((a, b) => { const ra = rank[a.data().status] ?? 5, rb = rank[b.data().status] ?? 5; if (ra !== rb) return ra - rb; return (b.data().createdAt?.toMillis?.() || 0) - (a.data().createdAt?.toMillis?.() || 0); });
-    currentSubscription = { id: docs[0].id, ...docs[0].data() };
-    renderDashboard(currentSubscription);
-    setupClientNotifications(docs[0].id);
-  } catch (e) { console.error(e); $('daysStatusTitle').textContent = 'تعذر تحميل البيانات'; }
+    const best = (a, b) => { const ra = rank[a.status] ?? 5, rb = rank[b.status] ?? 5; if (ra !== rb) return ra - rb; return (toD(b.createdAt)?.getTime() || 0) - (toD(a.createdAt)?.getTime() || 0); };
+    const byKid = {};
+    (portalDoc.kids || []).forEach(k => { const s = { ...k, id: k.subId }; const key = (s.childName || '').trim().replace(/\s+/g, ' '); (byKid[key] = byKid[key] || []).push(s); });
+    const prevId = kids[kidIdx]?.id;
+    kids = Object.values(byKid).map(l => l.sort(best)[0]).sort(best);
+    const idx = Math.max(0, kids.findIndex(k => k.id === prevId));
+    const prevStatus = currentSubscription?.status;
+    selectKid(idx, true);
+    const d = currentSubscription;
+    if (d && prevStatus && d.status !== prevStatus) {
+      if (d.status === 'approved') Notif.show('🎉 تمت الموافقة على طلبك', `${d.childName} — ${d.amount} د.ك · ادفع الآن`, 'dashboard.html');
+      if (d.status === 'active') Notif.show('✅ تم تفعيل الاشتراك', `${d.childName} — ${d.packageName}`, 'dashboard.html');
+    }
+  }, err => { console.error(err); status('تعذر تحميل البيانات', 'تحقق من الاتصال أو تواصل معنا'); });
 }
 
 // ---------- NAV ----------
@@ -94,7 +105,8 @@ function renderSchedule(type) {
   $('scheduleMini').innerHTML = rows;
 }
 function showNoSubscription() {
-  ringIcon('0', '#A07050', 0); status('لا يوجد طلب تسجيل', 'لم نجد طلباً مرتبطاً برقمك. عبّئ نموذج التسجيل للبدء.');
+  ringIcon('0', '#A07050', 0); status('لا توجد بيانات لهذا الرقم بعد', 'إذا سجّلت للتو فستظهر بياناتك بعد مراجعة الإدارة. أو عبّئ نموذج التسجيل.');
+  $('welcomeName').textContent = 'بك'; $('childNameDisplay').textContent = '--'; $('packageLabel').textContent = '--'; $('amountDisplay').textContent = '--';
   $('welcomeName').textContent = 'بك'; alertSet('لا يوجد اشتراك', 'سجّل الآن عبر النموذج', '📝 التسجيل');
 }
 function alertAction() {
@@ -115,16 +127,20 @@ async function payNow(sub, kind) {
   }
 }
 
-// ---------- PAUSE ----------
+// ---------- PAUSE (request → admin approves with one tap) ----------
 function isPausedNow(s) { const a = toD(s.pauseStart), b = toD(s.pauseEnd); if (!a || !b) return false; const n = new Date(); return n >= a && n <= b; }
+function pendingPauseFor(subId) { return (portalDoc?.pauseRequests || []).find(r => r.subId === subId && r.status === 'pending'); }
 function renderPause(sub) {
   ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pausedBanner').style.display = 'none';
+  const pend = pendingPauseFor(sub.id);
   if (isPausedNow(sub)) {
     $('pauseActive').style.display = 'block'; $('pauseFrom').textContent = fmt(sub.pauseStart); $('pauseTo').textContent = fmt(sub.pauseEnd);
     $('pausedBanner').style.display = 'flex'; $('pausedUntil').textContent = fmt(sub.pauseEnd);
     status('⏸️ الاشتراك متوقف مؤقتاً', 'يستأنف التدريب في ' + fmt(sub.pauseEnd));
+  } else if (pend) {
+    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = '🕒'; $('pauseUsed').querySelector('p').innerHTML = `طلب الإيقاف من <b>${pend.start}</b> لمدة أسبوع <b>بانتظار موافقة الإدارة</b>.<br/>ستصلك رسالة عند الموافقة.`;
   } else if (sub.pauseUsed || sub.pauseEnd || sub.status !== 'active') {
-    $('pauseUsed').style.display = 'block'; if (sub.status !== 'active') $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.';
+    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = sub.status !== 'active' ? 'ℹ️' : '✅'; $('pauseUsed').querySelector('p').textContent = sub.status !== 'active' ? 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.' : 'تم استخدام الإيقاف المؤقت لهذا الشهر. سيتاح مجدداً مع التجديد القادم.';
   } else {
     $('pauseInfo').style.display = 'block';
     const inp = $('pauseStartInput'), today = new Date().toISOString().split('T')[0];
@@ -140,46 +156,50 @@ function previewPause(sub) {
 async function requestPause() {
   const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
   const v = $('pauseStartInput').value; if (!v) return alert('اختر تاريخ بداية الإيقاف');
-  const s = new Date(v); s.setHours(0, 0, 0, 0); const e = new Date(s); e.setDate(e.getDate() + 7);
-  if (!confirm(`إيقاف اشتراك ${sub.childName} من ${s.toLocaleDateString('ar-KW')} لمدة 7 أيام؟`)) return;
-  const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
-  const ne = toD(sub.subscriptionEnd); ne.setDate(ne.getDate() + 7);
+  const s = new Date(v); const e = new Date(s); e.setDate(e.getDate() + 7);
+  if (!confirm(`طلب إيقاف اشتراك ${sub.childName} من ${s.toLocaleDateString('ar-KW')} لمدة 7 أيام؟`)) return;
+  const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...';
+  const reason = $('pauseReason').value.trim();
   try {
-    await db.collection('subscriptions').doc(sub.id).update({ pauseStart: firebase.firestore.Timestamp.fromDate(s), pauseEnd: firebase.firestore.Timestamp.fromDate(e), pauseUsed: true, pauseReason: $('pauseReason').value.trim(), pauseRequestedAt: firebase.firestore.FieldValue.serverTimestamp(), subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne) });
-    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، قمت بإيقاف اشتراك ${sub.childName} مؤقتاً لمدة أسبوع\nمن: ${s.toLocaleDateString('ar-KW')}\nإلى: ${e.toLocaleDateString('ar-KW')}${$('pauseReason').value ? '\nالسبب: ' + $('pauseReason').value : ''}`), '_blank');
+    await db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion({ subId: sub.id, childName: sub.childName, start: v, end: e.toISOString().split('T')[0], reason, status: 'pending', requestedAt: new Date().toISOString() }) });
+    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أطلب إيقاف اشتراك ${sub.childName} مؤقتاً لمدة أسبوع\nمن: ${s.toLocaleDateString('ar-KW')}\nإلى: ${e.toLocaleDateString('ar-KW')}${reason ? '\nالسبب: ' + reason : ''}`), '_blank');
     go('overview');
-  } catch (err) { alert('تعذر حفظ الإيقاف: ' + err.message); btn.disabled = false; btn.textContent = '⏸️ تأكيد الإيقاف لمدة أسبوع'; }
+  } catch (err) { alert('تعذر إرسال الطلب: ' + err.message); btn.disabled = false; btn.textContent = '⏸️ تأكيد الإيقاف لمدة أسبوع'; }
 }
 
 // ---------- NOTIFICATIONS ----------
-function setupClientNotifications(id) {
-  const saveToken = t => db.collection('subscriptions').doc(id).update({ fcmTokens: firebase.firestore.FieldValue.arrayUnion(t) });
-  if (window.Notification && Notification.permission === 'default') {
+let notifSetup = false;
+function setupClientNotifications() {
+  if (notifSetup) return; notifSetup = true;
+  const saveToken = t => db.collection('portal').doc(PHONE).update({ fcmTokens: firebase.firestore.FieldValue.arrayUnion(t) }).catch(() => {});
+  if (window.Notification && Notification.permission === 'default' && !document.querySelector('.banner.notif')) {
     const b = document.createElement('div'); b.className = 'banner notif';
     b.innerHTML = `<span>🔔 فعّل الإشعارات لتصلك الموافقة وتذكير التجديد</span><button id="notifOn">تفعيل</button><button class="x" onclick="this.parentElement.remove()">✕</button>`;
     document.querySelector('.app-head').insertAdjacentElement('afterend', b);
     b.querySelector('#notifOn').onclick = async () => { const ok = await Notif.ask(); b.remove(); if (ok) { Notif.show('تم تفعيل الإشعارات ✅', 'ستصلك تنبيهات أكاديمية سلام هنا'); Notif.registerPush(saveToken); } };
   }
   if (Notif.granted()) Notif.registerPush(saveToken);
-  let prev = currentSubscription?.status;
-  db.collection('subscriptions').doc(id).onSnapshot(doc => {
-    if (!doc.exists) return; const d = { id: doc.id, ...doc.data() };
-    if (prev && d.status !== prev) {
-      if (d.status === 'approved') Notif.show('🎉 تمت الموافقة على طلبك', `${d.childName} — ${d.amount} د.ك · ادفع الآن لتفعيل الاشتراك`, 'dashboard.html');
-      if (d.status === 'active') Notif.show('✅ تم تفعيل الاشتراك', `${d.childName} — ${d.packageName}`, 'dashboard.html');
-      if (d.status === 'rejected') Notif.show('طلب التسجيل', d.adminNote || 'لم يتم قبول الطلب، تواصل مع الإدارة', 'dashboard.html');
-    }
-    prev = d.status; currentSubscription = d; renderDashboard(d);
-  });
-  const s = currentSubscription;
-  if (s && s.status === 'active' && s.subscriptionEnd) {
-    const days = Math.ceil((toD(s.subscriptionEnd) - new Date()) / 864e5), key = 'expNotif-' + id + '-' + new Date().toDateString();
-    if (days <= 3 && days >= 0 && !localStorage.getItem(key)) { localStorage.setItem(key, '1'); Notif.show('⏳ اشتراكك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, 'dashboard.html'); }
-  }
+  kids.forEach(s => { if (s.status === 'active' && s.subscriptionEnd) { const days = Math.ceil((toD(s.subscriptionEnd) - new Date()) / 864e5), key = 'expNotif-' + s.id + '-' + new Date().toDateString(); if (days <= 3 && days >= 0 && !localStorage.getItem(key)) { localStorage.setItem(key, '1'); Notif.show('⏳ اشتراك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, 'dashboard.html'); } } });
 }
 
-function logout() { if (confirm('تسجيل الخروج؟')) auth.signOut().then(() => location.href = 'login.html'); }
+function logout() { if (confirm('تسجيل الخروج؟')) { localStorage.removeItem('salamPhone'); location.href = 'login.html'; } }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+loadClientData();
 
-// ---------- AUTH + LOAD ----------
-auth.onAuthStateChanged(async user => { if (!user) { location.href = 'login.html'; return; } await loadClientData(user); });
+
+// ---------- MULTI-KID (one parent, several children) ----------
+function kidDot(s) { if (s.status === 'active') { const d = Math.ceil((toD(s.subscriptionEnd) - new Date()) / 864e5); return d <= 5 ? 'bad' : d <= 10 ? 'warn' : 'ok'; } if (s.status === 'approved' || s.status === 'pending_payment') return 'warn'; if (s.status === 'pending_review') return 'gold'; return 'bad'; }
+function renderKidSwitch() {
+  const el = $('kidSwitch'); if (!el) return;
+  const p = kids[0] || {}; const addHref = 'register.html?' + new URLSearchParams({ parent: p.parentName || portalDoc?.parentName || '', phone: PHONE, email: p.email || '' }).toString();
+  const link = $('addKidLink'); if (link) link.href = addHref;
+  if (kids.length < 2) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = kids.map((s, i) => `<button class="kid ${i === kidIdx ? 'on' : ''}" onclick="selectKid(${i})"><span class="av">👦</span>${(s.childName || '').split(' ')[0]}<span class="st ${kidDot(s)}"></span></button>`).join('') + `<a class="kid add" href="${addHref}"><span class="av">➕</span>طفل آخر</a>`;
+}
+function selectKid(i, first) {
+  kidIdx = i; const s = kids[i]; if (!s) return;
+  currentSubscription = s; renderDashboard(s); renderKidSwitch();
+  setupClientNotifications();
+  if (!first) go('overview');
+}

@@ -8,6 +8,7 @@ const CATS = {
 };
 const ICON = { 'إيجار': '🏟️', 'رواتب': '👨‍🏫', 'أكل وشرب': '🍔', 'معدات': '⚽', 'زي وملابس': '👕', 'مواصلات': '🚌', 'تسويق': '📣', 'صيانة': '🔧', 'رحلات وفعاليات': '🎳', 'أخرى': '📦', 'اشتراكات': '💳', 'بيع زي': '👕', 'بطولات': '🏆', 'رعاية': '🤝' };
 const ALIASES = { 'ايجار': 'إيجار', 'إيجار': 'إيجار', 'راتب': 'رواتب', 'رواتب': 'رواتب', 'اكل': 'أكل وشرب', 'أكل': 'أكل وشرب', 'ماء': 'أكل وشرب', 'مويه': 'أكل وشرب', 'غداء': 'أكل وشرب', 'معدات': 'معدات', 'كور': 'معدات', 'كرات': 'معدات', 'زي': 'زي وملابس', 'ملابس': 'زي وملابس', 'مواصلات': 'مواصلات', 'باص': 'مواصلات', 'بنزين': 'مواصلات', 'تسويق': 'تسويق', 'اعلان': 'تسويق', 'إعلان': 'تسويق', 'صيانة': 'صيانة', 'رحلة': 'رحلات وفعاليات', 'بولينج': 'رحلات وفعاليات', 'فعالية': 'رحلات وفعاليات', 'اشتراك': 'اشتراكات', 'اشتراكات': 'اشتراكات', 'بطولة': 'بطولات', 'رعاية': 'رعاية' };
+const PortalSync = require('./portal-sync');
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 const KD = n => (+n || 0).toFixed(3);
 const todayISO = () => new Date(Date.now() + 3 * 3600e3).toISOString().split('T')[0]; // Kuwait UTC+3
@@ -133,11 +134,11 @@ async function handleUpdate(update, { db, tg }) {
       const s = d.data();
       if (act === 'approve') {
         const start = new Date(); const end = new Date(start); end.setDate(end.getDate() + 30);
-        await ref.update({ status: 'approved', approvedAt: new Date(), plannedStart: start, plannedEnd: end, approvedVia: 'telegram' });
+        await ref.update({ status: 'approved', approvedAt: new Date(), plannedStart: start, plannedEnd: end, approvedVia: 'telegram' }); await PortalSync.syncPhone(db, s.phone);
         const wa = `https://wa.me/965${s.phone}?text=` + encodeURIComponent(`السلام عليكم ${s.parentName} 👋\n\nيسعدنا إبلاغكم بالموافقة على تسجيل ${s.childName} في أكاديمية سلام 🏆\n\nالباقة: ${s.packageName}\nالرسوم الشهرية: ${s.amount} د.ك\n\nلإتمام التسجيل يرجى سداد الرسوم، وسيتم تفعيل الاشتراك فور استلام الدفع.\n\nأكاديمية سلام 💪 93000607`);
         await tg('editMessageText', { chat_id: chat, message_id: cq.message.message_id, text: `✅ <b>تمت الموافقة</b> على ${s.childName}\n\nأرسل رسالة الموافقة للأهل:`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '💬 فتح واتساب', url: wa }]] } });
       } else {
-        await ref.update({ status: 'rejected', rejectedAt: new Date(), approvedVia: 'telegram' });
+        await ref.update({ status: 'rejected', rejectedAt: new Date(), approvedVia: 'telegram' }); await PortalSync.syncPhone(db, s.phone);
         await tg('editMessageText', { chat_id: chat, message_id: cq.message.message_id, text: `⛔ تم رفض طلب ${s.childName}`, parse_mode: 'HTML' });
       }
       return;

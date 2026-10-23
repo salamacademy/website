@@ -5,7 +5,7 @@ const PKG_NAMES = { football: 'كرة القدم', confidence: 'بناء الث�
 const PKG_ICON = { football: '⚽', confidence: '🥋', excellence: '⚡', excellence_loyal: '🏅', premium: '⚡' };
 const TITLES = { dashboard: 'لوحة التحكم', review: 'طلبات المراجعة', members: 'الأعضاء', expiring: 'تنتهي قريباً', paused: 'الإيقافات المؤقتة', add: 'إضافة اشتراك', notify: 'إرسال رسالة', finance: 'المالية', telegram: 'بوت تيليجرام' };
 const SUBS = { dashboard: 'نظرة سريعة على الأكاديمية اليوم', review: 'راجع النموذج ثم وافق أو ارفض', members: 'ابحث وصفِّ جميع المشتركين', expiring: 'أرسل تذكير التجديد', paused: 'إيقافات الأسبوع الواحد', add: 'تسجيل مباشر بدون نموذج', notify: 'واتساب للمشتركين', finance: 'الدخل والمصاريف والصافي', telegram: 'سجّل المصاريف من هاتفك' };
-let allSubscriptions = [];
+let allSubscriptions = [], allPortals = [];
 let notifReady = false;
 
 
@@ -13,7 +13,9 @@ async function loadAllData() {
   try {
     const snap = await db.collection('subscriptions').orderBy('createdAt', 'desc').get();
     allSubscriptions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const ps = await db.collection('portal').get(); allPortals = ps.docs.map(d => ({ id: d.id, ...d.data() }));
     renderStats(); renderRecent(); filterSubscriptions(); renderExpiring(); renderPaused(); renderReview();
+    syncPortalsIfNeeded();
   } catch (e) { console.error(e); showToast('❌ تعذر تحميل البيانات'); }
 }
 
@@ -46,7 +48,7 @@ function renderStats() {
   const rev = allSubscriptions.filter(s => { const c = toD(s.createdAt); return c && c.getMonth() === now.getMonth() && c.getFullYear() === now.getFullYear() && s.status === 'active'; }).reduce((a, s) => a + (+s.amount || 0), 0);
   set('statPending', pending); set('statActive', active.length); set('statExpiring', expiring.length);
   set('statExpired', allSubscriptions.filter(s => s.status === 'expired').length);
-  set('statPaused', allSubscriptions.filter(isPausedNow).length); if (typeof finNetNow === 'function') set('statRevenue', finNetNow()); else set('statRevenue', rev.toFixed(0));
+  set('statPaused', allSubscriptions.filter(isPausedNow).length + (pauseRequests().length ? ' +' + pauseRequests().length : '')); if (typeof finNetNow === 'function') set('statRevenue', finNetNow()); else set('statRevenue', rev.toFixed(0));
   ['reviewBadge', 'tabReviewDot'].forEach(id => { const b = document.getElementById(id); if (b) { b.textContent = pending; b.style.display = pending ? 'inline-flex' : 'none'; } });
 }
 function set(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
@@ -96,15 +98,39 @@ function renderExpiring() {
 }
 
 // ---------- PAUSED ----------
+function pauseRequests() { const out = []; allPortals.forEach(p => (p.pauseRequests || []).forEach((r, i) => { if (r.status === 'pending') out.push({ ...r, phone: p.id, idx: i, parentName: p.parentName }); })); return out; }
 function renderPaused() {
+  const reqs = pauseRequests();
+  const reqHtml = reqs.length ? `<div class="page-title" style="margin-top:0"><h3>🕒 طلبات إيقاف بانتظار الموافقة</h3><span>${reqs.length}</span></div>` + reqs.map(r => `<div class="mcard s-pending"><div class="mcard-top"><div><div class="mcard-name">${r.childName}</div><div class="mcard-sub">👤 ${r.parentName || ''} · <span dir="ltr">${r.phone}</span></div></div><span class="chip gold">🕒 طلب</span></div><div class="mcard-meta"><span class="chip">من ${r.start}</span><span class="chip">إلى ${r.end}</span>${r.reason ? `<span class="chip">📝 ${r.reason}</span>` : ''}</div><div class="mcard-actions"><button class="abtn ok" style="flex:2" onclick="approvePause('${r.phone}',${r.idx})">✅ موافقة (+7 أيام)</button><button class="abtn bad" onclick="rejectPause('${r.phone}',${r.idx})">⛔ رفض</button><button class="abtn wa" onclick="window.open('https://wa.me/965${r.phone}','_blank')">💬</button></div></div>`).join('') + '<div class="page-title"><h3>⏸️ الإيقافات</h3></div>' : '';
   const list = allSubscriptions.filter(s => s.pauseStart).sort((a, b) => toD(b.pauseStart) - toD(a.pauseStart));
-  document.getElementById('pausedList').innerHTML = list.length ? list.map(s => {
+  document.getElementById('pausedList').innerHTML = reqHtml + (list.length ? list.map(s => {
     const now = isPausedNow(s), future = toD(s.pauseStart) > new Date();
     const state = now ? '<span class="chip info">⏸️ جارٍ الآن</span>' : future ? '<span class="chip gold">🕒 قادم</span>' : '<span class="chip ok">✔️ انتهى</span>';
     return `<div class="mcard s-paused"><div class="mcard-top"><div><div class="mcard-name">${s.childName}</div><div class="mcard-sub">👤 ${s.parentName} · <span dir="ltr">${s.phone}</span></div></div>${state}</div>
       <div class="mcard-meta"><span class="chip">من ${fmtDate(s.pauseStart)}</span><span class="chip">إلى ${fmtDate(s.pauseEnd)}</span><span class="chip copper">${PKG_NAMES[s.packageType] || ''}</span>${s.pauseReason ? `<span class="chip">📝 ${s.pauseReason}</span>` : ''}</div>
       <div class="mcard-actions">${(now || future) ? `<button class="abtn bad" onclick="cancelPause('${s.id}')">إلغاء الإيقاف</button>` : ''}<button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}','_blank')">💬 واتساب</button></div></div>`;
-  }).join('') : emptyBox('⏸️', 'لا توجد إيقافات');
+  }).join('') : emptyBox('⏸️', 'لا توجد إيقافات'));
+}
+async function approvePause(phone, idx) {
+  const p = allPortals.find(x => x.id === phone); const r = p?.pauseRequests?.[idx]; if (!r) return;
+  const s = allSubscriptions.find(x => x.id === r.subId); if (!s) return showToast('❌ الاشتراك غير موجود');
+  if (!confirm(`الموافقة على إيقاف ${s.childName} من ${r.start} لمدة 7 أيام؟ سيُمدَّد الاشتراك 7 أيام.`)) return;
+  const st = new Date(r.start); st.setHours(0,0,0,0); const en = new Date(st); en.setDate(en.getDate() + 7); const ne = toD(s.subscriptionEnd); if (ne) ne.setDate(ne.getDate() + 7);
+  const reqs = p.pauseRequests.slice(); reqs[idx] = { ...r, status: 'approved', decidedAt: new Date().toISOString() };
+  try {
+    await db.collection('subscriptions').doc(s.id).update({ pauseStart: firebase.firestore.Timestamp.fromDate(st), pauseEnd: firebase.firestore.Timestamp.fromDate(en), pauseUsed: true, pauseReason: r.reason || '', pauseRequestedAt: firebase.firestore.FieldValue.serverTimestamp(), ...(ne ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne) } : {}) });
+    await db.collection('portal').doc(phone).update({ pauseRequests: reqs }); await PortalSync.syncPhone(db, phone);
+    window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`تمت الموافقة على إيقاف اشتراك ${s.childName} مؤقتاً من ${st.toLocaleDateString('ar-KW')} إلى ${en.toLocaleDateString('ar-KW')} ✅\nتم تمديد الاشتراك 7 أيام.\nأكاديمية سلام`), '_blank');
+    showToast('✅ تمت الموافقة'); await loadAllData();
+  } catch (e) { showToast('❌ ' + e.message); }
+}
+async function rejectPause(phone, idx) {
+  const p = allPortals.find(x => x.id === phone); const r = p?.pauseRequests?.[idx]; if (!r) return;
+  const reason = prompt('سبب الرفض (اختياري):', ''); if (reason === null) return;
+  const reqs = p.pauseRequests.slice(); reqs[idx] = { ...r, status: 'rejected', decidedAt: new Date().toISOString(), adminNote: reason };
+  await db.collection('portal').doc(phone).update({ pauseRequests: reqs });
+  if (reason) window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`بخصوص طلب إيقاف اشتراك ${r.childName}: للأسف لا يمكن قبوله حالياً.\n${reason}\nأكاديمية سلام 93000607`), '_blank');
+  showToast('تم الرفض'); await loadAllData();
 }
 async function cancelPause(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;
@@ -112,7 +138,7 @@ async function cancelPause(id) {
   const end = toD(s.subscriptionEnd);
   const upd = { pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete(), pauseUsed: false, pauseReason: firebase.firestore.FieldValue.delete() };
   if (end) { end.setDate(end.getDate() - 7); upd.subscriptionEnd = firebase.firestore.Timestamp.fromDate(end); }
-  try { await db.collection('subscriptions').doc(id).update(upd); showToast('تم إلغاء الإيقاف'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
+  try { await db.collection('subscriptions').doc(id).update(upd); await PortalSync.syncPhone(db, s.phone); showToast('تم إلغاء الإيقاف'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
 }
 
 // ---------- REVIEW ----------
@@ -160,7 +186,7 @@ async function confirmApprove() {
   const start = new Date(document.getElementById('apStart').value); const end = new Date(start); end.setDate(end.getDate() + 30);
   try {
     await db.collection('subscriptions').doc(id).update({ status: 'approved', amount, adminNote: note, approvedAt: firebase.firestore.FieldValue.serverTimestamp(), plannedStart: firebase.firestore.Timestamp.fromDate(start), plannedEnd: firebase.firestore.Timestamp.fromDate(end) });
-    closeApprove();
+    closeApprove(); await PortalSync.syncPhone(db, s.phone);
     const msg = `السلام عليكم ${s.parentName} 👋\n\nيسعدنا إبلاغكم بالموافقة على تسجيل ${s.childName} في أكاديمية سلام 🏆\n\nالباقة: ${s.packageName}\nالرسوم الشهرية: ${amount} د.ك\nبداية الاشتراك: ${start.toLocaleDateString('ar-KW')}${note ? '\n' + note : ''}\n\nلإتمام التسجيل يرجى سداد الرسوم عبر بوابة الأعضاء أو التحويل، وسيتم تفعيل الاشتراك فور استلام الدفع.\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
     window.open('https://wa.me/965' + s.phone + '?text=' + encodeURIComponent(msg), '_blank');
     showToast('✅ تمت الموافقة'); await loadAllData();
@@ -171,6 +197,7 @@ async function rejectRequest(id) {
   const reason = prompt('سبب الرفض (يُرسل للأهل عبر واتساب، اتركه فارغاً لعدم الإرسال):', ''); if (reason === null) return;
   try {
     await db.collection('subscriptions').doc(id).update({ status: 'rejected', adminNote: reason, rejectedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    await PortalSync.syncPhone(db, s.phone);
     if (reason) window.open('https://wa.me/965' + s.phone + '?text=' + encodeURIComponent(`السلام عليكم ${s.parentName}،\n\nنشكركم على اهتمامكم بأكاديمية سلام. للأسف لا يمكننا قبول طلب تسجيل ${s.childName} حالياً.\n\nالسبب: ${reason}\n\nللاستفسار: 93000607`), '_blank');
     showToast('تم رفض الطلب'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
@@ -181,7 +208,7 @@ async function activateSubscription(id) {
   const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const end = new Date(start); end.setDate(end.getDate() + 30);
   try {
     await db.collection('subscriptions').doc(id).update({ status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
-    await recordIncomeForSub(s, s.amount);
+    await recordIncomeForSub(s, s.amount); await PortalSync.syncPhone(db, s.phone);
     sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, end); showToast('✅ تم التفعيل'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
 }
@@ -201,11 +228,12 @@ async function saveEdit() {
   const sv = document.getElementById('editStartDate').value, ev = document.getElementById('editEndDate').value;
   if (sv) upd.subscriptionStart = firebase.firestore.Timestamp.fromDate(new Date(sv));
   if (ev) { upd.subscriptionEnd = firebase.firestore.Timestamp.fromDate(new Date(ev)); upd.daysRemaining = Math.max(0, Math.ceil((new Date(ev) - new Date()) / 864e5)); }
-  try { await db.collection('subscriptions').doc(id).update(upd); closeEditModal(); showToast('✅ تم الحفظ'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
+  try { await db.collection('subscriptions').doc(id).update(upd); closeEditModal(); const s = allSubscriptions.find(x => x.id === id); if (s) await PortalSync.syncPhone(db, s.phone); showToast('✅ تم الحفظ'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
 }
 async function deleteSubscription(id) {
   if (!confirm('حذف هذا الاشتراك نهائياً؟')) return;
-  try { await db.collection('subscriptions').doc(id).delete(); showToast('تم الحذف'); await loadAllData(); } catch (e) { showToast('❌ خطأ'); }
+  const sdel = allSubscriptions.find(x => x.id === id);
+  try { await db.collection('subscriptions').doc(id).delete(); if (sdel) await PortalSync.syncPhone(db, sdel.phone); showToast('تم الحذف'); await loadAllData(); } catch (e) { showToast('❌ خطأ'); }
 }
 
 // ---------- ADD ----------
@@ -215,7 +243,7 @@ async function saveSubscription(e) {
   const o = document.getElementById('newPackage').selectedOptions[0];
   const start = new Date(document.getElementById('newStartDate').value); const end = new Date(start); end.setDate(end.getDate() + 30);
   const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: v('newEmail'), packageType: o.value, packageName: o.dataset.name, amount: +document.getElementById('newAmount').value, paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, pauseUsed: false, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
-  try { const ref = await db.collection('subscriptions').add(data); await recordIncomeForSub({ id: ref.id, ...data }, data.amount, data.paymentMethod); sendWelcomeWhatsApp(data.phone, data.childName, data.packageName, end); showToast('✅ تمت الإضافة'); clearAddForm(); await loadAllData(); go('members'); }
+  try { const ref = await db.collection('subscriptions').add(data); await recordIncomeForSub({ id: ref.id, ...data }, data.amount, data.paymentMethod); await PortalSync.syncPhone(db, data.phone); sendWelcomeWhatsApp(data.phone, data.childName, data.packageName, end); showToast('✅ تمت الإضافة'); clearAddForm(); await loadAllData(); go('members'); }
   catch (err) { showToast('❌ ' + err.message); }
   btn.disabled = false; btn.textContent = '💾 حفظ وتفعيل الاشتراك';
 }
@@ -261,6 +289,21 @@ function setupAdminNotifications(user) {
     });
     loadAllData();
   });
+  let prReady = false;
+  db.collection('portal').onSnapshot(snap => {
+    if (!prReady) { prReady = true; return; }
+    snap.docChanges().forEach(ch => { if (ch.type !== 'modified') return; const d = ch.doc.data(); const prev = allPortals.find(x => x.id === ch.doc.id); const n = (d.pauseRequests || []).filter(r => r.status === 'pending').length, m = (prev?.pauseRequests || []).filter(r => r.status === 'pending').length; if (n > m) { const r = (d.pauseRequests || []).filter(x => x.status === 'pending').pop(); Notif.show('🕒 طلب إيقاف مؤقت', `${r.childName} — من ${r.start} · ${r.reason || ''}`, 'dashboard.html'); } });
+    loadAllData();
+  });
+}
+
+// ---------- PORTAL SYNC ----------
+let lastSyncSig = '';
+async function syncPortalsIfNeeded() {
+  const sig = JSON.stringify(allSubscriptions.map(s => [s.id, s.status, s.subscriptionEnd?.seconds, s.pauseEnd?.seconds, s.amount, s.adminNote, s.phone]));
+  const missing = allSubscriptions.some(s => !allPortals.find(p => p.id === PortalSync.norm(s.phone)));
+  if (sig === lastSyncSig && !missing) return; lastSyncSig = sig;
+  try { await PortalSync.syncAll(db, allSubscriptions); } catch (e) { console.warn('portal sync', e); }
 }
 
 // ---------- MISC ----------

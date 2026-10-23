@@ -119,7 +119,7 @@
       </div>
       <div class="fg2">
         <div class="fg"><label>بداية الاشتراك</label><input type="date" id="newStartDate" required/></div>
-        <div class="fg"><label>طريقة الدفع</label><select id="newPaymentMethod"><option value="cash">نقدي</option><option value="upayment">Upayment</option><option value="bank">تحويل</option></select></div>
+        <div class="fg"><label>طريقة الدفع</label><select id="newPaymentMethod"><option value="cash">نقدي</option><option value="upayment">UPayment</option><option value="bank">تحويل</option></select></div>
       </div>
       <div class="fg"><label>ملاحظات</label><textarea id="newNotes" rows="2"></textarea></div>
       <button type="submit" class="btn primary">💾 حفظ وتفعيل الاشتراك</button>
@@ -184,7 +184,7 @@
 
   <!-- ===== NOTIFY ===== -->
   <section class="page" data-page="notify">
-    <div class="page-title"><h3>📨 إرسال رسالة</h3><button class="link" onclick="go('telegram')">🤖 بوت تيليجرام</button></div>
+    <div class="page-title"><h3>📨 إرسال رسالة</h3><div style="display:flex;gap:6px"><button class="link" onclick="lastSyncSig='';syncPortalsIfNeeded().then(()=>showToast('✅ تمت مزامنة بوابة الأهالي'))">🔄 مزامنة البوابة</button><button class="link" onclick="go('telegram')">🤖 تيليجرام</button></div></div>
     <div class="card">
       <div class="card-h"><h4>⚠️ تذكير انتهاء الاشتراك</h4></div>
       <p class="note" style="margin-bottom:12px">يفتح واتساب لكل مشترك ينتهي اشتراكه خلال 7 أيام برسالة تذكير جاهزة.</p>
@@ -249,7 +249,7 @@
     <div class="type-toggle"><button type="button" class="out on" id="tgOut" onclick="setTxType('expense')">💸 مصروف</button><button type="button" class="in" id="tgIn" onclick="setTxType('income')">💰 دخل</button></div>
     <div class="fg"><input type="number" id="txAmount" class="amount-in" placeholder="0.000" step="0.001" min="0" inputmode="decimal"/><div style="text-align:center;font-size:0.75rem;color:var(--text-light);font-weight:800;margin-top:4px">د.ك</div></div>
     <div class="fg"><label>الفئة</label><div class="cat-grid" id="txCats"></div></div>
-    <div class="fg2"><div class="fg"><label>التاريخ</label><input type="date" id="txDate"/></div><div class="fg"><label>طريقة الدفع</label><select id="txMethod"><option value="cash">نقدي</option><option value="knet">كي نت / تحويل</option><option value="upayment">Upayment</option></select></div></div>
+    <div class="fg2"><div class="fg"><label>التاريخ</label><input type="date" id="txDate"/></div><div class="fg"><label>طريقة الدفع</label><select id="txMethod"><option value="cash">نقدي</option><option value="knet">كي نت / تحويل</option><option value="upayment">UPayment</option></select></div></div>
     <div class="fg"><label>ملاحظة</label><input type="text" id="txNote" placeholder="مثال: إيجار ملعب الروضة — أكتوبر"/></div>
     <label class="chatid" style="cursor:pointer;background:#FFF3CD"><span>🔁 تكرار شهري (إيجار، راتب...)</span><input type="checkbox" id="txRecurring" style="width:20px;height:20px;accent-color:var(--copper)"/></label>
     <button onclick="saveTx()" class="btn primary" id="txSaveBtn" style="margin-top:10px">💾 حفظ</button>
@@ -264,6 +264,7 @@
 <script src="../js/firebase-config.js"></script>
 <script src="../js/pwa-install.js"></script>
 <script src="../js/notifications.js"></script>
+<script src="../js/portal-sync.js"></script>
 <script src="../js/admin-dashboard.js"></script>
 <script src="../js/finance.js"></script>
 </body>

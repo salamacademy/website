@@ -23,23 +23,21 @@ service cloud.firestore {
     match /settings/{id}     { allow read, write: if isAdmin(); }
     match /botState/{id}     { allow read, write: if false; }
 
+    // Parent portal: one doc per phone, readable by anyone who knows the phone (get only — no listing).
+    // Parents may only append pause requests / push tokens; everything else is written by admins / the bot.
+    match /portal/{phone} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pauseRequests', 'fcmTokens']);
+    }
+
     match /subscriptions/{subId} {
       allow read, write: if isAdmin();
       allow create: if request.resource.data.status == 'pending_review'
                     && request.resource.data.termsAccepted == true
                     && request.resource.data.phone is string;
-      allow read: if isOwner();
-      // Parent: save push token
-      allow update: if isOwner()
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens']);
-      // Parent: one-week pause, once per month, active subs only; end date must move exactly +7 days
-      allow update: if isOwner()
-                    && resource.data.status == 'active'
-                    && resource.data.pauseUsed != true
-                    && request.resource.data.pauseUsed == true
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pauseStart','pauseEnd','pauseUsed','pauseReason','pauseRequestedAt','subscriptionEnd'])
-                    && request.resource.data.pauseEnd == request.resource.data.pauseStart + duration.value(7, 'd')
-                    && request.resource.data.subscriptionEnd == resource.data.subscriptionEnd + duration.value(7, 'd');
+
     }
   }
 }

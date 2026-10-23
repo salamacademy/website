@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
 const tgcore = require('./telegram-core');
+const PortalSync = require('./portal-sync');
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || (functions.config().telegram && functions.config().telegram.token) || '';
 const tg = async (method, body) => { const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r.json(); };
 
@@ -82,4 +83,10 @@ exports.tgOnNewRequest = functions.firestore.document('subscriptions/{id}').onCr
 exports.tgOnPause = functions.firestore.document('subscriptions/{id}').onUpdate(async (chg) => {
   const b = chg.before.data(), a = { id: chg.after.id, ...chg.after.data() }; if (b.pauseStart || !a.pauseStart || !TG_TOKEN) return;
   return tgcore.notifyAdmins(db, tg, `⏸️ <b>إيقاف مؤقت جديد</b>\n\n<b>${a.childName}</b> — من ${tgcore.fmtD(a.pauseStart)} إلى ${tgcore.fmtD(a.pauseEnd)}${a.pauseReason ? '\n📝 ' + a.pauseReason : ''}\n👤 ${a.parentName} · ${a.phone}`);
+});
+
+// Keep parent portal in sync with any subscription write
+exports.syncPortal = functions.firestore.document('subscriptions/{id}').onWrite(async (chg) => {
+  const phones = new Set([chg.before.exists && chg.before.data().phone, chg.after.exists && chg.after.data().phone].filter(Boolean));
+  for (const p of phones) await PortalSync.syncPhone(db, p);
 });

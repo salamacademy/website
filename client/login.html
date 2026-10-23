@@ -2,9 +2,9 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover,maximum-scale=1"/>
   <title>دخول الأعضاء | أكاديمية سلام</title>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="../css/portal.css"/>
   <link rel="manifest" href="../manifest.json"/>
   <meta name="theme-color" content="#B8541E"/>
@@ -16,79 +16,40 @@
   <div class="portal-container">
     <div class="portal-card">
       <div class="portal-top-bar">
-        <img src="../images/logo-ar.png" alt="Salam Academy" class="portal-logo-img" onerror="this.src='../images/logo-en.png'"/>
+        <img src="../images/logo-ar.png" alt="Salam Academy" class="portal-logo-img" style="filter:none;background:#fff;border-radius:50%;padding:6px"/>
         <h1>أكاديمية سلام</h1>
-        <p>بوابة الأعضاء</p>
+        <p>بوابة أولياء الأمور</p>
       </div>
-
-      <div class="portal-body-pad" id="loginView">
-        <div class="tab-toggle">
-          <button class="tab-btn active" onclick="showTab('phone',this)">📱 رقم الهاتف</button>
-          <button class="tab-btn" onclick="showTab('email',this)">📧 البريد</button>
-        </div>
-
-        <!-- Phone -->
-        <div id="phoneTab">
-          <div id="phoneStep1">
-            <div class="form-group">
-              <label>رقم الهاتف الكويتي</label>
-              <div class="phone-input-wrap">
-                <span class="phone-prefix">🇰🇼 +965</span>
-                <input type="tel" id="loginPhone" placeholder="XXXXXXXX" maxlength="8"/>
-              </div>
-            </div>
-            <div id="recaptcha-container"></div>
-            <button class="btn-portal-primary" onclick="sendOTP()">📲 إرسال رمز التحقق</button>
-          </div>
-
-          <div id="phoneStep2" style="display:none">
-            <div class="otp-hint">✅ تم إرسال رمز التحقق إلى هاتفك</div>
-            <div class="form-group">
-              <label>رمز التحقق OTP</label>
-              <input type="text" id="otpCode" placeholder="- - - - - -" maxlength="6" style="text-align:center;letter-spacing:10px;font-size:1.5rem;font-weight:900"/>
-            </div>
-            <button class="btn-portal-primary" onclick="verifyOTP()">✔️ تحقق وادخل</button>
-            <button class="btn-portal-ghost" onclick="backToPhone()">← تغيير الرقم</button>
+      <div class="portal-body-pad">
+        <p style="text-align:center;color:var(--text-mid);font-size:0.9rem;margin-bottom:18px;line-height:1.7">أدخل رقم هاتفك المسجّل في الأكاديمية لمتابعة اشتراك أطفالك</p>
+        <div class="form-group">
+          <label>رقم الهاتف</label>
+          <div class="phone-input-wrap">
+            <span class="phone-prefix">🇰🇼 +965</span>
+            <input type="tel" id="loginPhone" placeholder="XXXXXXXX" maxlength="8" inputmode="numeric" autocomplete="tel" autofocus/>
           </div>
         </div>
-
-        <!-- Email -->
-        <div id="emailTab" style="display:none">
-          <div class="form-group">
-            <label>البريد الإلكتروني</label>
-            <input type="email" id="loginEmail" placeholder="example@mail.com"/>
-          </div>
-          <div class="form-group">
-            <label>كلمة المرور</label>
-            <input type="password" id="loginPassword" placeholder="••••••••"/>
-          </div>
-          <button class="btn-portal-primary" onclick="loginWithEmail()">🔑 تسجيل الدخول</button>
-          <button class="btn-portal-ghost" onclick="forgotPassword()">نسيت كلمة المرور؟</button>
-        </div>
-
-        <div class="divider"><span>أو</span></div>
-        <a href="https://wa.me/96593000607" target="_blank" class="btn-portal-whatsapp">
-          💬 تواصل معنا على واتساب
-        </a>
-        <a href="register.html" class="btn-portal-ghost" style="display:block;text-align:center;text-decoration:none;margin-top:10px">📝 ليس لديك حساب؟ عبّئ نموذج التسجيل</a>
-        <p class="portal-footer-note">
-          <a href="../index.html">← العودة للموقع الرئيسي</a>
-        </p>
+        <button class="btn-portal-primary" onclick="enter()">دخول ←</button>
+        <div id="msgBox" class="error-msg"></div>
+        <div class="divider"><span>ليس لديك اشتراك؟</span></div>
+        <a href="register.html" class="btn-portal-ghost" style="display:block;text-align:center;text-decoration:none;margin-top:0">📝 نموذج التسجيل</a>
+        <a href="https://wa.me/96593000607" target="_blank" class="btn-portal-whatsapp" style="margin-top:10px">💬 تواصل معنا على واتساب</a>
+        <p class="portal-footer-note"><a href="../index.html">← العودة للموقع الرئيسي</a></p>
       </div>
-
-      <div id="loadingView" style="display:none" class="loading-view">
-        <div class="spinner"></div>
-        <p>جاري التحقق...</p>
-      </div>
-
-      <div id="msgBox" class="error-msg"></div>
     </div>
   </div>
-
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="../js/firebase-config.js"></script>
-  <script src="../js/client-login.js"></script>
+  <script>
+    const saved = localStorage.getItem('salamPhone');
+    if (saved && /^\d{8}$/.test(saved)) location.replace('dashboard.html');
+    const inp = document.getElementById('loginPhone');
+    inp.addEventListener('input', () => { inp.value = inp.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '').slice(0, 8); });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') enter(); });
+    function enter() {
+      const p = inp.value.trim();
+      if (!/^[569]\d{7}$/.test(p)) { const m = document.getElementById('msgBox'); m.textContent = 'أدخل رقم هاتف كويتي صحيح (8 أرقام)'; m.style.display = 'block'; m.style.background = '#ffebee'; m.style.color = '#c62828'; return; }
+      localStorage.setItem('salamPhone', p); location.href = 'dashboard.html';
+    }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+  </script>
 </body>
 </html>

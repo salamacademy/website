@@ -124,6 +124,15 @@ const UPAYMENT_CONFIG = {
 
 Statuses: `pending_review` → `approved` → `active` → `expired` (or `rejected` / `cancelled`)
 
+## 🔓 Parent Login (phone only, no OTP)
+
+Parents enter their phone number and are in — no SMS, no OTP, no Firebase Auth cost. To keep private data safe:
+- The parent app reads **`portal/{phone}`**, a mirror that contains only: child names, package, amount, status, dates, pause info. **No** health notes, allergies, survey answers or admin notes.
+- `subscriptions` (the full records) stays admin-only.
+- The mirror is refreshed automatically by the admin dashboard after every change, by the Telegram bot on every change (even when the dashboard is closed), and by the `syncPortal` Cloud Function if deployed. A manual **🔄 مزامنة البوابة** button is in 📨.
+- Pausing is now a **request**: the parent picks the week → it lands in ⏸️ الإيقافات as "🕒 طلب" with ✅ موافقة (+7 أيام) / ⛔ رفض → you get a notification (dashboard + Telegram).
+- Phone-only login means anyone who knows a parent's phone number can see that family's subscription status (not personal details). If you later want stronger protection, Firebase Phone OTP can be re-enabled.
+
 ## 📱 Mobile App (PWA)
 
 Both dashboards are built as a phone app: bottom tab bar, a floating ➕ button, card lists (no tables), bottom-sheet dialogs, and a centred 430px phone frame on desktop. Admin tabs: الرئيسية · المراجعة · ➕ إضافة · الأعضاء · رسائل (plus تنتهي قريباً / الإيقافات via the home tiles). Member tabs: الرئيسية · الجدول · 💳 الدفع · إيقاف · اشتراكي.
