@@ -129,13 +129,15 @@ const DEFAULT_ITEMS = [
   { icon: '🥊', name: 'معدات تدريب — واقي + قفازات', price: 30, category: 'بيع زي', order: 11, active: true }
 ];
 async function loadPayItems() {
-  const snap = await db.collection('payItems').get();
+  let snap;
+  try { snap = await db.collection('payItems').get(); }
+  catch (e) { const el = document.getElementById('payItemsList'); if (el) el.innerHTML = `<div class="empty" style="padding:14px;color:var(--bad)">❌ تعذر تحميل المنتجات<br/><small>${e.code === 'permission-denied' ? 'لم يتم نشر قواعد Firestore بعد — نفّذ: firebase deploy --only firestore:rules' : e.message}</small></div>`; return; }
   payItemsAdmin = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0));
   const el = document.getElementById('payItemsList'); if (!el) return;
   el.innerHTML = payItemsAdmin.length ? payItemsAdmin.map(i => `<div class="pay-row ${i.active ? '' : 'off'}" onclick="openPayItem('${i.id}')"><div class="pi">${i.icon || '🏷️'}</div><div class="m"><b>${i.name}</b><small>${i.packageType ? '🔁 يفعّل باقة ' + (PKG_NAMES[i.packageType] || i.packageType) + ' · ' : ''}${i.category || ''}${i.allowQty ? ' · كمية' : ''}${i.active ? '' : ' · مخفي'}</small></div><div class="pp">${(+i.price).toFixed(3)} <small style="font-size:.65rem;color:var(--text-light)">د.ك</small></div></div>`).join('')
     : `<div class="empty" style="padding:14px">لا توجد منتجات بعد<br/><button class="link" style="margin-top:10px" onclick="seedPayItems()">✨ إنشاء القائمة الافتراضية</button></div>`;
 }
-async function seedPayItems() { const b = db.batch(); DEFAULT_ITEMS.forEach(i => b.set(db.collection('payItems').doc(), { ...i, createdAt: firebase.firestore.FieldValue.serverTimestamp() })); await b.commit(); showToast('✅ تم الإنشاء'); loadPayItems(); }
+async function seedPayItems() { try { const b = db.batch(); DEFAULT_ITEMS.forEach(i => b.set(db.collection('payItems').doc(), { ...i, createdAt: firebase.firestore.FieldValue.serverTimestamp() })); await b.commit(); showToast('✅ تم الإنشاء'); loadPayItems(); } catch (e) { showToast('❌ ' + (e.code === 'permission-denied' ? 'غير مصرح — انشر قواعد Firestore أولاً' : e.message)); } }
 function openPayItem(id) {
   const i = id ? payItemsAdmin.find(x => x.id === id) : null;
   document.getElementById('piId').value = id || ''; document.getElementById('piTitle').textContent = i ? '✏️ تعديل المنتج' : '➕ منتج دفع';
@@ -150,8 +152,10 @@ async function savePayItem() {
   if (!name || !(price >= 0)) return showToast('❌ أدخل الاسم والسعر');
   const data = { name, price, icon: document.getElementById('piIcon').value.trim() || '🏷️', packageType: document.getElementById('piPkg').value || null, category: document.getElementById('piCat').value, order: +document.getElementById('piOrder').value || 10, allowQty: document.getElementById('piQty').checked, active: document.getElementById('piActive').checked, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
   const id = document.getElementById('piId').value;
-  if (id) await db.collection('payItems').doc(id).update(data); else await db.collection('payItems').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-  closePayItem(); showToast('✅ تم الحفظ'); loadPayItems();
+  try {
+    if (id) await db.collection('payItems').doc(id).update(data); else await db.collection('payItems').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    closePayItem(); showToast('✅ تم الحفظ'); loadPayItems();
+  } catch (e) { showToast('❌ ' + (e.code === 'permission-denied' ? 'غير مصرح — انشر قواعد Firestore أولاً' : e.message)); }
 }
 async function deletePayItem() { const id = document.getElementById('piId').value; if (!id || !confirm('حذف هذا المنتج؟')) return; await db.collection('payItems').doc(id).delete(); closePayItem(); showToast('تم الحذف'); loadPayItems(); }
 

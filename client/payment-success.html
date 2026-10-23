@@ -14,7 +14,7 @@ const q = new URLSearchParams(location.search); const order = q.get('order'); co
 const set = (i, t, m) => { document.getElementById('ico').textContent = i; document.getElementById('ttl').textContent = t; document.getElementById('msg').innerHTML = m; };
 (async () => {
   if (!order) { set('ℹ️', 'لا يوجد طلب دفع', 'ارجع إلى حسابك للدفع.'); return; }
-  try { if (window.PAYMENT_API_URL && !PAYMENT_API_URL.includes('YOUR_')) await fetch(PAYMENT_API_URL + '/verifyPayment?order=' + encodeURIComponent(order) + (track ? '&track_id=' + encodeURIComponent(track) : '')); } catch (_) {}
+  try { if (typeof PAYMENT_API_URL !== 'undefined' && PAYMENT_API_URL && !PAYMENT_API_URL.includes('YOUR_')) await fetch(PAYMENT_API_URL + '/verifyPayment?order=' + encodeURIComponent(order) + (track ? '&track_id=' + encodeURIComponent(track) : '')); } catch (_) {}
   db.collection('payments').doc(order).onSnapshot(d => {
     if (!d.exists) { set('❓', 'لم نجد الطلب', 'تواصل معنا إذا تم خصم المبلغ.'); return; }
     const p = d.data(); const box = document.getElementById('box');

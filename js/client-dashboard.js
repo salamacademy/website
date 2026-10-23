@@ -139,7 +139,7 @@ async function startPayment() {
   const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => ({ id, qty })); if (!items.length) return;
   const btn = $('payBtn'); btn.disabled = true; btn.innerHTML = '⏳ جاري تحويلك إلى UPayment...';
   try {
-    if (!window.PAYMENT_API_URL || PAYMENT_API_URL.includes('YOUR_')) throw new Error('not-configured');
+    if (typeof PAYMENT_API_URL === 'undefined' || !PAYMENT_API_URL || PAYMENT_API_URL.includes('YOUR_')) throw new Error('not-configured');
     const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, subId: sub ? sub.id : null, childName: sub ? sub.childName : '', parentName: sub ? sub.parentName : (portalDoc?.parentName || ''), email: sub ? sub.email : '', items, returnBase: location.origin + location.pathname.replace(/[^/]*$/, '') }) });
     const j = await r.json(); if (!j.ok || !j.link) throw new Error(j.error || 'فشل إنشاء الدفع');
     location.href = j.link;
@@ -147,7 +147,7 @@ async function startPayment() {
     const list = items.map(({ id, qty }) => { const i = payItems.find(x => x.id === id); return `• ${i.name}${qty > 1 ? ' ×' + qty : ''} — ${(i.price * qty).toFixed(3)} د.ك`; }).join('\n');
     window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أريد الدفع${sub ? ' لـ ' + sub.childName : ''}:\n${list}\nالإجمالي: ${cartTotal().toFixed(3)} د.ك\nيرجى إرسال رابط الدفع.`), '_blank');
     btn.disabled = false; btn.innerHTML = '<img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span>';
-    if (e.message !== 'not-configured') alert('تعذر إنشاء رابط الدفع — تم تحويلك للواتساب');
+    if (e.message !== 'not-configured') alert('تعذر إنشاء رابط الدفع: ' + e.message + '\nتم تحويلك للواتساب');
   }
 }
 
