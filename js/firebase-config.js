@@ -15,7 +15,7 @@ const auth = firebase.auth ? firebase.auth() : null;
 
 // UPayment — the API key lives ONLY in Cloud Functions (never in the browser).
 // After `firebase deploy --only functions`, paste the functions base URL here:
-const PAYMENT_API_URL = "https://us-central1-salam-5e6f2.cloudfunctions.net"; // e.g. https://us-central1-salam-5e6f2.cloudfunctions.net
+const PAYMENT_API_URL = "https://europe-west1-salam-5e6f2.cloudfunctions.net"; // e.g. https://europe-west1-salam-5e6f2.cloudfunctions.net
 
 // WhatsApp
 const WHATSAPP_NUMBER = "96593000607";

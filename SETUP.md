@@ -184,8 +184,8 @@ Log expenses from your phone, get the monthly P&L, see subscribers, and approve 
 4. Keep it running on any always-on machine (a PC, a VPS, Railway/Render free tier). It uses long-polling, so no public URL is needed.
 
 **Run it — Option B (Blaze): Cloud Function webhook**
-1. `firebase functions:config:set telegram.token="123:ABC"` then `firebase deploy --only functions`
-2. Open once in a browser: `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://us-central1-salam-5e6f2.cloudfunctions.net/telegramWebhook`
+1. Add `TELEGRAM_BOT_TOKEN=123:ABC` to `functions/.env` then `firebase deploy --only functions`
+2. Open once in a browser: `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://europe-west1-salam-5e6f2.cloudfunctions.net/telegramWebhook`
 
 **Connect your phone:** send `/start` to the bot → it replies with your Chat ID → Admin dashboard → 📨 → 🤖 بوت تيليجرام → add the ID. Only added IDs can use the bot.
 
@@ -213,12 +213,12 @@ The API key never touches the browser — it lives in Cloud Functions. This need
 
 **Setup (one time, ~10 min)**
 1. Firebase Console → Upgrade to Blaze
-2. `firebase functions:config:set upayments.key="YOUR_API_KEY" upayments.sandbox="true"`  
-   (the *Encrypted API Key* from the UPay dashboard is for their JS plugin — not needed here; use the plain API Key / Bearer token)
+2. Create `functions/.env` (copy `functions/.env.example`) with `UPAYMENTS_KEY=...` and `UPAYMENTS_SANDBOX=true`  
+   (the *Encrypted API Key* from the UPay dashboard is for their JS plugin — not needed here; use the plain API Key / Bearer token). The file is git-ignored.
 3. `cd functions && npm install && cd ..` then `firebase deploy --only functions`
-4. Copy the functions base URL from the deploy output (e.g. `https://us-central1-salam-5e6f2.cloudfunctions.net`) into `js/firebase-config.js` → `PAYMENT_API_URL`, push the site
+4. Copy the functions base URL from the deploy output (e.g. `https://europe-west1-salam-5e6f2.cloudfunctions.net`) into `js/firebase-config.js` → `PAYMENT_API_URL`, push the site
 5. In the admin app → المالية → 🛒 → **✨ إنشاء القائمة الافتراضية** (or add your own items). Items with "يفعّل باقة" auto-activate that package on payment; renewals extend from the current end date
-6. Test with UPayment sandbox test cards, then switch: `firebase functions:config:set upayments.sandbox="false"` and redeploy
+6. Test with UPayment sandbox test cards, then set `UPAYMENTS_SANDBOX=false` in `functions/.env` and redeploy
 
 Until step 4 is done, the ادفع button falls back to a WhatsApp message listing the chosen items.
 
