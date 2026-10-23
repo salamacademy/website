@@ -153,6 +153,49 @@ Parents can pause an **active** subscription once per month for exactly 7 days (
 
 iPhone note: web push on iOS requires iOS 16.4+ and the app to be **added to the Home Screen** first.
 
+## 💰 Accounting (المالية tab)
+
+- Firestore collection `transactions`: `{ type: income|expense, amount, category, note, method, date: "YYYY-MM-DD", recurring, createdBy: admin|telegram }`
+- Month navigator, Income / Expenses / Net tiles, category breakdown bars with %, grouped transaction list, CSV export
+- ➕ FAB on this tab opens the add sheet (type toggle, amount, category chips, date, method, note, 🔁 monthly recurring)
+- **Recurring**: mark rent/salaries as 🔁 once → each month tap "تسجيلها لهذا الشهر" to post them in one go
+- **Auto income**: activating a subscription (▶️ تفعيل or manual add) records an `اشتراكات` income automatically
+- Home tile "صافي الشهر" shows this month's net
+
+## 🤖 Telegram Bot
+
+Log expenses from your phone, get the monthly P&L, see subscribers, and approve registrations — all synced live with the dashboard.
+
+**Create the bot (2 min):** Telegram → `@BotFather` → `/newbot` → copy the token.
+
+**Run it — Option A (free, no Blaze): the `bot/` folder**
+1. Firebase Console → Project settings → Service accounts → *Generate new private key* → save as `bot/serviceAccount.json` (never commit it; it's git-ignored)
+2. `cd bot && npm install`
+3. `set TELEGRAM_BOT_TOKEN=123:ABC` (Windows) / `export TELEGRAM_BOT_TOKEN=123:ABC` then `npm start`
+4. Keep it running on any always-on machine (a PC, a VPS, Railway/Render free tier). It uses long-polling, so no public URL is needed.
+
+**Run it — Option B (Blaze): Cloud Function webhook**
+1. `firebase functions:config:set telegram.token="123:ABC"` then `firebase deploy --only functions`
+2. Open once in a browser: `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://us-central1-salam-5e6f2.cloudfunctions.net/telegramWebhook`
+
+**Connect your phone:** send `/start` to the bot → it replies with your Chat ID → Admin dashboard → 📨 → 🤖 بوت تيليجرام → add the ID. Only added IDs can use the bot.
+
+**What you can type**
+| You send | Bot does |
+|---|---|
+| `350 إيجار` | saves a 350 KD rent expense instantly |
+| `25 اشتراك أحمد` | saves 25 KD subscription income |
+| `120` | asks مصروف/دخل → then category buttons |
+| 📊 ملخص الشهر | income, expenses, net, % per category |
+| 📋 آخر العمليات | last 10 transactions |
+| 👥 المشتركين | counts by status and package |
+| 📝 طلبات التسجيل | each pending form with ✅ موافقة / ⛔ رفض buttons |
+| ⚠️ تنتهي قريباً / ⏸️ الإيقافات | lists with WhatsApp links |
+
+Recognised words: إيجار، راتب/رواتب، أكل/ماء/غداء، معدات/كور، زي/ملابس، باص/بنزين، إعلان/تسويق، صيانة، رحلة/بولينج، اشتراك، بطولة، رعاية. Anything else → category buttons.
+
+The bot also pushes an alert to every connected phone on each new registration (with approve/reject buttons) and each new pause.
+
 ## 📊 Firestore Data Structure
 
 ### `subscriptions` collection:

@@ -18,6 +18,11 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // Accounting + bot settings: admins only (the bot uses the Admin SDK and bypasses rules)
+    match /transactions/{id} { allow read, write: if isAdmin(); }
+    match /settings/{id}     { allow read, write: if isAdmin(); }
+    match /botState/{id}     { allow read, write: if false; }
+
     match /subscriptions/{subId} {
       allow read, write: if isAdmin();
       allow create: if request.resource.data.status == 'pending_review'

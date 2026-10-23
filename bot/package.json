@@ -1,0 +1,8 @@
+{
+  "name": "salam-academy-telegram-bot",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "main": "polling.js",
+  "scripts": { "start": "node polling.js" },
+  "dependencies": { "firebase-admin": "^12.0.0" }
+}

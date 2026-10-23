@@ -3,8 +3,8 @@
 // ============================
 const PKG_NAMES = { football: 'كرة القدم', confidence: 'بناء الثقة والكيوكشن', excellence: 'التميز', excellence_loyal: 'التميز (أسرة سلام)', premium: 'المميزة (قديم)' };
 const PKG_ICON = { football: '⚽', confidence: '🥋', excellence: '⚡', excellence_loyal: '🏅', premium: '⚡' };
-const TITLES = { dashboard: 'لوحة التحكم', review: 'طلبات المراجعة', members: 'الأعضاء', expiring: 'تنتهي قريباً', paused: 'الإيقافات المؤقتة', add: 'إضافة اشتراك', notify: 'إرسال رسالة' };
-const SUBS = { dashboard: 'نظرة سريعة على الأكاديمية اليوم', review: 'راجع النموذج ثم وافق أو ارفض', members: 'ابحث وصفِّ جميع المشتركين', expiring: 'أرسل تذكير التجديد', paused: 'إيقافات الأسبوع الواحد', add: 'تسجيل مباشر بدون نموذج', notify: 'واتساب للمشتركين' };
+const TITLES = { dashboard: 'لوحة التحكم', review: 'طلبات المراجعة', members: 'الأعضاء', expiring: 'تنتهي قريباً', paused: 'الإيقافات المؤقتة', add: 'إضافة اشتراك', notify: 'إرسال رسالة', finance: 'المالية', telegram: 'بوت تيليجرام' };
+const SUBS = { dashboard: 'نظرة سريعة على الأكاديمية اليوم', review: 'راجع النموذج ثم وافق أو ارفض', members: 'ابحث وصفِّ جميع المشتركين', expiring: 'أرسل تذكير التجديد', paused: 'إيقافات الأسبوع الواحد', add: 'تسجيل مباشر بدون نموذج', notify: 'واتساب للمشتركين', finance: 'الدخل والمصاريف والصافي', telegram: 'سجّل المصاريف من هاتفك' };
 let allSubscriptions = [];
 let notifReady = false;
 
@@ -32,6 +32,7 @@ function go(page) {
   document.querySelectorAll('.tab[data-page]').forEach(t => t.classList.toggle('on', t.dataset.page === page));
   document.getElementById('adminPageTitle').textContent = TITLES[page] || '';
   document.getElementById('headSub').textContent = SUBS[page] || '';
+  const fab = document.querySelector('.fab'); if (fab) { fab.textContent = page === 'finance' ? '💸' : '+'; fab.onclick = page === 'finance' ? () => openTx() : () => go('add'); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function showAdminSection(n) { go(n === 'subscriptions' ? 'members' : n); }
@@ -45,7 +46,7 @@ function renderStats() {
   const rev = allSubscriptions.filter(s => { const c = toD(s.createdAt); return c && c.getMonth() === now.getMonth() && c.getFullYear() === now.getFullYear() && s.status === 'active'; }).reduce((a, s) => a + (+s.amount || 0), 0);
   set('statPending', pending); set('statActive', active.length); set('statExpiring', expiring.length);
   set('statExpired', allSubscriptions.filter(s => s.status === 'expired').length);
-  set('statPaused', allSubscriptions.filter(isPausedNow).length); set('statRevenue', rev.toFixed(0));
+  set('statPaused', allSubscriptions.filter(isPausedNow).length); if (typeof finNetNow === 'function') set('statRevenue', finNetNow()); else set('statRevenue', rev.toFixed(0));
   ['reviewBadge', 'tabReviewDot'].forEach(id => { const b = document.getElementById(id); if (b) { b.textContent = pending; b.style.display = pending ? 'inline-flex' : 'none'; } });
 }
 function set(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
@@ -180,6 +181,7 @@ async function activateSubscription(id) {
   const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const end = new Date(start); end.setDate(end.getDate() + 30);
   try {
     await db.collection('subscriptions').doc(id).update({ status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
+    await recordIncomeForSub(s, s.amount);
     sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, end); showToast('✅ تم التفعيل'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
 }
@@ -213,7 +215,7 @@ async function saveSubscription(e) {
   const o = document.getElementById('newPackage').selectedOptions[0];
   const start = new Date(document.getElementById('newStartDate').value); const end = new Date(start); end.setDate(end.getDate() + 30);
   const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: v('newEmail'), packageType: o.value, packageName: o.dataset.name, amount: +document.getElementById('newAmount').value, paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, pauseUsed: false, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
-  try { await db.collection('subscriptions').add(data); sendWelcomeWhatsApp(data.phone, data.childName, data.packageName, end); showToast('✅ تمت الإضافة'); clearAddForm(); await loadAllData(); go('members'); }
+  try { const ref = await db.collection('subscriptions').add(data); await recordIncomeForSub({ id: ref.id, ...data }, data.amount, data.paymentMethod); sendWelcomeWhatsApp(data.phone, data.childName, data.packageName, end); showToast('✅ تمت الإضافة'); clearAddForm(); await loadAllData(); go('members'); }
   catch (err) { showToast('❌ ' + err.message); }
   btn.disabled = false; btn.textContent = '💾 حفظ وتفعيل الاشتراك';
 }
@@ -274,3 +276,10 @@ auth.onAuthStateChanged(async (user) => {
   loadAllData();
   setupAdminNotifications(user);
 });
+
+async function recordIncomeForSub(s, amount, method) {
+  try {
+    await db.collection('transactions').add({ type: 'income', amount: +amount || 0, category: 'اشتراكات', note: `اشتراك ${s.childName} — ${s.packageName || ''}`, method: method || 'cash', date: new Date().toISOString().split('T')[0], subId: s.id, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' });
+    if (typeof loadFinance === 'function') loadFinance();
+  } catch (e) { console.warn('income tx', e); }
+}

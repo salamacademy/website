@@ -4,6 +4,9 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
+const tgcore = require('./telegram-core');
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || (functions.config().telegram && functions.config().telegram.token) || '';
+const tg = async (method, body) => { const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r.json(); };
 
 async function sendTo(tokens, title, body, url) {
   tokens = (tokens || []).filter(Boolean);
@@ -61,4 +64,22 @@ exports.sendCustomPush = functions.https.onCall(async (data, ctx) => {
   if (!isAdmin) throw new functions.https.HttpsError('permission-denied', 'admins only');
   const sub = (await db.collection('subscriptions').doc(data.subId).get()).data();
   return sendTo(sub?.fcmTokens, data.title || 'أكاديمية سلام', data.body || '', '/website/client/dashboard.html');
+});
+
+
+// ================= TELEGRAM BOT (webhook) =================
+// Set token:  firebase functions:config:set telegram.token="123:ABC"   (or TELEGRAM_BOT_TOKEN secret)
+// Register:   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<region>-salam-5e6f2.cloudfunctions.net/telegramWebhook
+exports.telegramWebhook = functions.https.onRequest(async (req, res) => {
+  try { if (req.method === 'POST' && TG_TOKEN) await tgcore.handleUpdate(req.body, { db, tg }); } catch (e) { console.error(e); }
+  res.status(200).send('ok');
+});
+// Telegram alerts on new registration / pause (reuse existing triggers)
+exports.tgOnNewRequest = functions.firestore.document('subscriptions/{id}').onCreate(async (snap) => {
+  const s = { id: snap.id, ...snap.data() }; if (s.status !== 'pending_review' || !TG_TOKEN) return;
+  return tgcore.notifyAdmins(db, tg, '🔔 <b>طلب تسجيل جديد</b>\n\n' + tgcore.requestCard(s), tgcore.requestKb(s.id));
+});
+exports.tgOnPause = functions.firestore.document('subscriptions/{id}').onUpdate(async (chg) => {
+  const b = chg.before.data(), a = { id: chg.after.id, ...chg.after.data() }; if (b.pauseStart || !a.pauseStart || !TG_TOKEN) return;
+  return tgcore.notifyAdmins(db, tg, `⏸️ <b>إيقاف مؤقت جديد</b>\n\n<b>${a.childName}</b> — من ${tgcore.fmtD(a.pauseStart)} إلى ${tgcore.fmtD(a.pauseEnd)}${a.pauseReason ? '\n📝 ' + a.pauseReason : ''}\n👤 ${a.parentName} · ${a.phone}`);
 });

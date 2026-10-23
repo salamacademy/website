@@ -24,7 +24,8 @@
       </div>
       <div class="head-actions">
         <button class="icon-btn" onclick="go('review')" title="طلبات المراجعة">📝<span class="dot" id="reviewBadge">0</span></button>
-        <button class="icon-btn" onclick="loadAllData();showToast('تم التحديث')" title="تحديث">🔄</button>
+        <button class="icon-btn" onclick="go('notify')" title="رسائل">📨</button>
+        <button class="icon-btn" onclick="loadAllData();loadFinance();showToast('تم التحديث')" title="تحديث">🔄</button>
         <button class="icon-btn" onclick="adminLogout()" title="خروج">⏻</button>
       </div>
     </div>
@@ -44,7 +45,7 @@
       <div class="tile c-warn" onclick="go('expiring')"><div class="t-ico">⚠️</div><div class="t-num" id="statExpiring">–</div><div class="t-lbl">تنتهي خلال 7 أيام</div></div>
       <div class="tile c-info" onclick="go('paused')"><div class="t-ico">⏸️</div><div class="t-num" id="statPaused">–</div><div class="t-lbl">متوقف مؤقتاً</div></div>
       <div class="tile c-bad" onclick="go('members');setFilter('expired')"><div class="t-ico">❌</div><div class="t-num" id="statExpired">–</div><div class="t-lbl">منتهي</div></div>
-      <div class="tile c-copper"><div class="t-ico">💰</div><div class="t-num" id="statRevenue">–</div><div class="t-lbl">إيراد الشهر (د.ك)</div></div>
+      <div class="tile c-copper" onclick="go('finance')"><div class="t-ico">💰</div><div class="t-num" id="statRevenue">–</div><div class="t-lbl">صافي الشهر (د.ك)</div></div>
     </div>
 
     <div class="card">
@@ -126,9 +127,64 @@
     </form>
   </section>
 
+
+  <!-- ===== FINANCE ===== -->
+  <section class="page" data-page="finance">
+    <div class="month-nav"><button onclick="finMonth(1)">›</button><b id="finMonthLabel">--</b><button onclick="finMonth(-1)">‹</button></div>
+    <div class="fin-tiles">
+      <div class="fin-tile in"><div class="l">الدخل</div><div class="v" id="finIn">0 <small>د.ك</small></div></div>
+      <div class="fin-tile out"><div class="l">المصاريف</div><div class="v" id="finOut">0 <small>د.ك</small></div></div>
+      <div class="fin-tile net" id="finNetTile"><div class="l">الصافي</div><div class="v" id="finNet">0 <small>د.ك</small></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>📊 المصاريف حسب الفئة</h4><span id="finOutCount" style="font-size:0.75rem;color:var(--text-light);font-weight:800"></span></div>
+      <div class="bars" id="finOutBars"><div class="empty">لا توجد مصاريف هذا الشهر</div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>💰 الدخل حسب الفئة</h4><span id="finInCount" style="font-size:0.75rem;color:var(--text-light);font-weight:800"></span></div>
+      <div class="bars" id="finInBars"><div class="empty">لا يوجد دخل هذا الشهر</div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>🔁 مصاريف شهرية ثابتة</h4><button class="link" onclick="postRecurring()">تسجيلها لهذا الشهر</button></div>
+      <div id="recurringList"><div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div></div>
+    </div>
+    <div class="page-title" style="margin-top:4px"><h3>📋 العمليات</h3><button class="link" onclick="exportCSV()">⬇️ CSV</button></div>
+    <div class="segs" id="finSegs">
+      <button class="seg on" data-v="all" onclick="finFilter('all')">الكل</button>
+      <button class="seg" data-v="expense" onclick="finFilter('expense')">مصاريف</button>
+      <button class="seg" data-v="income" onclick="finFilter('income')">دخل</button>
+    </div>
+    <div id="txList"><div class="empty">جاري التحميل...</div></div>
+  </section>
+
+  <!-- ===== TELEGRAM ===== -->
+  <section class="page" data-page="telegram">
+    <div class="page-title"><h3>🤖 بوت تيليجرام</h3></div>
+    <div class="card">
+      <div class="card-h"><h4>الأجهزة المتصلة</h4></div>
+      <p class="note" style="margin-bottom:10px">أرسل <code>/start</code> للبوت، ثم أضف رقم المحادثة الذي يرسله لك هنا. فقط الأرقام المضافة تستطيع استخدام البوت.</p>
+      <div id="chatIdList"></div>
+      <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newChatId" placeholder="Chat ID مثال: 123456789" inputmode="numeric" style="flex:1;border:2px solid rgba(184,84,30,0.12);background:var(--copper-xpale);border-radius:14px;padding:11px 14px;direction:ltr"/><button class="btn primary" style="width:auto;padding:0 18px" onclick="addChatId()">إضافة</button></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>ماذا يفعل البوت؟</h4></div>
+      <div class="tg-step"><b>💸</b><div>اكتب <code>350 إيجار</code> أو فقط <code>350</code> → يسألك مصروف أم دخل → الفئة → يُحفظ ويظهر هنا فوراً</div></div>
+      <div class="tg-step"><b>📊</b><div><strong>ملخص الشهر</strong>: الدخل، المصاريف، الصافي، ونسبة كل فئة</div></div>
+      <div class="tg-step"><b>👥</b><div><strong>المشتركين</strong>: النشطين، تنتهي قريباً، الإيقافات</div></div>
+      <div class="tg-step"><b>📝</b><div><strong>طلبات التسجيل</strong>: يعرض النموذج كاملاً مع أزرار موافقة / رفض</div></div>
+      <div class="tg-step"><b>🔔</b><div>تنبيه فوري عند كل تسجيل جديد أو إيقاف مؤقت</div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>التشغيل</h4></div>
+      <div class="tg-step"><b>1</b><div>في تيليجرام افتح <code>@BotFather</code> → <code>/newbot</code> → انسخ الـ Token</div></div>
+      <div class="tg-step"><b>2</b><div>شغّل البوت من مجلد <code>bot/</code> (تعليمات كاملة في <code>SETUP.md</code>)</div></div>
+      <div class="tg-step"><b>3</b><div>أرسل <code>/start</code> للبوت وأضف الـ Chat ID أعلاه</div></div>
+    </div>
+  </section>
+
   <!-- ===== NOTIFY ===== -->
   <section class="page" data-page="notify">
-    <div class="page-title"><h3>📨 إرسال رسالة</h3></div>
+    <div class="page-title"><h3>📨 إرسال رسالة</h3><button class="link" onclick="go('telegram')">🤖 بوت تيليجرام</button></div>
     <div class="card">
       <div class="card-h"><h4>⚠️ تذكير انتهاء الاشتراك</h4></div>
       <p class="note" style="margin-bottom:12px">يفتح واتساب لكل مشترك ينتهي اشتراكه خلال 7 أيام برسالة تذكير جاهزة.</p>
@@ -150,7 +206,7 @@
   <button class="tab" data-page="review" onclick="go('review')"><i>📝</i>المراجعة<span class="dot" id="tabReviewDot">0</span></button>
   <div class="tab fab-slot"><button class="fab" onclick="go('add')" title="إضافة اشتراك">+</button></div>
   <button class="tab" data-page="members" onclick="go('members')"><i>👥</i>الأعضاء</button>
-  <button class="tab" data-page="notify" onclick="go('notify')"><i>📨</i>رسائل</button>
+  <button class="tab" data-page="finance" onclick="go('finance')"><i>💰</i>المالية</button>
 </div></nav>
 
 <!-- EDIT SHEET -->
@@ -184,6 +240,23 @@
   <div class="sheet"><div class="sheet-grip"></div><div id="detailBody"></div></div>
 </div>
 
+
+<!-- TRANSACTION SHEET -->
+<div class="sheet-bg" id="txModal" onclick="if(event.target===this)closeTx()">
+  <div class="sheet"><div class="sheet-grip"></div>
+    <h3 id="txTitle">➕ عملية جديدة</h3><p class="sub">تُحفظ فوراً وتظهر في بوت تيليجرام أيضاً</p>
+    <input type="hidden" id="txId"/>
+    <div class="type-toggle"><button type="button" class="out on" id="tgOut" onclick="setTxType('expense')">💸 مصروف</button><button type="button" class="in" id="tgIn" onclick="setTxType('income')">💰 دخل</button></div>
+    <div class="fg"><input type="number" id="txAmount" class="amount-in" placeholder="0.000" step="0.001" min="0" inputmode="decimal"/><div style="text-align:center;font-size:0.75rem;color:var(--text-light);font-weight:800;margin-top:4px">د.ك</div></div>
+    <div class="fg"><label>الفئة</label><div class="cat-grid" id="txCats"></div></div>
+    <div class="fg2"><div class="fg"><label>التاريخ</label><input type="date" id="txDate"/></div><div class="fg"><label>طريقة الدفع</label><select id="txMethod"><option value="cash">نقدي</option><option value="knet">كي نت / تحويل</option><option value="upayment">Upayment</option></select></div></div>
+    <div class="fg"><label>ملاحظة</label><input type="text" id="txNote" placeholder="مثال: إيجار ملعب الروضة — أكتوبر"/></div>
+    <label class="chatid" style="cursor:pointer;background:#FFF3CD"><span>🔁 تكرار شهري (إيجار، راتب...)</span><input type="checkbox" id="txRecurring" style="width:20px;height:20px;accent-color:var(--copper)"/></label>
+    <button onclick="saveTx()" class="btn primary" id="txSaveBtn" style="margin-top:10px">💾 حفظ</button>
+    <button onclick="deleteTx()" class="btn bad" id="txDelBtn" style="display:none">🗑️ حذف العملية</button>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -192,5 +265,6 @@
 <script src="../js/pwa-install.js"></script>
 <script src="../js/notifications.js"></script>
 <script src="../js/admin-dashboard.js"></script>
+<script src="../js/finance.js"></script>
 </body>
 </html>
