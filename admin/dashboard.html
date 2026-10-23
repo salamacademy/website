@@ -148,6 +148,14 @@
       <div class="card-h"><h4>🔁 مصاريف شهرية ثابتة</h4><button class="link" onclick="postRecurring()">تسجيلها لهذا الشهر</button></div>
       <div id="recurringList"><div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div></div>
     </div>
+    <div class="card">
+      <div class="card-h"><h4>🛒 منتجات الدفع (تظهر للأهل عند الضغط على ادفع)</h4><button class="link" onclick="openPayItem()">➕ إضافة</button></div>
+      <div id="payItemsList"><div class="empty" style="padding:14px">جاري التحميل...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4><img src="../images/upayment.svg" class="upay-ic" alt=""/> مدفوعات UPayment</h4><span id="payCount" style="font-size:.75rem;color:var(--text-light);font-weight:800"></span></div>
+      <div id="paymentsList"><div class="empty" style="padding:14px">لا توجد مدفوعات بعد</div></div>
+    </div>
     <div class="page-title" style="margin-top:4px"><h3>📋 العمليات</h3><button class="link" onclick="exportCSV()">⬇️ CSV</button></div>
     <div class="segs" id="finSegs">
       <button class="seg on" data-v="all" onclick="finFilter('all')">الكل</button>
@@ -240,6 +248,22 @@
   <div class="sheet"><div class="sheet-grip"></div><div id="detailBody"></div></div>
 </div>
 
+
+<!-- PAY ITEM SHEET -->
+<div class="sheet-bg" id="payItemModal" onclick="if(event.target===this)closePayItem()">
+  <div class="sheet"><div class="sheet-grip"></div>
+    <h3 id="piTitle">➕ منتج دفع</h3><p class="sub">ما يراه ولي الأمر في صفحة ادفع</p>
+    <input type="hidden" id="piId"/>
+    <div class="fg2"><div class="fg"><label>الأيقونة</label><input type="text" id="piIcon" placeholder="⚽" maxlength="4" style="text-align:center;font-size:1.4rem"/></div><div class="fg"><label>السعر (د.ك)</label><input type="number" id="piPrice" step="0.001" min="0" placeholder="25.000" inputmode="decimal"/></div></div>
+    <div class="fg"><label>الاسم</label><input type="text" id="piName" placeholder="مثال: اشتراك كرة القدم"/></div>
+    <div class="fg"><label>يفعّل باقة؟ (اختياري)</label><select id="piPkg"><option value="">— لا، منتج عادي (تيشيرت، معدات...) —</option><option value="football">⚽ كرة القدم — يفعّل/يجدد 30 يوم</option><option value="confidence">🥋 بناء الثقة — يفعّل/يجدد 30 يوم</option><option value="excellence">⚡ التميز — يفعّل/يجدد 30 يوم</option></select></div>
+    <div class="fg2"><div class="fg"><label>الترتيب</label><input type="number" id="piOrder" value="10"/></div><div class="fg"><label>فئة الدخل</label><select id="piCat"><option>اشتراكات</option><option>بيع زي</option><option>رحلات وفعاليات</option><option>بطولات</option><option>أخرى</option></select></div></div>
+    <label class="chatid" style="cursor:pointer"><span>🔢 السماح باختيار الكمية (مثل التيشيرتات)</span><input type="checkbox" id="piQty" style="width:20px;height:20px;accent-color:var(--green-mid)"/></label>
+    <label class="chatid" style="cursor:pointer;margin-top:6px"><span>👁️ ظاهر للأهل</span><input type="checkbox" id="piActive" checked style="width:20px;height:20px;accent-color:var(--green-mid)"/></label>
+    <button onclick="savePayItem()" class="btn primary" style="margin-top:12px">💾 حفظ</button>
+    <button onclick="deletePayItem()" class="btn bad" id="piDel" style="display:none">🗑️ حذف</button>
+  </div>
+</div>
 
 <!-- TRANSACTION SHEET -->
 <div class="sheet-bg" id="txModal" onclick="if(event.target===this)closeTx()">

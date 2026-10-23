@@ -100,17 +100,14 @@
     </div>
   </section>
 
-  <!-- ===== PAY / RENEW ===== -->
+  <!-- ===== PAY ===== -->
   <section class="page" data-page="renew">
-    <div class="page-title"><h3>💳 الدفع والتجديد</h3></div>
-    <div class="card" style="text-align:center">
-      <div style="font-size:0.85rem;color:var(--text-light)">الباقة</div>
-      <div style="font-size:1.1rem;font-weight:900;color:var(--copper-dark)" id="renewPackageName">--</div>
-      <div style="font-size:2.4rem;font-weight:900;color:var(--copper);margin:6px 0" id="renewAmount">-- د.ك</div>
-      <button class="btn upay" onclick="renewSubscription()"><img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span></button>
-      <a class="btn wa" href="https://wa.me/96593000607?text=%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%AF%D9%81%D8%B9%20%D8%A7%D9%84%D9%86%D9%82%D8%AF%D9%8A" target="_blank">💬 الدفع النقدي / التحويل</a>
-      <a class="btn ghost" href="register.html" id="addKidLink">📝 تسجيل طفل آخر</a>
-    </div>
+    <div class="page-title"><h3>💳 اختر ما تريد دفعه</h3><span id="payKid"></span></div>
+    <div id="payGrid" class="pay-grid"><div class="empty" style="grid-column:1/-1">جاري التحميل...</div></div>
+    <div class="pay-total"><span style="font-weight:800;color:var(--text-mid)">الإجمالي</span><span><b id="payTotal">0.000</b> <small style="font-weight:800;color:var(--text-light)">د.ك</small></span></div>
+    <button class="btn upay" id="payBtn" onclick="startPayment()" disabled style="opacity:.6"><img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span></button>
+    <p class="note" style="margin-top:10px">💳 كي نت · فيزا · ماستركارد · Apple Pay — دفع آمن عبر UPayment. يتم تفعيل الاشتراك تلقائياً بعد نجاح الدفع.</p>
+    <a class="btn ghost" href="register.html" id="addKidLink" style="margin-top:10px">📝 تسجيل طفل آخر</a>
   </section>
 
 </div>

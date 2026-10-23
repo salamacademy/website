@@ -22,6 +22,10 @@ service cloud.firestore {
     match /transactions/{id} { allow read, write: if isAdmin(); }
     match /settings/{id}     { allow read, write: if isAdmin(); }
     match /botState/{id}     { allow read, write: if false; }
+    // Pay catalog: public read (prices are public), admin write
+    match /payItems/{id}     { allow read: if true; allow write: if isAdmin(); }
+    // Payments: created/updated only by Cloud Functions; parent can fetch their own order by id; admin lists
+    match /payments/{id}     { allow get: if true; allow list: if isAdmin(); allow write: if false; }
 
     // Parent portal: one doc per phone, readable by anyone who knows the phone (get only — no listing).
     // Parents may only append pause requests / push tokens; everything else is written by admins / the bot.

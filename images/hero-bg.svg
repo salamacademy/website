@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice">
+  <defs>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5"/></filter>
+    <filter id="ink"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.06"/></feComponentTransfer></filter>
+    <linearGradient id="m1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d5c4a" stop-opacity=".35"/><stop offset="1" stop-color="#7d5c4a" stop-opacity=".05"/></linearGradient>
+    <linearGradient id="m2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b6a58" stop-opacity=".22"/><stop offset="1" stop-color="#8b6a58" stop-opacity=".03"/></linearGradient>
+    <linearGradient id="m3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a08572" stop-opacity=".14"/><stop offset="1" stop-color="#a08572" stop-opacity=".02"/></linearGradient>
+    <radialGradient id="sun"><stop offset="0" stop-color="#B8541E" stop-opacity=".22"/><stop offset=".6" stop-color="#B8541E" stop-opacity=".08"/><stop offset="1" stop-color="#B8541E" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="none"/>
+  <!-- ink sun / enso -->
+  <circle cx="1180" cy="330" r="190" fill="url(#sun)"/>
+  <path d="M1040 330a140 140 0 1 1 230 108" fill="none" stroke="#B8541E" stroke-opacity=".28" stroke-width="12" stroke-linecap="round"/>
+  <path d="M1030 300a150 150 0 0 1 60-85" fill="none" stroke="#B8541E" stroke-opacity=".14" stroke-width="7" stroke-linecap="round"/>
+  <!-- far mountains -->
+  <path filter="url(#soft)" fill="url(#m3)" d="M0 620 L120 520 L220 560 L330 440 L430 500 L520 410 L640 520 L760 430 L880 540 L980 470 L1100 560 L1230 450 L1340 540 L1460 480 L1600 560 L1600 900 L0 900Z"/>
+  <!-- mid mountains -->
+  <path filter="url(#soft)" fill="url(#m2)" d="M0 700 L90 640 L190 690 L300 560 L410 640 L520 600 L660 700 L790 590 L900 660 L1020 620 L1140 700 L1280 600 L1400 680 L1600 640 L1600 900 L0 900Z"/>
+  <!-- near mountains with ink strokes -->
+  <path fill="url(#m1)" d="M0 790 L130 730 L240 770 L360 690 L470 760 L590 720 L700 790 L820 700 L940 760 L1060 740 L1200 800 L1330 720 L1460 780 L1600 740 L1600 900 L0 900Z"/>
+  <path d="M360 690 L420 745 M820 700 L880 755 M1330 720 L1390 770" stroke="#6B2A0C" stroke-opacity=".18" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- karate figure: zenkutsu-dachi with gyaku-zuki (single silhouette) -->
+  <g transform="translate(250 395) scale(1.15)" opacity=".30" fill="#6B2A0C">
+    <circle cx="178" cy="26" r="23"/>
+    <!-- neck + torso + gi -->
+    <path d="M166 48 L190 48 L194 64 L222 72 L228 150 Q195 166 160 156 L150 104 L140 68 Z"/>
+    <!-- gi skirt -->
+    <path d="M158 150 L232 150 L236 176 Q196 190 154 178 Z"/>
+    <!-- belt -->
+    <path d="M152 140 L236 142 L236 152 L152 150 Z" fill="#B8541E"/>
+    <!-- front arm punch -->
+    <path d="M216 76 L300 54 L324 56 L326 70 L302 74 L222 100 Z"/>
+    <!-- rear arm chambered at hip -->
+    <path d="M146 76 L120 128 L118 146 L136 146 L160 110 Z"/>
+    <!-- front leg bent -->
+    <path d="M156 178 L120 232 L96 300 L120 306 L148 250 L196 214 L200 190 Z"/>
+    <!-- back leg straight -->
+    <path d="M220 176 L270 236 L332 312 L352 302 L294 222 L246 170 Z"/>
+    <!-- feet -->
+    <path d="M94 298 L62 306 L64 318 L118 312 Z"/>
+    <path d="M340 304 L370 308 L372 320 L326 320 Z"/>
+  </g>
+  <!-- ink speckle -->
+  <rect width="1600" height="900" filter="url(#ink)"/>
+</svg>

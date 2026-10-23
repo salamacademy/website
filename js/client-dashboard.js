@@ -57,8 +57,6 @@ function renderDashboard(sub) {
   $('childNameDisplay').textContent = sub.childName || '--';
   $('packageLabel').textContent = sch.name || sub.packageName || '--';
   $('amountDisplay').textContent = (sub.amount || '--') + ' د.ك';
-  $('renewPackageName').textContent = sub.packageName || sch.name || '--';
-  $('renewAmount').textContent = (sub.amount || '--') + ' د.ك';
   renderDetails(sub); renderSchedule(sub.packageType);
   if (sub.status !== 'active' && sub.status !== 'expired') { renderRequestState(sub); return; }
 
@@ -112,18 +110,44 @@ function showNoSubscription() {
 function alertAction() {
   const s = currentSubscription;
   if (!s) return location.href = 'register.html';
-  if (s.status === 'active' || s.status === 'expired') return go('renew');
-  payNow(s, 'تفعيل');
+  go('renew');
 }
 
-// ---------- PAY ----------
-function renewSubscription() { if (!currentSubscription) return location.href = 'register.html'; payNow(currentSubscription, currentSubscription.status === 'active' ? 'تجديد' : 'تفعيل'); }
-async function payNow(sub, kind) {
+// ---------- PAY (catalog → UPayment) ----------
+let payItems = [], cart = {};
+async function loadPayItems() {
+  try { const snap = await db.collection('payItems').where('active', '==', true).get(); payItems = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0)); }
+  catch (e) { console.warn('payItems', e); payItems = []; }
+  renderPayGrid();
+}
+function suggestedItem(sub) { if (!sub) return null; return payItems.find(i => i.packageType && sub.packageType && i.packageType === sub.packageType) || null; }
+function renderPayGrid() {
+  const sub = currentSubscription; const sug = suggestedItem(sub);
+  if (sub && Object.keys(cart).length === 0 && sug) cart[sug.id] = 1;
+  $('payKid').textContent = sub ? '👦 ' + (sub.childName || '').split(' ')[0] : '';
+  const g = $('payGrid');
+  if (!payItems.length) { g.innerHTML = '<div class="empty" style="grid-column:1/-1"><b>🛒</b>لا توجد منتجات متاحة حالياً</div>'; updateTotal(); return; }
+  g.innerHTML = payItems.map(i => { const q = cart[i.id] || 0; return `<div class="pay-item ${q ? 'on' : ''} ${sug && sug.id === i.id ? 'sug' : ''}" onclick="toggleItem('${i.id}')"><span class="tick">✓</span><div class="pi">${i.icon || '🏷️'}</div><div class="pn">${i.name}</div><div class="pp">${(+i.price).toFixed(3)} <small>د.ك</small></div>${i.allowQty ? `<div class="qty" onclick="event.stopPropagation()"><button onclick="setQty('${i.id}',-1)">−</button><b>${q}</b><button onclick="setQty('${i.id}',1)">+</button></div>` : ''}</div>`; }).join('');
+  updateTotal();
+}
+function toggleItem(id) { if (cart[id]) delete cart[id]; else cart[id] = 1; renderPayGrid(); }
+function setQty(id, d) { cart[id] = Math.max(0, (cart[id] || 0) + d); if (!cart[id]) delete cart[id]; renderPayGrid(); }
+function cartTotal() { return Object.entries(cart).reduce((a, [id, q]) => { const i = payItems.find(x => x.id === id); return a + (i ? +i.price * q : 0); }, 0); }
+function updateTotal() { const t = cartTotal(); $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = t <= 0; b.style.opacity = t <= 0 ? '.6' : '1'; }
+function renewSubscription() { go('renew'); }
+async function startPayment() {
+  const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => ({ id, qty })); if (!items.length) return;
+  const btn = $('payBtn'); btn.disabled = true; btn.innerHTML = '⏳ جاري تحويلك إلى UPayment...';
   try {
-    const res = await fetch('https://sandboxapi.upayments.com/api/v1/charge', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + UPAYMENT_CONFIG.apiKey }, body: JSON.stringify({ totalPrice: sub.amount, currency: 'KWD', customerName: sub.parentName, customerEmail: sub.email || 'noemail@salam.kw', customerMobileNumber: '+965' + sub.phone, title: sub.packageName + ' — أكاديمية سلام', orderId: sub.id, returnUrl: location.origin + '/client/payment-success.html?id=' + sub.id, cancelUrl: location.href, language: 'ar' }) });
-    const r = await res.json(); if (r.status === true && r.data?.link) { location.href = r.data.link; return; } throw 0;
-  } catch (_) {
-    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أريد ${kind} اشتراك ${sub.childName} 🏆\nالباقة: ${sub.packageName}\nالمبلغ: ${sub.amount} د.ك\nيرجى تزويدي بطريقة الدفع.`), '_blank');
+    if (!window.PAYMENT_API_URL || PAYMENT_API_URL.includes('YOUR_')) throw new Error('not-configured');
+    const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, subId: sub ? sub.id : null, childName: sub ? sub.childName : '', parentName: sub ? sub.parentName : (portalDoc?.parentName || ''), email: sub ? sub.email : '', items, returnBase: location.origin + location.pathname.replace(/[^/]*$/, '') }) });
+    const j = await r.json(); if (!j.ok || !j.link) throw new Error(j.error || 'فشل إنشاء الدفع');
+    location.href = j.link;
+  } catch (e) {
+    const list = items.map(({ id, qty }) => { const i = payItems.find(x => x.id === id); return `• ${i.name}${qty > 1 ? ' ×' + qty : ''} — ${(i.price * qty).toFixed(3)} د.ك`; }).join('\n');
+    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أريد الدفع${sub ? ' لـ ' + sub.childName : ''}:\n${list}\nالإجمالي: ${cartTotal().toFixed(3)} د.ك\nيرجى إرسال رابط الدفع.`), '_blank');
+    btn.disabled = false; btn.innerHTML = '<img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span>';
+    if (e.message !== 'not-configured') alert('تعذر إنشاء رابط الدفع — تم تحويلك للواتساب');
   }
 }
 
@@ -184,7 +208,7 @@ function setupClientNotifications() {
 
 function logout() { if (confirm('تسجيل الخروج؟')) { localStorage.removeItem('salamPhone'); location.href = 'login.html'; } }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
-loadClientData();
+loadClientData(); loadPayItems();
 
 
 // ---------- MULTI-KID (one parent, several children) ----------
@@ -199,7 +223,7 @@ function renderKidSwitch() {
 }
 function selectKid(i, first) {
   kidIdx = i; const s = kids[i]; if (!s) return;
-  currentSubscription = s; renderDashboard(s); renderKidSwitch();
+  currentSubscription = s; renderDashboard(s); renderKidSwitch(); cart = {}; renderPayGrid();
   setupClientNotifications();
   if (!first) go('overview');
 }

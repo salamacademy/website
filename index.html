@@ -31,6 +31,7 @@
   <div class="nav-links">
     <a href="#sports">البرامج</a>
     <a href="#packages">الباقات</a>
+    <a href="#gallery">الصور</a>
     <a href="#why-us">عن الأكاديمية</a>
     <a href="#contact">تواصل</a>
     <a href="client/login.html" class="btn-nav-portal">دخول العضو</a>
@@ -50,6 +51,7 @@
 <!-- HERO -->
 <section class="hero">
   <div class="hero-bg"></div>
+  <div class="hero-art" aria-hidden="true"></div>
   <div class="hero-orb hero-orb-1"></div>
   <div class="hero-orb hero-orb-2"></div>
   <div class="hero-orb hero-orb-3"></div>
@@ -87,23 +89,13 @@
         </div>
       </div>
 
-      <!-- Visual -->
+      <!-- Visual: photo collage -->
       <div class="hero-visual">
-        <div class="hero-logo-ring">
-          <div class="ring-outer"></div>
-          <div class="ring-inner"></div>
-          <div class="hero-logo-center">
-            <img src="images/logo-ar.png" alt="Salam Academy Logo" onerror="this.src='images/logo-en.png'" style="max-width:150px;max-height:150px"/>
-          </div>
-          <div class="hero-float-badge badge-1">
-            <span>⚽</span><span>كرة القدم</span>
-          </div>
-          <div class="hero-float-badge badge-2">
-            <span>🏅</span><span>+2,500 متابع</span>
-          </div>
-          <div class="hero-float-badge badge-3">
-            <span>✅</span><span>مدربون معتمدون</span>
-          </div>
+        <div class="collage">
+          <figure class="c1"><img src="images/photos/football-juniors.jpg" alt="فريق كرة القدم"/></figure>
+          <figure class="c2"><img src="images/photos/medals.jpg" alt="أبطال الكيوكشن"/></figure>
+          <figure class="c3"><img src="images/photos/boxing-kids.jpg" alt="بناء الثقة"/></figure>
+          <div class="collage-badge"><img src="images/logo-ar.png" alt=""/><span>منذ 2019<br/><b>+200 بطل</b></span></div>
         </div>
       </div>
     </div>
@@ -143,20 +135,17 @@
       <p class="section-desc">برامج رياضية متكاملة صُممت لتنمية المهارات البدنية والشخصية للأطفال</p>
     </div>
     <div class="sports-grid">
-      <div class="sport-card reveal reveal-delay-1">
-        <div class="sport-card-icon">⚽</div>
-        <h3>كرة القدم</h3>
-        <p>تدريب احترافي على يد مدربين معتمدين لتطوير مهارات طفلك الكروية والجماعية في بيئة محفزة</p>
+      <div class="sport-card photo reveal reveal-delay-1">
+        <img src="images/photos/football-team.jpg" alt=""/>
+        <div class="sport-body"><div class="sport-card-icon">⚽</div><h3>كرة القدم</h3><p>تدريب احترافي على يد مدربين معتمدين لتطوير مهارات طفلك الكروية والجماعية في ملاعب مغطاة ومكيفة</p></div>
       </div>
-      <div class="sport-card reveal reveal-delay-2">
-        <div class="sport-card-icon">🥋</div>
-        <h3>بناء الثقة والدفاع عن النفس</h3>
-        <p>برامج متخصصة تبني شخصية قوية وثقة بالنفس مع مهارات الدفاع الذاتي للأطفال</p>
+      <div class="sport-card photo reveal reveal-delay-2">
+        <img src="images/photos/karate-belts.jpg" alt=""/>
+        <div class="sport-body"><div class="sport-card-icon">🥋</div><h3>بناء الثقة والكيوكشن</h3><p>برامج متخصصة تبني شخصية قوية وثقة بالنفس مع مهارات الدفاع الذاتي ونظام الأحزمة</p></div>
       </div>
-      <div class="sport-card reveal reveal-delay-3">
-        <div class="sport-card-icon">🏕️</div>
-        <h3>المعسكرات الرياضية</h3>
-        <p>معسكرات مكثفة تجمع الرياضة والمتعة وبناء روح الفريق في بيئة آمنة ومنظمة</p>
+      <div class="sport-card photo reveal reveal-delay-3">
+        <img src="images/photos/football-trophy.jpg" alt=""/>
+        <div class="sport-body"><div class="sport-card-icon">🏕️</div><h3>المعسكرات والبطولات</h3><p>معسكرات مكثفة وبطولات داخلية وخارجية تجمع الرياضة والمتعة وروح الفريق</p></div>
       </div>
     </div>
   </div>
@@ -290,6 +279,26 @@
   </div>
 </section>
 
+<!-- GALLERY -->
+<section class="gallery-section" id="gallery">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-tag">📸 لحظات من الأكاديمية</div>
+      <h2 class="section-title">أبطال <span>سلام</span></h2>
+      <p class="section-desc" style="margin:0 auto 36px">صور من تدريباتنا وبطولاتنا وفعالياتنا</p>
+    </div>
+    <div class="gallery">
+      <figure class="g-tall reveal reveal-delay-1"><img src="images/photos/medals.jpg" alt=""/><figcaption>🥇 ميداليات بطولة الكيوكشن</figcaption></figure>
+      <figure class="reveal reveal-delay-2"><img src="images/photos/kuwait-day.jpg" alt=""/><figcaption>🇰🇼 احتفالات الأعياد الوطنية</figcaption></figure>
+      <figure class="reveal reveal-delay-3"><img src="images/photos/football-juniors.jpg" alt=""/><figcaption>⚽ أشبال كرة القدم</figcaption></figure>
+      <figure class="g-wide reveal reveal-delay-2"><img src="images/photos/football-team.jpg" alt=""/><figcaption>🏆 فريق سلام</figcaption></figure>
+      <figure class="reveal reveal-delay-3"><img src="images/photos/kuwait-shirts.jpg" alt=""/><figcaption>💙 زي الأكاديمية</figcaption></figure>
+      <figure class="reveal reveal-delay-4"><img src="images/photos/boxing-kids.jpg" alt=""/><figcaption>🥊 حصص الدفاع عن النفس</figcaption></figure>
+    </div>
+    <div style="text-align:center;margin-top:24px"><a href="https://www.instagram.com/salam_academy_kwt" target="_blank" class="btn-secondary">📸 المزيد على إنستغرام</a></div>
+  </div>
+</section>
+
 <!-- WHY US -->
 <section class="why-section" id="why-us">
   <div class="container">
@@ -298,6 +307,8 @@
       <h2 class="section-title">ما يجعلنا <span>مختلفين</span></h2>
       <p class="section-desc">أكثر من مجرد أكاديمية رياضية — نحن نبني مستقبل طفلك</p>
     </div>
+    <div class="why-layout">
+    <figure class="why-photo reveal"><img src="images/photos/quran.jpg" alt="قيم وأخلاق"/><figcaption>📖 قصص وقيم وأخلاق — نغرس في أبطالنا القيم الأصيلة إلى جانب الرياضة</figcaption></figure>
     <div class="why-grid">
       <div class="why-card reveal reveal-delay-1">
         <div class="why-card-icon">👨‍🏫</div>
@@ -329,6 +340,7 @@
         <h4>تطوير شامل</h4>
         <p>نطور المهارات الجسدية والعقلية والاجتماعية لطفلك بشكل متكامل</p>
       </div>
+    </div>
     </div>
   </div>
 </section>
@@ -391,7 +403,8 @@
         <h4>روابط سريعة</h4>
         <a href="#sports">البرامج الرياضية</a>
         <a href="#packages">الباقات والاشتراكات</a>
-        <a href="#why-us">عن الأكاديمية</a>
+        <a href="#gallery">الصور</a>
+    <a href="#why-us">عن الأكاديمية</a>
         <a href="#contact">تواصل معنا</a>
       </div>
       <div class="footer-col">

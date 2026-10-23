@@ -36,7 +36,7 @@ salam-academy/
 ├── admin/
 │   ├── login.html          ← Admin login
 │   └── dashboard.html      ← Full admin control panel
-├── images/                 ← Add logo.png, favicon.png here
+├── images/photos/          ← Academy photos used on the landing page
 ├── firestore.rules         ← Security rules
 └── SETUP.md                ← This file
 ```
@@ -204,6 +204,25 @@ Log expenses from your phone, get the monthly P&L, see subscribers, and approve 
 Recognised words: إيجار، راتب/رواتب، أكل/ماء/غداء، معدات/كور، زي/ملابس، باص/بنزين، إعلان/تسويق، صيانة، رحلة/بولينج، اشتراك، بطولة، رعاية. Anything else → category buttons.
 
 The bot also pushes an alert to every connected phone on each new registration (with approve/reject buttons) and each new pause.
+
+## 💳 UPayment (live payments)
+
+**How it works:** parent taps **ادفع** → picks items from the catalog (المالية → 🛒 منتجات الدفع) → UPayment checkout (KNET / cards / Apple Pay) → UPayment calls our webhook → the subscription is activated/renewed for 30 days automatically, the income is booked in المالية, the parent portal is refreshed, and you get a Telegram ping.
+
+The API key never touches the browser — it lives in Cloud Functions. This needs the **Blaze** plan (free tier covers it).
+
+**Setup (one time, ~10 min)**
+1. Firebase Console → Upgrade to Blaze
+2. `firebase functions:config:set upayments.key="YOUR_API_KEY" upayments.sandbox="true"`  
+   (the *Encrypted API Key* from the UPay dashboard is for their JS plugin — not needed here; use the plain API Key / Bearer token)
+3. `cd functions && npm install && cd ..` then `firebase deploy --only functions`
+4. Copy the functions base URL from the deploy output (e.g. `https://us-central1-salam-5e6f2.cloudfunctions.net`) into `js/firebase-config.js` → `PAYMENT_API_URL`, push the site
+5. In the admin app → المالية → 🛒 → **✨ إنشاء القائمة الافتراضية** (or add your own items). Items with "يفعّل باقة" auto-activate that package on payment; renewals extend from the current end date
+6. Test with UPayment sandbox test cards, then switch: `firebase functions:config:set upayments.sandbox="false"` and redeploy
+
+Until step 4 is done, the ادفع button falls back to a WhatsApp message listing the chosen items.
+
+Collections: `payItems` (catalog), `payments/{orderId}` (status pending/paid/failed, items, gateway response).
 
 ## 📊 Firestore Data Structure
 

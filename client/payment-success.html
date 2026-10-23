@@ -1,64 +1,27 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>تم الدفع بنجاح | أكاديمية سلام</title>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/main.css" />
-  <link rel="stylesheet" href="../css/portal.css" />
-</head>
-<body class="portal-body">
-  <div class="portal-container">
-    <div class="portal-card" style="text-align:center">
-      <div style="font-size:5rem;margin-bottom:16px">🎉</div>
-      <h1 style="color:#2e7d32;font-size:1.8rem;margin-bottom:8px">تم الدفع بنجاح عبر <span style="color:#2B9AD6">UPayment</span>!</h1>
-      <p style="color:#666;margin-bottom:24px">مرحباً بك في أكاديمية سلام. تم تسجيل اشتراكك بنجاح.</p>
-      <div id="successDetails" style="background:#e8f5e9;border-radius:12px;padding:16px;margin-bottom:24px;text-align:right">
-        جاري تحميل التفاصيل...
-      </div>
-      <p style="font-size:0.9rem;color:#666;margin-bottom:20px">
-        سيتواصل معك فريقنا قريباً عبر الواتساب لتأكيد التفاصيل.
-      </p>
-      <a href="dashboard.html" class="btn-portal-primary" style="display:block;text-decoration:none;text-align:center">
-        الذهاب لبوابة الأعضاء
-      </a>
-      <a href="https://wa.me/96593000607" target="_blank" class="btn-portal-whatsapp" style="margin-top:12px">
-        تواصل معنا
-      </a>
-    </div>
-  </div>
-
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="../js/firebase-config.js"></script>
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const subId = params.get('id');
-    if (subId) {
-      db.collection('subscriptions').doc(subId).get().then(doc => {
-        if (doc.exists) {
-          const d = doc.data();
-          document.getElementById('successDetails').innerHTML = `
-            <div style="margin-bottom:8px"><strong>اسم الطفل:</strong> ${d.childName}</div>
-            <div style="margin-bottom:8px"><strong>الباقة:</strong> ${d.packageName}</div>
-            <div><strong>المبلغ:</strong> ${d.amount} د.ك</div>
-          `;
-          // Update subscription status
-          const startDate = new Date();
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() + 30);
-          db.collection('subscriptions').doc(subId).update({
-            status: 'active',
-            subscriptionStart: firebase.firestore.Timestamp.fromDate(startDate),
-            subscriptionEnd: firebase.firestore.Timestamp.fromDate(endDate),
-            daysRemaining: 30,
-            paidAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        }
-      });
-    }
-  </script>
-</body>
-</html>
+<html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/><title>نتيجة الدفع | أكاديمية سلام</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet"/><link rel="stylesheet" href="../css/portal.css"/>
+<style>.portal-body{background:linear-gradient(160deg,#1B5E20,#2E7D32 50%,#0F3D13)}.btn-portal-primary{background:linear-gradient(135deg,#1B5E20,#2E7D32)}</style></head>
+<body class="portal-body"><div class="portal-container"><div class="portal-card"><div class="portal-body-pad" style="text-align:center">
+<div id="ico" style="font-size:4.5rem">⏳</div><h1 id="ttl" style="color:#1B5E20;font-size:1.6rem;margin:10px 0 6px">جاري التحقق من الدفع...</h1>
+<p id="msg" style="color:#6B4530;line-height:1.8">لحظات من فضلك</p>
+<div id="box" style="background:#F3F8F2;border-radius:14px;padding:14px;margin:18px 0;text-align:right;display:none"></div>
+<a href="dashboard.html" class="btn-portal-primary" style="display:block;text-decoration:none;text-align:center">الذهاب إلى حسابي</a>
+<a href="https://wa.me/96593000607" target="_blank" class="btn-portal-whatsapp" style="margin-top:10px">💬 تواصل معنا</a></div></div></div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script><script src="../js/firebase-config.js"></script>
+<script>
+const q = new URLSearchParams(location.search); const order = q.get('order'); const track = q.get('track_id'); const result = (q.get('result') || '').toUpperCase();
+const set = (i, t, m) => { document.getElementById('ico').textContent = i; document.getElementById('ttl').textContent = t; document.getElementById('msg').innerHTML = m; };
+(async () => {
+  if (!order) { set('ℹ️', 'لا يوجد طلب دفع', 'ارجع إلى حسابك للدفع.'); return; }
+  try { if (window.PAYMENT_API_URL && !PAYMENT_API_URL.includes('YOUR_')) await fetch(PAYMENT_API_URL + '/verifyPayment?order=' + encodeURIComponent(order) + (track ? '&track_id=' + encodeURIComponent(track) : '')); } catch (_) {}
+  db.collection('payments').doc(order).onSnapshot(d => {
+    if (!d.exists) { set('❓', 'لم نجد الطلب', 'تواصل معنا إذا تم خصم المبلغ.'); return; }
+    const p = d.data(); const box = document.getElementById('box');
+    box.style.display = 'block'; box.innerHTML = (p.items || []).map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${i.icon || ''} ${i.name}${i.qty > 1 ? ' ×' + i.qty : ''}</span><b>${(i.price * i.qty).toFixed(3)} د.ك</b></div>`).join('') + `<div style="display:flex;justify-content:space-between;border-top:1px dashed #ccc;margin-top:8px;padding-top:8px"><b>الإجمالي</b><b style="color:#1B5E20">${(+p.amount).toFixed(3)} د.ك</b></div>`;
+    if (p.status === 'paid') set('🎉', 'تم الدفع بنجاح!', `شكراً لك${p.childName ? ' — ' + p.childName : ''}. ${p.activated ? 'تم تفعيل الاشتراك تلقائياً ✅' : 'سيتم تحديث حسابك خلال لحظات.'}`);
+    else if (p.status === 'failed' || result === 'NOT CAPTURED' || result === 'CANCELED') set('❌', 'لم تتم عملية الدفع', 'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى من حسابك.');
+    else set('⏳', 'بانتظار تأكيد الدفع', 'إذا أتممت الدفع فسيتم التأكيد خلال لحظات...');
+  });
+})();
+</script></body></html>

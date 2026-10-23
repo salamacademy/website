@@ -117,8 +117,58 @@ async function removeChatId(id) {
   await db.collection('settings').doc('telegram').set({ chatIds: ids }, { merge: true }); loadTelegram();
 }
 
-// realtime: transactions added from Telegram appear instantly
+
+
+// ---------- PAY ITEMS (catalog shown to parents) ----------
+let payItemsAdmin = [];
+const DEFAULT_ITEMS = [
+  { icon: '⚽', name: 'اشتراك كرة القدم (شهر)', price: 25, packageType: 'football', category: 'اشتراكات', order: 1, active: true },
+  { icon: '🥋', name: 'اشتراك بناء الثقة والكيوكشن (شهر)', price: 70, packageType: 'confidence', category: 'اشتراكات', order: 2, active: true },
+  { icon: '⚡', name: 'باقة التميز — كرة القدم + الكيوكشن (4 أيام)', price: 85, packageType: 'excellence', category: 'اشتراكات', order: 3, active: true },
+  { icon: '👕', name: 'تيشيرت الأكاديمية', price: 5, category: 'بيع زي', order: 10, active: true, allowQty: true },
+  { icon: '🥊', name: 'معدات تدريب — واقي + قفازات', price: 30, category: 'بيع زي', order: 11, active: true }
+];
+async function loadPayItems() {
+  const snap = await db.collection('payItems').get();
+  payItemsAdmin = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0));
+  const el = document.getElementById('payItemsList'); if (!el) return;
+  el.innerHTML = payItemsAdmin.length ? payItemsAdmin.map(i => `<div class="pay-row ${i.active ? '' : 'off'}" onclick="openPayItem('${i.id}')"><div class="pi">${i.icon || '🏷️'}</div><div class="m"><b>${i.name}</b><small>${i.packageType ? '🔁 يفعّل باقة ' + (PKG_NAMES[i.packageType] || i.packageType) + ' · ' : ''}${i.category || ''}${i.allowQty ? ' · كمية' : ''}${i.active ? '' : ' · مخفي'}</small></div><div class="pp">${(+i.price).toFixed(3)} <small style="font-size:.65rem;color:var(--text-light)">د.ك</small></div></div>`).join('')
+    : `<div class="empty" style="padding:14px">لا توجد منتجات بعد<br/><button class="link" style="margin-top:10px" onclick="seedPayItems()">✨ إنشاء القائمة الافتراضية</button></div>`;
+}
+async function seedPayItems() { const b = db.batch(); DEFAULT_ITEMS.forEach(i => b.set(db.collection('payItems').doc(), { ...i, createdAt: firebase.firestore.FieldValue.serverTimestamp() })); await b.commit(); showToast('✅ تم الإنشاء'); loadPayItems(); }
+function openPayItem(id) {
+  const i = id ? payItemsAdmin.find(x => x.id === id) : null;
+  document.getElementById('piId').value = id || ''; document.getElementById('piTitle').textContent = i ? '✏️ تعديل المنتج' : '➕ منتج دفع';
+  document.getElementById('piIcon').value = i ? (i.icon || '') : ''; document.getElementById('piPrice').value = i ? i.price : ''; document.getElementById('piName').value = i ? i.name : '';
+  document.getElementById('piPkg').value = i ? (i.packageType || '') : ''; document.getElementById('piOrder').value = i ? (i.order || 10) : (payItemsAdmin.length + 1); document.getElementById('piCat').value = i ? (i.category || 'أخرى') : 'اشتراكات';
+  document.getElementById('piQty').checked = !!(i && i.allowQty); document.getElementById('piActive').checked = i ? i.active !== false : true;
+  document.getElementById('piDel').style.display = i ? 'flex' : 'none'; document.getElementById('payItemModal').classList.add('open');
+}
+function closePayItem() { document.getElementById('payItemModal').classList.remove('open'); }
+async function savePayItem() {
+  const name = document.getElementById('piName').value.trim(), price = parseFloat(document.getElementById('piPrice').value);
+  if (!name || !(price >= 0)) return showToast('❌ أدخل الاسم والسعر');
+  const data = { name, price, icon: document.getElementById('piIcon').value.trim() || '🏷️', packageType: document.getElementById('piPkg').value || null, category: document.getElementById('piCat').value, order: +document.getElementById('piOrder').value || 10, allowQty: document.getElementById('piQty').checked, active: document.getElementById('piActive').checked, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  const id = document.getElementById('piId').value;
+  if (id) await db.collection('payItems').doc(id).update(data); else await db.collection('payItems').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  closePayItem(); showToast('✅ تم الحفظ'); loadPayItems();
+}
+async function deletePayItem() { const id = document.getElementById('piId').value; if (!id || !confirm('حذف هذا المنتج؟')) return; await db.collection('payItems').doc(id).delete(); closePayItem(); showToast('تم الحذف'); loadPayItems(); }
+
+// ---------- UPAYMENT PAYMENTS LOG ----------
+async function loadPayments() {
+  try {
+    const snap = await db.collection('payments').orderBy('createdAt', 'desc').limit(30).get();
+    const el = document.getElementById('paymentsList'); if (!el) return;
+    document.getElementById('payCount').textContent = snap.size ? 'آخر ' + snap.size : '';
+    const ST = { paid: ['ok', '✅ مدفوع'], pending: ['gold', '⏳ معلّق'], failed: ['bad', '❌ فشل'] };
+    el.innerHTML = snap.empty ? '<div class="empty" style="padding:14px">لا توجد مدفوعات بعد</div>' : snap.docs.map(d => { const p = d.data(); const st = ST[p.status] || ['copper', p.status]; return `<div class="pay-row"><div class="pi">💳</div><div class="m"><b>${p.childName || p.parentName || p.phone}</b><small>${(p.items || []).map(i => i.name).join('، ')} · ${p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('ar-KW') : ''}${p.paymentType ? ' · ' + p.paymentType : ''}</small></div><div style="text-align:left"><div class="pp">${(+p.amount).toFixed(3)}</div><span class="chip ${st[0]}" style="font-size:.65rem">${st[1]}</span></div></div>`; }).join('');
+  } catch (e) { console.warn('payments', e); }
+}
+
+// ---------- BOOT ----------
 let txReady = false;
-auth.onAuthStateChanged(u => { if (!u) return; loadFinance(); loadTelegram();
+auth.onAuthStateChanged(u => { if (!u) return; loadFinance(); loadTelegram(); loadPayItems(); loadPayments();
   db.collection('transactions').onSnapshot(() => { if (!txReady) { txReady = true; return; } loadFinance(); });
+  db.collection('payments').onSnapshot(() => loadPayments());
 });
