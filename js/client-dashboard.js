@@ -9,7 +9,7 @@ const SCHEDULES = {
   excellence_loyal: { name: 'باقة التميز – أسرة سلام', icon: '🏅', rows: [['📅', '4 أيام بالأسبوع'], ['⚽', 'كرة القدم: السبت · الروضة'], ['🥋', 'الكيوكشن: أحد/ثلاثاء/خميس · جنوب السرة']] },
   premium: { name: 'الباقة المميزة', icon: '⚡', rows: [['📅', '6 أيام'], ['📍', 'الروضة + السلام']] }
 };
-const TITLES = { overview: 'هذا ملخص اشتراك طفلك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: 'إيقاف أسبوع واحد كل شهر', renew: 'ادفع أو جدد اشتراكك' };
+const TITLES = { overview: 'هذا ملخص اشتراك طفلك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: '3 أيام إيقاف كل شهر', renew: 'ادفع أو جدد اشتراكك' };
 const toD = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : null;
 const fmt = ts => { const d = toD(ts); return d ? d.toLocaleDateString('ar-KW') : '--'; };
 const $ = id => document.getElementById(id);
@@ -33,6 +33,7 @@ function loadClientData() {
     const idx = Math.max(0, kids.findIndex(k => k.id === prevId));
     const prevStatus = currentSubscription?.status;
     selectKid(idx, true);
+    if (location.hash === '#pay' && !window.__wentPay) { window.__wentPay = true; setTimeout(() => go('renew'), 300); }
     const d = currentSubscription;
     if (d && prevStatus && d.status !== prevStatus) {
       if (d.status === 'approved') Notif.show('🎉 تمت الموافقة على طلبك', `${d.childName} — ${d.amount} د.ك · ادفع الآن`, 'dashboard.html');
@@ -151,44 +152,52 @@ async function startPayment() {
   }
 }
 
-// ---------- PAUSE (request → admin approves with one tap) ----------
-function isPausedNow(s) { const a = toD(s.pauseStart), b = toD(s.pauseEnd); if (!a || !b) return false; const n = new Date(); return n >= a && n <= b; }
-function pendingPauseFor(subId) { return (portalDoc?.pauseRequests || []).find(r => r.subId === subId && r.status === 'pending'); }
+// ---------- PAUSE: 3 × one-day pauses per subscription month (request → admin approves) ----------
+const PAUSE_MAX = 3;
+const dayKey = d => (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0];
+function pausesOf(s) { return Array.isArray(s.pauses) ? s.pauses : (s.pauseStart ? [{ date: dayKey(toD(s.pauseStart)) }] : []); }
+function isPausedNow(s) { const t = dayKey(new Date()); return pausesOf(s).some(p => p.date === t); }
+function pendingPausesFor(subId) { return (portalDoc?.pauseRequests || []).filter(r => r.subId === subId && r.status === 'pending'); }
 function renderPause(sub) {
   ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pausedBanner').style.display = 'none';
-  const pend = pendingPauseFor(sub.id);
+  const used = pausesOf(sub), pend = pendingPausesFor(sub.id), left = PAUSE_MAX - used.length - pend.length;
+  const quota = $('pauseQuota'); if (quota) quota.innerHTML = Array.from({ length: PAUSE_MAX }, (_, i) => `<span class="chip ${i < used.length ? 'info' : i < used.length + pend.length ? 'gold' : 'ok'}">${i < used.length ? '⏸️ ' + used[i].date : i < used.length + pend.length ? '🕒 ' + pend[i - used.length].start : '○ متاح'}</span>`).join('');
   if (isPausedNow(sub)) {
-    $('pauseActive').style.display = 'block'; $('pauseFrom').textContent = fmt(sub.pauseStart); $('pauseTo').textContent = fmt(sub.pauseEnd);
-    $('pausedBanner').style.display = 'flex'; $('pausedUntil').textContent = fmt(sub.pauseEnd);
-    status('⏸️ الاشتراك متوقف مؤقتاً', 'يستأنف التدريب في ' + fmt(sub.pauseEnd));
-  } else if (pend) {
-    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = '🕒'; $('pauseUsed').querySelector('p').innerHTML = `طلب الإيقاف من <b>${pend.start}</b> لمدة أسبوع <b>بانتظار موافقة الإدارة</b>.<br/>ستصلك رسالة عند الموافقة.`;
-  } else if (sub.pauseUsed || sub.pauseEnd || sub.status !== 'active') {
-    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = sub.status !== 'active' ? 'ℹ️' : '✅'; $('pauseUsed').querySelector('p').textContent = sub.status !== 'active' ? 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.' : 'تم استخدام الإيقاف المؤقت لهذا الشهر. سيتاح مجدداً مع التجديد القادم.';
+    $('pauseActive').style.display = 'block'; $('pauseFrom').textContent = new Date().toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('pausedBanner').style.display = 'flex'; $('pausedUntil').textContent = ''; status('⏸️ الاشتراك متوقف اليوم', 'يستأنف التدريب غداً');
+    $('pauseHistory').innerHTML = `<small style="color:var(--text-light);font-weight:800">المتبقي: ${Math.max(0, left)} من ${PAUSE_MAX} هذا الشهر</small>`;
+  } else if (sub.status !== 'active') {
+    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = 'ℹ️'; $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.';
+  } else if (left <= 0) {
+    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = '✅';
+    $('pauseUsed').querySelector('p').innerHTML = pend.length ? `لديك ${pend.length} طلب إيقاف <b>بانتظار موافقة الإدارة</b> (${pend.map(r => r.start).join('، ')}).` : 'تم استخدام الإيقافات الثلاثة لهذا الشهر.<br/>ستتاح مجدداً مع التجديد القادم.';
   } else {
     $('pauseInfo').style.display = 'block';
-    const inp = $('pauseStartInput'), today = new Date().toISOString().split('T')[0];
-    inp.min = today; if (!inp.value) inp.value = today; const e = toD(sub.subscriptionEnd); if (e) inp.max = e.toISOString().split('T')[0];
+    const inp = $('pauseStartInput'), today = dayKey(new Date());
+    inp.min = today; if (!inp.value || inp.value < today) inp.value = today; const e = toD(sub.subscriptionEnd); if (e) inp.max = dayKey(e);
     inp.oninput = () => previewPause(sub); previewPause(sub);
+    $('pauseBtn').textContent = `⏸️ طلب إيقاف هذا اليوم (متبقٍ ${left})`;
   }
 }
 function previewPause(sub) {
   const v = $('pauseStartInput').value; if (!v) return;
-  const s = new Date(v), e = new Date(s); e.setDate(e.getDate() + 7); $('pauseEndPreview').textContent = e.toLocaleDateString('ar-KW');
-  const ne = toD(sub.subscriptionEnd); if (ne) { ne.setDate(ne.getDate() + 7); $('newEndPreview').textContent = ne.toLocaleDateString('ar-KW'); }
+  $('pauseEndPreview').textContent = new Date(v).toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
+  const ne = toD(sub.subscriptionEnd); if (ne) { ne.setDate(ne.getDate() + 1); $('newEndPreview').textContent = ne.toLocaleDateString('ar-KW'); }
 }
 async function requestPause() {
   const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
-  const v = $('pauseStartInput').value; if (!v) return alert('اختر تاريخ بداية الإيقاف');
-  const s = new Date(v); const e = new Date(s); e.setDate(e.getDate() + 7);
-  if (!confirm(`طلب إيقاف اشتراك ${sub.childName} من ${s.toLocaleDateString('ar-KW')} لمدة 7 أيام؟`)) return;
+  const v = $('pauseStartInput').value; if (!v) return alert('اختر يوم الإيقاف');
+  if (pausesOf(sub).some(p => p.date === v) || pendingPausesFor(sub.id).some(r => r.start === v)) return alert('هذا اليوم مطلوب أو موقوف مسبقاً');
+  const used = pausesOf(sub).length + pendingPausesFor(sub.id).length; if (used >= PAUSE_MAX) return alert('استنفدت الإيقافات الثلاثة لهذا الشهر');
+  const dLabel = new Date(v).toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
+  if (!confirm(`طلب إيقاف اشتراك ${sub.childName} يوم ${dLabel}؟`)) return;
   const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...';
   const reason = $('pauseReason').value.trim();
   try {
-    await db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion({ subId: sub.id, childName: sub.childName, start: v, end: e.toISOString().split('T')[0], reason, status: 'pending', requestedAt: new Date().toISOString() }) });
-    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أطلب إيقاف اشتراك ${sub.childName} مؤقتاً لمدة أسبوع\nمن: ${s.toLocaleDateString('ar-KW')}\nإلى: ${e.toLocaleDateString('ar-KW')}${reason ? '\nالسبب: ' + reason : ''}`), '_blank');
-    go('overview');
-  } catch (err) { alert('تعذر إرسال الطلب: ' + err.message); btn.disabled = false; btn.textContent = '⏸️ تأكيد الإيقاف لمدة أسبوع'; }
+    await db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion({ subId: sub.id, childName: sub.childName, start: v, end: v, days: 1, reason, status: 'pending', requestedAt: new Date().toISOString() }) });
+    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أطلب إيقاف اشتراك ${sub.childName} يوم ${dLabel}${reason ? '\nالسبب: ' + reason : ''}`), '_blank');
+    $('pauseReason').value = ''; go('overview');
+  } catch (err) { alert('تعذر إرسال الطلب: ' + err.message); btn.disabled = false; btn.textContent = '⏸️ طلب إيقاف هذا اليوم'; }
 }
 
 // ---------- NOTIFICATIONS ----------

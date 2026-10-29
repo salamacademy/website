@@ -52,7 +52,7 @@
       </div>
     </div>
 
-    <div id="pausedBanner" class="banner" style="display:none;margin:0 0 12px;background:var(--info-bg);color:var(--info)"><span>⏸️ الاشتراك متوقف مؤقتاً حتى <b id="pausedUntil"></b></span></div>
+    <div id="pausedBanner" class="banner" style="display:none;margin:0 0 12px;background:var(--info-bg);color:var(--info)"><span>⏸️ الاشتراك متوقف اليوم <b id="pausedUntil"></b></span></div>
 
     <div class="alertbox" id="renewalAlert">
       <div style="font-size:1.6rem">⚠️</div>
@@ -89,14 +89,15 @@
     <div class="page-title"><h3>⏸️ إيقاف مؤقت</h3></div>
     <div class="card">
       <div id="pauseInfo">
-        <p class="note" style="margin-bottom:14px">يمكنك إيقاف الاشتراك <strong>مرة واحدة لمدة أسبوع (7 أيام)</strong> خلال كل شهر — في حال السفر أو المرض. سيُمدَّد تاريخ الانتهاء 7 أيام تلقائياً وتُبلَّغ الإدارة.</p>
-        <div class="fg"><label>تاريخ بداية الإيقاف</label><input type="date" id="pauseStartInput"/></div>
+        <p class="note" style="margin-bottom:14px">يمكنك إيقاف الاشتراك <strong>3 مرات في الشهر، كل مرة يوم واحد</strong> — في حال الغياب أو المرض. كل يوم موافق عليه يُمدِّد تاريخ الانتهاء يوماً واحداً.</p>
+        <div id="pauseQuota" style="display:flex;gap:6px;justify-content:center;margin-bottom:14px"></div>
+        <div class="fg"><label>يوم الإيقاف</label><input type="date" id="pauseStartInput"/></div>
         <div class="fg"><label>السبب (اختياري)</label><input type="text" id="pauseReason" placeholder="مثال: سفر، مرض..."/></div>
-        <div class="note" style="margin-bottom:14px">ينتهي الإيقاف: <strong id="pauseEndPreview">--</strong><br/>تاريخ الانتهاء الجديد: <strong id="newEndPreview">--</strong></div>
-        <button class="btn primary" id="pauseBtn" onclick="requestPause()">⏸️ تأكيد الإيقاف لمدة أسبوع</button>
+        <div class="note" style="margin-bottom:14px">يوم الإيقاف: <strong id="pauseEndPreview">--</strong><br/>تاريخ الانتهاء الجديد بعد الموافقة: <strong id="newEndPreview">--</strong></div>
+        <button class="btn primary" id="pauseBtn" onclick="requestPause()">⏸️ طلب إيقاف هذا اليوم</button>
       </div>
-      <div id="pauseActive" style="display:none;text-align:center"><div style="font-size:3rem">⏸️</div><h4 style="color:var(--copper-dark);margin:8px 0">الاشتراك متوقف مؤقتاً</h4><p style="color:var(--text-mid);line-height:1.8">من <strong id="pauseFrom"></strong> إلى <strong id="pauseTo"></strong><br/>يستأنف التدريب تلقائياً بعد انتهاء المدة.</p></div>
-      <div id="pauseUsed" style="display:none;text-align:center"><div style="font-size:3rem">✅</div><p style="color:var(--text-mid);line-height:1.8">تم استخدام الإيقاف المؤقت لهذا الشهر.<br/>سيتاح مجدداً مع التجديد القادم.</p></div>
+      <div id="pauseActive" style="display:none;text-align:center"><div style="font-size:3rem">⏸️</div><h4 style="color:var(--green);margin:8px 0">الاشتراك متوقف اليوم</h4><p style="color:var(--text-mid);line-height:1.8"><strong id="pauseFrom"></strong><br/>يستأنف التدريب غداً.</p><div id="pauseHistory" style="margin-top:10px"></div></div>
+      <div id="pauseUsed" style="display:none;text-align:center"><div style="font-size:3rem">✅</div><p style="color:var(--text-mid);line-height:1.8">تم استخدام الإيقافات الثلاثة لهذا الشهر.<br/>ستتاح مجدداً مع التجديد القادم.</p></div>
     </div>
   </section>
 

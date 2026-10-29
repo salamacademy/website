@@ -146,7 +146,9 @@ Both portals install as apps from the browser — no App Store needed:
 
 ## ⏸️ One-Week Pause
 
-Parents can pause an **active** subscription once per month for exactly 7 days (⏸️ إيقاف مؤقت in their portal). The end date auto-extends +7 days and WhatsApp opens to inform you. Admin sees it under **⏸️ الإيقافات المؤقتة** and in the stats, with a cancel button that reverts the +7 days. `pauseUsed` resets on activation/renewal. Firestore rules enforce the exact +7-day math.
+Parents can request up to **3 one-day pauses per subscription month** (⏸️ إيقاف in their portal). Each request lands in ⏸️ الإيقافات as 🕒 with ✅ موافقة (+1 يوم) / ⛔ رفض; approving adds the day to `pauses[]` and extends the end date by one day. Quota resets on activation/renewal. Admin can cancel the latest pause (reverts −1 day).
+
+**Renewal link:** expired or expiring (≤7 days) members show a **📲 رابط التجديد** button that opens WhatsApp with the dates, price, and an auto-login link (`client/login.html?phone=…&go=pay`) that lands the parent directly on the ادفع page.
 
 ## 🔔 Notifications
 
@@ -213,8 +215,10 @@ The API key never touches the browser — it lives in Cloud Functions. This need
 
 **Setup (one time, ~10 min)**
 1. Firebase Console → Upgrade to Blaze
-2. Create `functions/.env` (copy `functions/.env.example`) with `UPAYMENTS_KEY=...` and `UPAYMENTS_SANDBOX=true`  
-   (the *Encrypted API Key* from the UPay dashboard is for their JS plugin — not needed here; use the plain API Key / Bearer token). The file is git-ignored.
+2. Create `functions/.env` (copy `functions/.env.example`). **Sandbox and live use different keys:**
+   - Testing → `UPAYMENTS_KEY=NWty8gdjt79cf756hdtyu6u8jht5ns6gfhgy8hdjL` (UPayment's public non-whitelabel test key) + `UPAYMENTS_SANDBOX=true`
+   - Live → your own API Key from the UPay dashboard + `UPAYMENTS_SANDBOX=false`
+   (the *Encrypted API Key* is for their JS plugin — not needed here). The file is git-ignored.
 3. `cd functions && npm install && cd ..` then `firebase deploy --only functions`
 4. Copy the functions base URL from the deploy output (e.g. `https://europe-west1-salam-5e6f2.cloudfunctions.net`) into `js/firebase-config.js` → `PAYMENT_API_URL`, push the site
 5. In the admin app → المالية → 🛒 → **✨ إنشاء القائمة الافتراضية** (or add your own items). Items with "يفعّل باقة" auto-activate that package on payment; renewals extend from the current end date

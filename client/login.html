@@ -39,8 +39,10 @@
     </div>
   </div>
   <script>
+    const qp = new URLSearchParams(location.search); const qPhone = (qp.get('phone') || '').replace(/\D/g, '').slice(-8);
+    if (/^[569]\d{7}$/.test(qPhone)) { localStorage.setItem('salamPhone', qPhone); location.replace('dashboard.html' + (qp.get('go') ? '#' + qp.get('go') : '')); }
     const saved = localStorage.getItem('salamPhone');
-    if (saved && /^\d{8}$/.test(saved)) location.replace('dashboard.html');
+    if (saved && /^\d{8}$/.test(saved)) location.replace('dashboard.html' + (qp.get('go') ? '#' + qp.get('go') : ''));
     const inp = document.getElementById('loginPhone');
     inp.addEventListener('input', () => { inp.value = inp.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '').slice(0, 8); });
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') enter(); });

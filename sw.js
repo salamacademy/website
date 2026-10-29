@@ -1,5 +1,5 @@
 // Salam Academy service worker — caches app shell, network-first for pages
-const CACHE = 'salam-v6';
+const CACHE = 'salam-v7';
 const SHELL = ['./css/main.css','./css/portal.css','./css/register.css','./css/app.css','./images/logo-ar.png','./images/logo-en.png','./images/icon-192.png','./images/icon-512.png','./images/hero-bg.svg','./images/upayment.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(()=>{})); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });

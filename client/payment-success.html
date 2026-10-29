@@ -10,16 +10,22 @@
 <a href="https://wa.me/96593000607" target="_blank" class="btn-portal-whatsapp" style="margin-top:10px">💬 تواصل معنا</a></div></div></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script><script src="../js/firebase-config.js"></script>
 <script>
-const q = new URLSearchParams(location.search); const order = q.get('order'); const track = q.get('track_id'); const result = (q.get('result') || '').toUpperCase();
+const q = new URLSearchParams(location.search);
+let order = q.get('order') || q.get('requested_order_id') || q.get('order_id') || ''; const track = q.get('track_id') || q.get('trackId'); const result = (q.get('result') || '').toUpperCase();
 const set = (i, t, m) => { document.getElementById('ico').textContent = i; document.getElementById('ttl').textContent = t; document.getElementById('msg').innerHTML = m; };
 (async () => {
-  if (!order) { set('ℹ️', 'لا يوجد طلب دفع', 'ارجع إلى حسابك للدفع.'); return; }
-  try { if (typeof PAYMENT_API_URL !== 'undefined' && PAYMENT_API_URL && !PAYMENT_API_URL.includes('YOUR_')) await fetch(PAYMENT_API_URL + '/verifyPayment?order=' + encodeURIComponent(order) + (track ? '&track_id=' + encodeURIComponent(track) : '')); } catch (_) {}
+  try {
+    if (typeof PAYMENT_API_URL !== 'undefined' && PAYMENT_API_URL && !PAYMENT_API_URL.includes('YOUR_')) {
+      const r = await fetch(PAYMENT_API_URL + '/verifyPayment?' + new URLSearchParams({ order, track_id: track || '' })); const j = await r.json(); if (j.orderId) order = j.orderId;
+    }
+  } catch (_) {}
+  if (!order) { set(result === 'CANCELED' ? '↩️' : 'ℹ️', result === 'CANCELED' ? 'تم إلغاء الدفع' : 'لا يوجد طلب دفع', 'لم يتم خصم أي مبلغ. ارجع إلى حسابك للدفع.'); return; }
+  let tries = 0;
   db.collection('payments').doc(order).onSnapshot(d => {
-    if (!d.exists) { set('❓', 'لم نجد الطلب', 'تواصل معنا إذا تم خصم المبلغ.'); return; }
+    if (!d.exists) { if (++tries < 2) return; set('❓', 'لم نجد الطلب', 'تواصل معنا إذا تم خصم المبلغ.'); return; }
     const p = d.data(); const box = document.getElementById('box');
     box.style.display = 'block'; box.innerHTML = (p.items || []).map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${i.icon || ''} ${i.name}${i.qty > 1 ? ' ×' + i.qty : ''}</span><b>${(i.price * i.qty).toFixed(3)} د.ك</b></div>`).join('') + `<div style="display:flex;justify-content:space-between;border-top:1px dashed #ccc;margin-top:8px;padding-top:8px"><b>الإجمالي</b><b style="color:#1B5E20">${(+p.amount).toFixed(3)} د.ك</b></div>`;
-    if (p.status === 'paid') set('🎉', 'تم الدفع بنجاح!', `شكراً لك${p.childName ? ' — ' + p.childName : ''}. ${p.activated ? 'تم تفعيل الاشتراك تلقائياً ✅' : 'سيتم تحديث حسابك خلال لحظات.'}`);
+    if (p.status === 'paid') set('🎉', 'تم الدفع بنجاح!', `شكراً لك${p.childName ? ' — ' + p.childName : ''}. ${p.activated ? 'تم تفعيل الاشتراك تلقائياً ✅' : 'تم تسجيل الدفعة ✅'}`);
     else if (p.status === 'failed' || result === 'NOT CAPTURED' || result === 'CANCELED') set('❌', 'لم تتم عملية الدفع', 'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى من حسابك.');
     else set('⏳', 'بانتظار تأكيد الدفع', 'إذا أتممت الدفع فسيتم التأكيد خلال لحظات...');
   });
