@@ -1,12 +1,14 @@
 // Salam Academy — Cloud Functions (push notifications)
 // Deploy: firebase deploy --only functions   (requires Blaze plan)
 const functions = require('firebase-functions');
+const REGION = 'europe-west1'; // must match Firestore (eur3)
+const fx = functions.region(REGION);
 const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
 const tgcore = require('./telegram-core');
 const PortalSync = require('./portal-sync');
-const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || (functions.config().telegram && functions.config().telegram.token) || '';
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const tg = async (method, body) => { const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r.json(); };
 
 async function sendTo(tokens, title, body, url) {
@@ -25,14 +27,14 @@ async function adminTokens() {
 }
 
 // 1) New registration → notify admins
-exports.onNewRequest = functions.firestore.document('subscriptions/{id}').onCreate(async (snap) => {
+exports.onNewRequest = fx.firestore.document('subscriptions/{id}').onCreate(async (snap) => {
   const d = snap.data();
   if (d.status !== 'pending_review') return;
   return sendTo(await adminTokens(), '📝 طلب تسجيل جديد', `${d.childName} — ${d.packageName}`, '/website/admin/dashboard.html');
 });
 
 // 2) Status change / pause → notify parent or admins
-exports.onSubscriptionUpdate = functions.firestore.document('subscriptions/{id}').onUpdate(async (chg) => {
+exports.onSubscriptionUpdate = fx.firestore.document('subscriptions/{id}').onUpdate(async (chg) => {
   const b = chg.before.data(), a = chg.after.data();
   const url = '/website/client/dashboard.html';
   if (b.status !== a.status) {
@@ -46,7 +48,7 @@ exports.onSubscriptionUpdate = functions.firestore.document('subscriptions/{id}'
 });
 
 // 3) Daily 9:00 Kuwait — expiry reminders (3 days & 1 day) + expire overdue
-exports.dailyReminders = functions.pubsub.schedule('0 9 * * *').timeZone('Asia/Kuwait').onRun(async () => {
+exports.dailyReminders = fx.pubsub.schedule('0 9 * * *').timeZone('Asia/Kuwait').onRun(async () => {
   const now = new Date();
   const snap = await db.collection('subscriptions').where('status', '==', 'active').get();
   for (const doc of snap.docs) {
@@ -59,7 +61,7 @@ exports.dailyReminders = functions.pubsub.schedule('0 9 * * *').timeZone('Asia/K
 });
 
 // 4) Admin sends a custom push to one subscription (callable)
-exports.sendCustomPush = functions.https.onCall(async (data, ctx) => {
+exports.sendCustomPush = fx.https.onCall(async (data, ctx) => {
   if (!ctx.auth) throw new functions.https.HttpsError('unauthenticated', 'login required');
   const isAdmin = (await db.collection('admins').doc(ctx.auth.uid).get()).exists;
   if (!isAdmin) throw new functions.https.HttpsError('permission-denied', 'admins only');
@@ -69,39 +71,39 @@ exports.sendCustomPush = functions.https.onCall(async (data, ctx) => {
 
 
 // ================= TELEGRAM BOT (webhook) =================
-// Set token:  firebase functions:config:set telegram.token="123:ABC"   (or TELEGRAM_BOT_TOKEN secret)
+// Set token in functions/.env → TELEGRAM_BOT_TOKEN=123:ABC
 // Register:   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<region>-salam-5e6f2.cloudfunctions.net/telegramWebhook
-exports.telegramWebhook = functions.https.onRequest(async (req, res) => {
+exports.telegramWebhook = fx.https.onRequest(async (req, res) => {
   try { if (req.method === 'POST' && TG_TOKEN) await tgcore.handleUpdate(req.body, { db, tg }); } catch (e) { console.error(e); }
   res.status(200).send('ok');
 });
 // Telegram alerts on new registration / pause (reuse existing triggers)
-exports.tgOnNewRequest = functions.firestore.document('subscriptions/{id}').onCreate(async (snap) => {
+exports.tgOnNewRequest = fx.firestore.document('subscriptions/{id}').onCreate(async (snap) => {
   const s = { id: snap.id, ...snap.data() }; if (s.status !== 'pending_review' || !TG_TOKEN) return;
   return tgcore.notifyAdmins(db, tg, '🔔 <b>طلب تسجيل جديد</b>\n\n' + tgcore.requestCard(s), tgcore.requestKb(s.id));
 });
-exports.tgOnPause = functions.firestore.document('subscriptions/{id}').onUpdate(async (chg) => {
+exports.tgOnPause = fx.firestore.document('subscriptions/{id}').onUpdate(async (chg) => {
   const b = chg.before.data(), a = { id: chg.after.id, ...chg.after.data() }; if (b.pauseStart || !a.pauseStart || !TG_TOKEN) return;
   return tgcore.notifyAdmins(db, tg, `⏸️ <b>إيقاف مؤقت جديد</b>\n\n<b>${a.childName}</b> — من ${tgcore.fmtD(a.pauseStart)} إلى ${tgcore.fmtD(a.pauseEnd)}${a.pauseReason ? '\n📝 ' + a.pauseReason : ''}\n👤 ${a.parentName} · ${a.phone}`);
 });
 
 // Keep parent portal in sync with any subscription write
-exports.syncPortal = functions.firestore.document('subscriptions/{id}').onWrite(async (chg) => {
+exports.syncPortal = fx.firestore.document('subscriptions/{id}').onWrite(async (chg) => {
   const phones = new Set([chg.before.exists && chg.before.data().phone, chg.after.exists && chg.after.data().phone].filter(Boolean));
   for (const p of phones) await PortalSync.syncPhone(db, p);
 });
 
 // ================= UPAYMENT (API key stays server-side) =================
-// Set once:  firebase functions:config:set upayments.key="YOUR_API_KEY" upayments.sandbox="false"
+// Config: functions/.env  →  UPAYMENTS_KEY=...  UPAYMENTS_SANDBOX=true|false  TELEGRAM_BOT_TOKEN=...
 // Deploy:    firebase deploy --only functions
 // Then put the functions base URL into js/firebase-config.js → PAYMENT_API_URL
-const UP = (() => { const c = (functions.config().upayments || {}); return { key: process.env.UPAYMENTS_KEY || c.key || '', sandbox: String(process.env.UPAYMENTS_SANDBOX || c.sandbox || 'true') !== 'false' }; })();
+const UP = { key: process.env.UPAYMENTS_KEY || '', sandbox: String(process.env.UPAYMENTS_SANDBOX || 'true') !== 'false' };
 const UP_BASE = () => UP.sandbox ? 'https://sandboxapi.upayments.com/api/v1' : 'https://uapi.upayments.com/api/v1';
 const CORS = (req, res) => { res.set('Access-Control-Allow-Origin', '*'); res.set('Access-Control-Allow-Headers', 'Content-Type'); res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS'); if (req.method === 'OPTIONS') { res.status(204).send(''); return true; } return false; };
 const norm = p => String(p || '').replace(/\D/g, '').slice(-8);
 
 // 1) Create a payment: validates items against payItems, stores payments/{orderId}, returns UPayment link
-exports.createPayment = functions.https.onRequest(async (req, res) => {
+exports.createPayment = fx.https.onRequest(async (req, res) => {
   if (CORS(req, res)) return;
   try {
     if (!UP.key) throw new Error('UPayments key not configured');
@@ -116,10 +118,10 @@ exports.createPayment = functions.https.onRequest(async (req, res) => {
     const payload = {
       products: items.map(i => ({ name: i.name, description: i.name, price: i.price, quantity: i.qty })),
       order: { id: orderId, reference: orderId, description: 'أكاديمية سلام — ' + items.map(i => i.name).join('، ').slice(0, 480), currency: 'KWD', amount },
-      language: 'ar', reference: { id: orderId },
+      language: 'ar', reference: { id: orderId }, tokens: {},
       customer: { uniqueId: phone, name: (b.parentName || 'Parent').slice(0, 50), email: (b.email || '').slice(0, 50) || undefined, mobile: '+965' + phone },
       returnUrl: `${base}/payment-success.html?order=${orderId}`, cancelUrl: `${base}/payment-success.html?order=${orderId}&result=CANCELED`,
-      notificationUrl: `https://${process.env.FUNCTION_REGION || 'us-central1'}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/upaymentWebhook`,
+      notificationUrl: `https://${REGION}-${process.env.GCLOUD_PROJECT || 'salam-5e6f2'}.cloudfunctions.net/upaymentWebhook`,
       paymentLinkExpiryInMinutes: 60
     };
     const r = await fetch(UP_BASE() + '/charge', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + UP.key }, body: JSON.stringify(payload) });
@@ -146,7 +148,7 @@ async function finalizePayment(orderId, gw) {
       const curEnd = s.subscriptionEnd && s.subscriptionEnd.toDate ? s.subscriptionEnd.toDate() : null;
       const start = s.status === 'active' && curEnd && curEnd > now ? curEnd : now; // renewal extends from current end
       const end = new Date(start); end.setDate(end.getDate() + 30);
-      await subRef.update({ status: 'active', packageType: pkgItem.packageType, packageName: pkgItem.name, amount: pkgItem.price, subscriptionStart: admin.firestore.Timestamp.fromDate(s.status === 'active' && curEnd && curEnd > now ? (s.subscriptionStart.toDate ? s.subscriptionStart.toDate() : now) : now), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId });
+      await subRef.update({ status: 'active', packageType: pkgItem.packageType, packageName: pkgItem.name, amount: pkgItem.price, subscriptionStart: admin.firestore.Timestamp.fromDate(s.status === 'active' && curEnd && curEnd > now ? (s.subscriptionStart.toDate ? s.subscriptionStart.toDate() : now) : now), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauses: [], pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId });
       activated = true; await PortalSync.syncPhone(db, p.phone);
     }
   }
@@ -162,7 +164,7 @@ async function fetchStatus(trackId) { const r = await fetch(UP_BASE() + '/get-pa
 function gwFromStatus(j) { const t = (j && j.data && (j.data.transaction || j.data)) || {}; return { result: t.result || t.status || t.transaction_status || '', payment_type: t.payment_type || t.paymentType || '', raw: j }; }
 
 // 3) Webhook from UPayments (notificationUrl) — verifies via status API before trusting
-exports.upaymentWebhook = functions.https.onRequest(async (req, res) => {
+exports.upaymentWebhook = fx.https.onRequest(async (req, res) => {
   try {
     const b = Object.assign({}, req.query || {}, req.body || {});
     const orderId = b.requested_order_id || b.order_id || b.reference || (b.order && b.order.id) || ''; const track = b.track_id || b.trackId;
@@ -173,14 +175,27 @@ exports.upaymentWebhook = functions.https.onRequest(async (req, res) => {
   } catch (e) { console.error(e); res.status(200).send('error'); }
 });
 
-// 4) Called by payment-success page on return (in case webhook is late)
-exports.verifyPayment = functions.https.onRequest(async (req, res) => {
+// 4) Called by payment-success page on return (in case webhook is late). Finds the order by id OR track_id.
+exports.verifyPayment = fx.https.onRequest(async (req, res) => {
   if (CORS(req, res)) return;
   try {
-    const orderId = req.query.order; const d = await db.collection('payments').doc(String(orderId)).get(); if (!d.exists) return res.json({ ok: false });
-    const p = d.data(); if (p.status === 'paid') return res.json({ ok: true, status: 'paid' });
-    const track = req.query.track_id || p.trackId; if (!track || !UP.key) return res.json({ ok: true, status: p.status });
-    const out = await finalizePayment(String(orderId), gwFromStatus(await fetchStatus(track)));
-    res.json({ ok: true, status: out });
+    let orderId = String(req.query.order || req.query.requested_order_id || req.query.order_id || '').trim(); const track = req.query.track_id || req.query.trackId;
+    let d = orderId ? await db.collection('payments').doc(orderId).get() : null;
+    if ((!d || !d.exists) && track) { const q = await db.collection('payments').where('trackId', '==', String(track)).limit(1).get(); if (!q.empty) { d = q.docs[0]; orderId = d.id; } }
+    if (!d || !d.exists) return res.json({ ok: false, error: 'order not found' });
+    const p = d.data(); if (p.status === 'paid') return res.json({ ok: true, orderId, status: 'paid' });
+    const tk = track || p.trackId; if (!tk || !UP.key) return res.json({ ok: true, orderId, status: p.status });
+    const out = await finalizePayment(orderId, gwFromStatus(await fetchStatus(tk)));
+    res.json({ ok: true, orderId, status: out });
   } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Pause request from a parent (portal/{phone}.pauseRequests) → Telegram alert
+exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(async (chg) => {
+  if (!TG_TOKEN) return;
+  const b = chg.before.data() || {}, a = chg.after.data() || {};
+  const pend = x => (x.pauseRequests || []).filter(r => r.status === 'pending');
+  if (pend(a).length <= pend(b).length) return;
+  const r = pend(a).pop();
+  return tgcore.notifyAdmins(db, tg, `🕒 <b>طلب إيقاف يوم</b>\n\n<b>${r.childName}</b> — ${r.start}${r.reason ? '\n📝 ' + r.reason : ''}\n👤 ${a.parentName || ''} · ${chg.after.id}\n\nوافق من لوحة الإدارة → ⏸️ الإيقافات`);
 });

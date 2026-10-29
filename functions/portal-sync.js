@@ -4,7 +4,7 @@
 // Used by: admin dashboard (browser SDK) and the Telegram bot (admin SDK) — same code.
 // ============================================================
 (function (root, factory) { if (typeof module === 'object' && module.exports) module.exports = factory(); else root.PortalSync = factory(); })(typeof self !== 'undefined' ? self : this, function () {
-  const PUBLIC = ['childName', 'parentName', 'phone', 'email', 'packageType', 'packageName', 'amount', 'status', 'subscriptionStart', 'subscriptionEnd', 'plannedStart', 'plannedEnd', 'adminNote', 'pauseStart', 'pauseEnd', 'pauseUsed', 'pauseReason', 'loyaltyMember', 'createdAt'];
+  const PUBLIC = ['childName', 'parentName', 'phone', 'email', 'packageType', 'packageName', 'amount', 'status', 'subscriptionStart', 'subscriptionEnd', 'plannedStart', 'plannedEnd', 'adminNote', 'pauseStart', 'pauseEnd', 'pauseUsed', 'pauseReason', 'pauses', 'loyaltyMember', 'createdAt'];
   const norm = p => String(p || '').replace(/\D/g, '').slice(-8);
   function buildDoc(subs) {
     const kids = subs.map(s => { const o = { subId: s.id }; PUBLIC.forEach(k => { if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; }); return o; });

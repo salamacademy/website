@@ -6,6 +6,7 @@
 // ============================================================
 const admin = require('firebase-admin');
 const core = require('./core');
+const PortalSync = require('./portal-sync');
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'PASTE_BOT_TOKEN_HERE';
 admin.initializeApp({ credential: admin.credential.cert(require('./serviceAccount.json')) });
 const db = admin.firestore();
@@ -18,15 +19,24 @@ db.collection('subscriptions').onSnapshot(snap => {
   if (!ready) { ready = true; snap.docs.forEach(d => { if (d.data().pauseStart) seenPause.add(d.id); }); return; }
   snap.docChanges().forEach(async ch => {
     const s = { id: ch.doc.id, ...ch.doc.data() };
+    PortalSync.syncPhone(db, s.phone).catch(e => console.warn('sync', e.message)); // keeps parent portal fresh even when admin app is closed
     if (ch.type === 'added' && s.status === 'pending_review') await core.notifyAdmins(db, tg, '🔔 <b>طلب تسجيل جديد</b>\n\n' + core.requestCard(s), core.requestKb(s.id));
     if (ch.type === 'modified' && s.pauseStart && !seenPause.has(s.id)) { seenPause.add(s.id); await core.notifyAdmins(db, tg, `⏸️ <b>إيقاف مؤقت جديد</b>\n\n<b>${s.childName}</b> — من ${core.fmtD(s.pauseStart)} إلى ${core.fmtD(s.pauseEnd)}${s.pauseReason ? '\n📝 ' + s.pauseReason : ''}\n👤 ${s.parentName} · ${s.phone}`); }
   });
+});
+
+// ---- pause requests from parents → notify admins ----
+let prReady = false; const prSeen = {};
+db.collection('portal').onSnapshot(snap => {
+  snap.docs.forEach(d => { const n = (d.data().pauseRequests || []).filter(r => r.status === 'pending').length; if (prReady && n > (prSeen[d.id] || 0)) { const r = (d.data().pauseRequests || []).filter(x => x.status === 'pending').pop(); core.notifyAdmins(db, tg, `🕒 <b>طلب إيقاف مؤقت</b>\n\n<b>${r.childName}</b> — من ${r.start} إلى ${r.end}${r.reason ? '\n📝 ' + r.reason : ''}\n👤 ${d.data().parentName || ''} · ${d.id}\n\nوافق من لوحة الإدارة → ⏸️ الإيقافات`); } prSeen[d.id] = n; });
+  prReady = true;
 });
 
 // ---- long polling loop ----
 (async () => {
   await tg('deleteWebhook', {}); // ensure polling mode
   console.log('🤖 Salam bot running (polling)…');
+  try { const all = (await db.collection('subscriptions').get()).docs.map(d => ({ id: d.id, ...d.data() })); await PortalSync.syncAll(db, all); console.log('✅ portal synced for', all.length, 'subscriptions'); } catch (e) { console.warn('initial sync', e.message); }
   let offset = 0;
   for (;;) {
     try {
