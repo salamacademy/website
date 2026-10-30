@@ -11,6 +11,7 @@ const firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+db.settings({ experimentalAutoDetectLongPolling: true }); // keeps Firestore working on iPhone/mobile networks that block streaming
 const auth = firebase.auth ? firebase.auth() : null;
 
 // UPayment — the API key lives ONLY in Cloud Functions (never in the browser).

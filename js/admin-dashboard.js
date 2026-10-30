@@ -23,6 +23,13 @@ async function loadAllData() {
 const toD = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : null;
 const fmtDate = ts => { const d = toD(ts); return d ? d.toLocaleDateString('ar-KW') : '--'; };
 const isoDate = ts => { const d = toD(ts); return d ? d.toISOString().split('T')[0] : ''; };
+const addDaysIso = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().split('T')[0]; };
+const tsFromIso = iso => firebase.firestore.Timestamp.fromDate(new Date(iso + 'T00:00:00Z'));
+const todayIso = () => new Date().toLocaleDateString('en-CA');
+function autoEndDate(startId, endId) { const sv = document.getElementById(startId).value; if (sv) document.getElementById(endId).value = addDaysIso(sv, 30); }
+// Firestore writes can hang on a weak connection — never leave a button spinning forever
+const withTimeout = (p, ms = 15000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+const SLOW_MSG = '❌ الاتصال ضعيف ولم يتأكد الحفظ — تحقق من الإنترنت واضغط حفظ مرة أخرى';
 function calcDaysLeft(s) { const e = toD(s.subscriptionEnd); return e ? Math.ceil((e - new Date()) / 864e5) : null; }
 const dayKey = d => (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0];
 const pausesOf = s => Array.isArray(s.pauses) ? s.pauses : (s.pauseStart ? [{ date: dayKey(toD(s.pauseStart)), end: dayKey(toD(s.pauseEnd || s.pauseStart)) }] : []);
@@ -67,7 +74,7 @@ function memberCard(s, opts = {}) {
   if (s.status === 'active' && days !== null && days <= 7) actions.push(`<button class="abtn wa" onclick="sendWhatsAppReminder('${s.phone}','${s.childName}',${days})">📲 تذكير</button>`);
   if (s.status === 'expired' || (s.status === 'active' && days !== null && days <= 7)) actions.push(`<button class="abtn primary" onclick="sendRenewalLink('${s.id}')">📲 رابط التجديد</button>`);
   if (s.status === 'expired') actions.push(`<button class="abtn ok" onclick="activateSubscription('${s.id}')">🔄 تجديد يدوي</button>`);
-  actions.push(`<button class="abtn" onclick="viewSurvey('${s.id}')">👁️</button><button class="abtn" onclick="openEditModal('${s.id}')">✏️</button><button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}','_blank')">💬</button>`);
+  actions.push(`<button class="abtn" onclick="viewSurvey('${s.id}')">👁️</button><button class="abtn" onclick="openEditModal('${s.id}')">✏️ تعديل</button><button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}','_blank')">💬</button>`);
   if (opts.del) actions.push(`<button class="abtn bad" onclick="deleteSubscription('${s.id}')">🗑️</button>`);
   return `<div class="mcard ${cardClass(s)}">
     <div class="mcard-top">
@@ -213,21 +220,44 @@ async function activateSubscription(id) {
 }
 
 // ---------- EDIT ----------
+function fillEditPackages(s) {
+  const sel = document.getElementById('editPackage');
+  sel.innerHTML = [...document.getElementById('newPackage').options].filter(o => o.value).map(o => o.outerHTML).join('');
+  if (s.packageType && ![...sel.options].some(o => o.value === s.packageType)) sel.insertAdjacentHTML('beforeend', `<option value="${s.packageType}" data-name="${s.packageName || ''}">${PKG_NAMES[s.packageType] || s.packageName || s.packageType}</option>`);
+  sel.value = s.packageType || '';
+}
 function openEditModal(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;
-  document.getElementById('editSubId').value = id; document.getElementById('editName').textContent = `${s.childName} — ${s.packageName || ''}`;
-  document.getElementById('editStatus').value = s.status || 'active'; document.getElementById('editNotes').value = s.notes || '';
-  document.getElementById('editStartDate').value = isoDate(s.subscriptionStart); document.getElementById('editEndDate').value = isoDate(s.subscriptionEnd);
+  const set = (k, val) => document.getElementById(k).value = val ?? '';
+  set('editSubId', id); document.getElementById('editName').textContent = `${s.childName} — ${s.packageName || ''}`;
+  set('editChildName', s.childName); set('editChildAge', s.childAge); set('editParentName', s.parentName); set('editPhone', s.phone); set('editEmail', s.email);
+  fillEditPackages(s); set('editAmount', s.amount);
+  set('editStatus', s.status || 'active'); set('editNotes', s.notes);
+  set('editStartDate', isoDate(s.subscriptionStart)); set('editEndDate', isoDate(s.subscriptionEnd));
   document.getElementById('editModal').classList.add('open');
 }
 function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
-async function saveEdit() {
-  const id = document.getElementById('editSubId').value;
-  const upd = { status: document.getElementById('editStatus').value, notes: document.getElementById('editNotes').value };
-  const sv = document.getElementById('editStartDate').value, ev = document.getElementById('editEndDate').value;
-  if (sv) upd.subscriptionStart = firebase.firestore.Timestamp.fromDate(new Date(sv));
-  if (ev) { upd.subscriptionEnd = firebase.firestore.Timestamp.fromDate(new Date(ev)); upd.daysRemaining = Math.max(0, Math.ceil((new Date(ev) - new Date()) / 864e5)); }
-  try { await db.collection('subscriptions').doc(id).update(upd); closeEditModal(); const s = allSubscriptions.find(x => x.id === id); if (s) await PortalSync.syncPhone(db, s.phone); showToast('✅ تم الحفظ'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
+async function saveEdit(btn) {
+  const id = v('editSubId'); const s = allSubscriptions.find(x => x.id === id); if (!s) return;
+  const phone = v('editPhone').replace(/\D/g, '');
+  if (!v('editChildName')) return showToast('❌ اكتب اسم الطفل');
+  if (phone.length !== 8) return showToast('❌ رقم الهاتف يجب أن يكون 8 أرقام');
+  const sv = v('editStartDate'), ev = v('editEndDate');
+  if (sv && ev && ev <= sv) return showToast('❌ تاريخ النهاية يجب أن يكون بعد البداية');
+  const o = document.getElementById('editPackage').selectedOptions[0];
+  const upd = { childName: v('editChildName'), parentName: v('editParentName'), phone, email: v('editEmail'), amount: +v('editAmount') || 0, status: v('editStatus'), notes: v('editNotes') };
+  if (v('editChildAge')) upd.childAge = +v('editChildAge');
+  if (o && o.value) { upd.packageType = o.value; upd.packageName = o.dataset.name || s.packageName || ''; }
+  if (sv) upd.subscriptionStart = tsFromIso(sv);
+  if (ev) { upd.subscriptionEnd = tsFromIso(ev); upd.daysRemaining = Math.max(0, Math.ceil((new Date(ev + 'T00:00:00Z') - new Date()) / 864e5)); }
+  btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+  try {
+    await withTimeout(db.collection('subscriptions').doc(id).update(upd));
+    closeEditModal(); showToast('✅ تم الحفظ');
+    for (const ph of new Set([s.phone, phone])) withTimeout(PortalSync.syncPhone(db, ph)).catch(e => console.warn('sync', e));
+    loadAllData();
+  } catch (e) { showToast(e.message === 'timeout' ? SLOW_MSG : '❌ ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '💾 حفظ التغييرات'; }
 }
 async function deleteSubscription(id) {
   if (!confirm('حذف هذا الاشتراك نهائياً؟')) return;
@@ -236,18 +266,31 @@ async function deleteSubscription(id) {
 }
 
 // ---------- ADD ----------
-function updatePackagePrice() { const o = document.getElementById('newPackage').selectedOptions[0]; if (o && o.dataset.price) document.getElementById('newAmount').value = o.dataset.price; }
+function updatePackagePrice(selId = 'newPackage', amtId = 'newAmount') { const o = document.getElementById(selId).selectedOptions[0]; if (o && o.dataset.price) document.getElementById(amtId).value = o.dataset.price; }
+let pendingAddId = null; // reused when a slow save is retried, so the same subscriber is never added twice
 async function saveSubscription(e) {
-  e.preventDefault(); const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
-  const o = document.getElementById('newPackage').selectedOptions[0];
-  const start = new Date(document.getElementById('newStartDate').value); const end = new Date(start); end.setDate(end.getDate() + 30);
-  const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: v('newEmail'), packageType: o.value, packageName: o.dataset.name, amount: +document.getElementById('newAmount').value, paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, pauseUsed: false, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
-  try { const ref = await db.collection('subscriptions').add(data); await recordIncomeForSub({ id: ref.id, ...data }, data.amount, data.paymentMethod); await PortalSync.syncPhone(db, data.phone); sendWelcomeWhatsApp(data.phone, data.childName, data.packageName, end); showToast('✅ تمت الإضافة'); clearAddForm(); await loadAllData(); go('members'); }
-  catch (err) { showToast('❌ ' + err.message); }
-  btn.disabled = false; btn.textContent = '💾 حفظ وتفعيل الاشتراك';
+  e.preventDefault(); const btn = e.target.querySelector('button[type=submit]'); if (btn.disabled) return;
+  btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+  try {
+    const o = document.getElementById('newPackage').selectedOptions[0];
+    const sv = v('newStartDate'), ev = v('newEndDate') || (sv && addDaysIso(sv, 30));
+    if (!o || !o.value) throw new Error('اختر الباقة');
+    if (!sv) throw new Error('حدد تاريخ البداية');
+    if (ev <= sv) throw new Error('تاريخ النهاية يجب أن يكون بعد البداية');
+    const end = new Date(ev + 'T00:00:00Z');
+    const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: v('newEmail'), packageType: o.value, packageName: o.dataset.name, amount: +v('newAmount'), paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: tsFromIso(sv), subscriptionEnd: tsFromIso(ev), daysRemaining: Math.max(0, Math.ceil((end - new Date()) / 864e5)), pauseUsed: false, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
+    const ref = pendingAddId ? db.collection('subscriptions').doc(pendingAddId) : db.collection('subscriptions').doc(); pendingAddId = ref.id;
+    await withTimeout(ref.set(data));
+    pendingAddId = null;
+    withTimeout(recordIncomeForSub({ id: ref.id, ...data }, data.amount, data.paymentMethod, 'inc_' + ref.id)).catch(e => console.warn('income', e));
+    withTimeout(PortalSync.syncPhone(db, data.phone)).catch(e => console.warn('sync', e));
+    sendWelcomeWhatsApp(data.phone, data.childName, data.packageName, end); showToast('✅ تمت الإضافة — يمكنك تعديله من ✏️ تعديل'); clearAddForm(); loadAllData(); go('members');
+  } catch (err) { showToast(err.message === 'timeout' ? SLOW_MSG : '❌ ' + err.message); }
+  finally { btn.disabled = false; btn.textContent = '💾 حفظ وتفعيل الاشتراك'; }
 }
 function v(id) { return (document.getElementById(id).value || '').trim(); }
-function clearAddForm() { ['newChildName', 'newChildAge', 'newParentName', 'newPhone', 'newEmail', 'newPackage', 'newAmount', 'newNotes', 'newStartDate'].forEach(i => document.getElementById(i).value = ''); }
+function clearAddForm() { ['newChildName', 'newChildAge', 'newParentName', 'newPhone', 'newEmail', 'newPackage', 'newAmount', 'newNotes'].forEach(i => document.getElementById(i).value = ''); pendingAddId = null; document.getElementById('newStartDate').value = todayIso(); autoEndDate('newStartDate', 'newEndDate'); }
+clearAddForm();
 
 // ---------- WHATSAPP ----------
 function sendWhatsAppReminder(phone, child, days) {
@@ -309,6 +352,7 @@ async function syncPortalsIfNeeded() {
 function adminLogout() { if (confirm('تسجيل الخروج؟')) auth.signOut().then(() => location.href = 'login.html'); }
 function showToast(msg) { const t = document.createElement('div'); t.className = 'toast'; if (msg.includes('❌')) t.style.background = '#C62828'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3200); }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && auth.currentUser) loadAllData(); }); // iPhone resumes the PWA without reloading
 
 // ---------- AUTH ----------
 auth.onAuthStateChanged(async (user) => {
@@ -319,9 +363,10 @@ auth.onAuthStateChanged(async (user) => {
   setupAdminNotifications(user);
 });
 
-async function recordIncomeForSub(s, amount, method) {
+async function recordIncomeForSub(s, amount, method, txId) {
   try {
-    await db.collection('transactions').add({ type: 'income', amount: +amount || 0, category: 'اشتراكات', note: `اشتراك ${s.childName} — ${s.packageName || ''}`, method: method || 'cash', date: new Date().toISOString().split('T')[0], subId: s.id, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' });
+    const col = db.collection('transactions'), ref = txId ? col.doc(txId) : col.doc(); // fixed id on retries → no double income
+    await ref.set({ type: 'income', amount: +amount || 0, category: 'اشتراكات', note: `اشتراك ${s.childName} — ${s.packageName || ''}`, method: method || 'cash', date: new Date().toISOString().split('T')[0], subId: s.id, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' });
     if (typeof loadFinance === 'function') loadFinance();
   } catch (e) { console.warn('income tx', e); }
 }

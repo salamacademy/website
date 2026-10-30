@@ -25,7 +25,7 @@
       <div class="head-actions">
         <button class="icon-btn" onclick="go('review')" title="طلبات المراجعة">📝<span class="dot" id="reviewBadge">0</span></button>
         <button class="icon-btn" onclick="go('notify')" title="رسائل">📨</button>
-        <button class="icon-btn" onclick="loadAllData();loadFinance();showToast('تم التحديث')" title="تحديث">🔄</button>
+        <button class="icon-btn" onclick="refreshApp()" title="تحديث">🔄</button>
         <button class="icon-btn" onclick="adminLogout()" title="خروج">⏻</button>
       </div>
     </div>
@@ -118,9 +118,11 @@
         <div class="fg"><label>المبلغ (د.ك)</label><input type="number" id="newAmount" required step="0.5"/></div>
       </div>
       <div class="fg2">
-        <div class="fg"><label>بداية الاشتراك</label><input type="date" id="newStartDate" required/></div>
-        <div class="fg"><label>طريقة الدفع</label><select id="newPaymentMethod"><option value="cash">نقدي</option><option value="upayment">UPayment</option><option value="bank">تحويل</option></select></div>
+        <div class="fg"><label>بداية الاشتراك</label><input type="date" id="newStartDate" required onchange="autoEndDate('newStartDate','newEndDate')"/></div>
+        <div class="fg"><label>نهاية الاشتراك</label><input type="date" id="newEndDate" required/></div>
       </div>
+      <p class="hint" style="margin:-4px 2px 10px;font-size:0.78rem;color:var(--text-light)">تُحسب النهاية تلقائياً (+30 يوماً) ويمكنك تعديلها</p>
+      <div class="fg"><label>طريقة الدفع</label><select id="newPaymentMethod"><option value="cash">نقدي</option><option value="upayment">UPayment</option><option value="bank">تحويل</option></select></div>
       <div class="fg"><label>ملاحظات</label><textarea id="newNotes" rows="2"></textarea></div>
       <button type="submit" class="btn primary">💾 حفظ وتفعيل الاشتراك</button>
       <button type="button" class="btn ghost" onclick="clearAddForm()">مسح</button>
@@ -222,11 +224,15 @@
   <div class="sheet"><div class="sheet-grip"></div>
     <h3>✏️ تعديل الاشتراك</h3><p class="sub" id="editName"></p>
     <input type="hidden" id="editSubId"/>
+    <div class="fg2"><div class="fg"><label>اسم الطفل</label><input type="text" id="editChildName"/></div><div class="fg"><label>العمر</label><input type="number" id="editChildAge" min="3" max="18"/></div></div>
+    <div class="fg2"><div class="fg"><label>ولي الأمر</label><input type="text" id="editParentName"/></div><div class="fg"><label>الهاتف</label><input type="tel" id="editPhone" maxlength="8" inputmode="numeric"/></div></div>
+    <div class="fg"><label>البريد</label><input type="email" id="editEmail"/></div>
+    <div class="fg2"><div class="fg"><label>الباقة</label><select id="editPackage" onchange="updatePackagePrice('editPackage','editAmount')"></select></div><div class="fg"><label>المبلغ (د.ك)</label><input type="number" id="editAmount" step="0.5"/></div></div>
     <div class="fg"><label>الحالة</label><select id="editStatus">
       <option value="active">✅ نشط</option><option value="approved">💳 موافق عليه - بانتظار الدفع</option><option value="pending_review">📝 قيد المراجعة</option><option value="expired">❌ منتهي</option><option value="rejected">⛔ مرفوض</option><option value="cancelled">🚫 ملغي</option></select></div>
-    <div class="fg2"><div class="fg"><label>البداية</label><input type="date" id="editStartDate"/></div><div class="fg"><label>النهاية</label><input type="date" id="editEndDate"/></div></div>
+    <div class="fg2"><div class="fg"><label>البداية</label><input type="date" id="editStartDate" onchange="autoEndDate('editStartDate','editEndDate')"/></div><div class="fg"><label>النهاية</label><input type="date" id="editEndDate"/></div></div>
     <div class="fg"><label>ملاحظات</label><textarea id="editNotes" rows="2"></textarea></div>
-    <button onclick="saveEdit()" class="btn primary">حفظ التغييرات</button>
+    <button onclick="saveEdit(this)" class="btn primary">💾 حفظ التغييرات</button>
     <button onclick="closeEditModal()" class="btn ghost">إلغاء</button>
   </div>
 </div>

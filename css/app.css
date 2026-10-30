@@ -107,7 +107,9 @@ input,select,textarea{font-family:inherit}
 .fg label{display:block;font-size:0.82rem;font-weight:800;color:var(--text);margin-bottom:6px}
 .fg input,.fg select,.fg textarea{width:100%;padding:12px 14px;border:2px solid rgba(184,84,30,0.12);border-radius:14px;font-size:0.95rem;background:var(--copper-xpale);color:var(--text);direction:rtl}
 .fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--copper);background:#fff;box-shadow:0 0 0 4px rgba(184,84,30,0.1)}
-.fg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fg2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.fg2>.fg{min-width:0}
+.fg input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;min-height:48px;display:block}
 .btn{width:100%;border:none;border-radius:16px;padding:14px;font-size:0.98rem;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .1s}
 .btn:active{transform:scale(.98)}
 .btn.primary{background:linear-gradient(135deg,var(--copper-dark),var(--copper));color:#fff;box-shadow:0 8px 22px rgba(184,84,30,0.35)}

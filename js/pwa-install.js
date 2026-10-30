@@ -37,3 +37,23 @@ if (isIOS && !isStandalone) {
     const btn = b.querySelector('#installBtn'); if (btn) btn.textContent = 'كيف؟';
   });
 }
+
+// ---------- App updates ----------
+// 🔄 button: fetch the newest app files, then reload
+async function refreshApp() {
+  if (typeof showToast === 'function') showToast('🔄 جاري تحديث التطبيق...');
+  try { const r = await navigator.serviceWorker?.getRegistration(); if (r) await r.update(); } catch (_) {}
+  location.reload();
+}
+if ('serviceWorker' in navigator) {
+  // a new sw.js took over → reload once so the new code runs (unless a form is open)
+  const hadController = !!navigator.serviceWorker.controller; let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    const c = navigator.serviceWorker.controller;
+    if (!hadController || reloading || !c || !/\/sw\.js$/.test(c.scriptURL)) return;
+    if (document.querySelector('.sheet-bg.open') || document.getElementById('newChildName')?.value) return;
+    reloading = true; location.reload();
+  });
+  // iPhone keeps the PWA in memory for days — check for a new version every time it comes back to the screen
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}); });
+}
