@@ -130,6 +130,7 @@ exports.createPayment = fx.https.onRequest(async (req, res) => {
       products: items.map(i => ({ name: i.name, description: i.name, price: i.price, quantity: i.qty })),
       order: { id: orderId, reference: orderId, description: 'أكاديمية سلام — ' + items.map(i => i.name).join('، ').slice(0, 480), currency: 'KWD', amount },
       language: 'ar', reference: { id: orderId }, tokens: {},
+      paymentGateway: { src: 'knet' }, // KNET only (no Visa/Master/Apple Pay)
       customer: { uniqueId: phone, name: (b.parentName || 'Parent').slice(0, 50), email: (b.email || '').slice(0, 50) || undefined, mobile: '+965' + phone },
       returnUrl: `${base}/payment-success.html?order=${orderId}`, cancelUrl: `${base}/payment-success.html?order=${orderId}&result=CANCELED`,
       notificationUrl: `https://${REGION}-${process.env.GCLOUD_PROJECT || 'salam-5e6f2'}.cloudfunctions.net/upaymentWebhook`,
