@@ -39,6 +39,7 @@
 
   <!-- ===== HOME ===== -->
   <section class="page active" data-page="dashboard">
+    <div id="expAlert"></div>
     <div class="tiles">
       <div class="tile c-gold" onclick="go('review')"><div class="t-ico">📝</div><div class="t-num" id="statPending">–</div><div class="t-lbl">بانتظار المراجعة</div></div>
       <div class="tile c-ok" onclick="go('members');setFilter('active')"><div class="t-ico">✅</div><div class="t-num" id="statActive">–</div><div class="t-lbl">اشتراك نشط</div></div>
@@ -194,7 +195,7 @@
 
   <!-- ===== NOTIFY ===== -->
   <section class="page" data-page="notify">
-    <div class="page-title"><h3>📨 إرسال رسالة</h3><div style="display:flex;gap:6px"><button class="link" onclick="lastSyncSig='';syncPortalsIfNeeded().then(()=>showToast('✅ تمت مزامنة بوابة الأهالي'))">🔄 مزامنة البوابة</button><button class="link" onclick="go('telegram')">🤖 تيليجرام</button></div></div>
+    <div class="page-title"><h3>📨 إرسال رسالة</h3><div style="display:flex;gap:6px"><button class="link" onclick="syncPortalsIfNeeded(true).then(()=>showToast('✅ تمت مزامنة بوابة الأهالي'))">🔄 مزامنة البوابة</button><button class="link" onclick="go('telegram')">🤖 تيليجرام</button></div></div>
     <div class="card">
       <div class="card-h"><h4>⚠️ تذكير انتهاء الاشتراك</h4></div>
       <p class="note" style="margin-bottom:12px">يفتح واتساب لكل مشترك ينتهي اشتراكه خلال 7 أيام برسالة تذكير جاهزة.</p>
@@ -221,7 +222,7 @@
 
 <!-- EDIT SHEET -->
 <div class="sheet-bg" id="editModal" onclick="if(event.target===this)closeEditModal()">
-  <div class="sheet"><div class="sheet-grip"></div>
+  <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeEditModal()" aria-label="إغلاق">✕</button>
     <h3>✏️ تعديل الاشتراك</h3><p class="sub" id="editName"></p>
     <input type="hidden" id="editSubId"/>
     <div class="fg2"><div class="fg"><label>اسم الطفل</label><input type="text" id="editChildName"/></div><div class="fg"><label>العمر</label><input type="number" id="editChildAge" min="3" max="18"/></div></div>
@@ -231,6 +232,8 @@
     <div class="fg"><label>الحالة</label><select id="editStatus">
       <option value="active">✅ نشط</option><option value="approved">💳 موافق عليه - بانتظار الدفع</option><option value="pending_review">📝 قيد المراجعة</option><option value="expired">❌ منتهي</option><option value="rejected">⛔ مرفوض</option><option value="cancelled">🚫 ملغي</option></select></div>
     <div class="fg2"><div class="fg"><label>البداية</label><input type="date" id="editStartDate" onchange="autoEndDate('editStartDate','editEndDate')"/></div><div class="fg"><label>النهاية</label><input type="date" id="editEndDate"/></div></div>
+    <div class="fg"><label>⏸️ الإيقافات <span class="chip" id="editPauseCount">0/3</span></label><div id="editPauses"></div>
+      <button type="button" class="abtn" style="margin-top:6px" onclick="addEditPause()">➕ إضافة إيقاف (+1 يوم)</button></div>
     <div class="fg"><label>ملاحظات</label><textarea id="editNotes" rows="2"></textarea></div>
     <button onclick="saveEdit(this)" class="btn primary">💾 حفظ التغييرات</button>
     <button onclick="closeEditModal()" class="btn ghost">إلغاء</button>
@@ -257,7 +260,7 @@
 
 <!-- PAY ITEM SHEET -->
 <div class="sheet-bg" id="payItemModal" onclick="if(event.target===this)closePayItem()">
-  <div class="sheet"><div class="sheet-grip"></div>
+  <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closePayItem()" aria-label="إغلاق">✕</button>
     <h3 id="piTitle">➕ منتج دفع</h3><p class="sub">ما يراه ولي الأمر في صفحة ادفع</p>
     <input type="hidden" id="piId"/>
     <div class="fg2"><div class="fg"><label>الأيقونة</label><input type="text" id="piIcon" placeholder="⚽" maxlength="4" style="text-align:center;font-size:1.4rem"/></div><div class="fg"><label>السعر (د.ك)</label><input type="number" id="piPrice" step="0.001" min="0" placeholder="25.000" inputmode="decimal"/></div></div>
@@ -265,8 +268,10 @@
     <div class="fg"><label>يفعّل باقة؟ (اختياري)</label><select id="piPkg"><option value="">— لا، منتج عادي (تيشيرت، معدات...) —</option><option value="football">⚽ كرة القدم — يفعّل/يجدد 30 يوم</option><option value="confidence">🥋 بناء الثقة — يفعّل/يجدد 30 يوم</option><option value="excellence">⚡ التميز — يفعّل/يجدد 30 يوم</option></select></div>
     <div class="fg2"><div class="fg"><label>الترتيب</label><input type="number" id="piOrder" value="10"/></div><div class="fg"><label>فئة الدخل</label><select id="piCat"><option>اشتراكات</option><option>بيع زي</option><option>رحلات وفعاليات</option><option>بطولات</option><option>أخرى</option></select></div></div>
     <label class="chatid" style="cursor:pointer"><span>🔢 السماح باختيار الكمية (مثل التيشيرتات)</span><input type="checkbox" id="piQty" style="width:20px;height:20px;accent-color:var(--green-mid)"/></label>
+    <label class="chatid" style="cursor:pointer;margin-top:6px"><span>✍️ ولي الأمر يكتب المبلغ بنفسه (دفعة بمبلغ مفتوح)</span><input type="checkbox" id="piCustom" style="width:20px;height:20px;accent-color:var(--green-mid)"/></label>
     <label class="chatid" style="cursor:pointer;margin-top:6px"><span>👁️ ظاهر للأهل</span><input type="checkbox" id="piActive" checked style="width:20px;height:20px;accent-color:var(--green-mid)"/></label>
-    <button onclick="savePayItem()" class="btn primary" style="margin-top:12px">💾 حفظ</button>
+    <button onclick="savePayItem(this)" class="btn primary" style="margin-top:12px">💾 حفظ</button>
+    <button onclick="closePayItem()" class="btn ghost">إلغاء</button>
     <button onclick="deletePayItem()" class="btn bad" id="piDel" style="display:none">🗑️ حذف</button>
   </div>
 </div>

@@ -146,13 +146,13 @@ input,select,textarea{font-family:inherit}
 /* ---------- BOTTOM SHEET (modals) ---------- */
 .sheet-bg{position:fixed;inset:0;background:rgba(28,15,6,0.55);backdrop-filter:blur(3px);z-index:100;display:none;align-items:flex-end;justify-content:center}
 .sheet-bg.open{display:flex}
-.sheet{width:100%;max-width:430px;max-height:92vh;overflow-y:auto;background:#fff;border-radius:28px 28px 0 0;padding:10px 18px calc(22px + var(--sab));animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.1)}
+.sheet{position:relative;width:100%;max-width:430px;max-height:92vh;max-height:88dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#fff;border-radius:28px 28px 0 0;padding:10px 18px calc(22px + var(--sab));animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.1)}
 @media(min-width:900px){ .sheet{border-radius:28px;margin-bottom:40px;max-height:85vh} }
 @keyframes sheetUp{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
 .sheet-grip{width:44px;height:5px;border-radius:3px;background:#E3D6C8;margin:4px auto 14px}
 .sheet h3{font-size:1.1rem;font-weight:900;color:var(--copper-dark);margin-bottom:4px}
 .sheet .sub{font-size:0.82rem;color:var(--text-light);margin-bottom:14px}
-.sheet-close{position:absolute;top:14px;left:14px;width:34px;height:34px;border-radius:50%;border:none;background:var(--copper-xpale);color:var(--copper-dark);font-size:1rem}
+.sheet-close{position:absolute;z-index:2;top:14px;left:14px;width:34px;height:34px;border-radius:50%;border:none;background:var(--copper-xpale);color:var(--copper-dark);font-size:1rem}
 .modal-overlay{display:none}
 
 /* ---------- CLIENT: days ring ---------- */
@@ -282,6 +282,17 @@ body.app-body,body.app-body.admin{background:#EEF1EA}
 .pay-item.on .tick{display:flex}
 .pay-item .qty{display:none;align-items:center;justify-content:center;gap:10px;margin-top:8px}
 .pay-item.on .qty{display:flex}
+.pay-item .amt{display:none;align-items:center;gap:6px;margin-top:8px}
+.pay-item.on .amt{display:flex}
+.pay-item .amt input{width:100%;min-width:0;padding:8px 10px;border:2px solid #2B9AD6;border-radius:12px;font-size:1.05rem;font-weight:800;text-align:center;direction:ltr;background:#fff}
+.pay-item .amt small{font-size:.7rem;color:var(--text-light);font-weight:700}
+.exp-alert{display:flex;flex-direction:column;gap:4px;margin:0 0 14px;padding:14px 16px;border-radius:18px;background:#FFF4E5;border:2px solid #F5A623;cursor:pointer}
+.exp-alert b{color:#B26A00;font-size:.98rem} .exp-alert small{color:var(--text);font-size:.82rem;line-height:1.5} .exp-alert span{color:var(--copper);font-size:.8rem;font-weight:800}
+.pause-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.pause-row input{flex:1;min-width:0;padding:10px;border:2px solid rgba(184,84,30,0.12);border-radius:12px;background:var(--copper-xpale);font-size:.9rem}
+.pause-row input[type=date]{flex:1.2;-webkit-appearance:none;appearance:none;min-height:44px}
+.pause-row button{flex:none;width:40px;height:40px;border:none;border-radius:12px;background:#FDECEA;font-size:1rem}
+.fg .hint{font-size:.8rem;color:var(--text-light);padding:4px 2px}
 .pay-item .qty button{width:28px;height:28px;border-radius:50%;border:none;background:#E3F2FD;color:#1565C0;font-weight:900;font-size:1rem}
 .pay-item.sug::after{content:'باقتك';position:absolute;top:-9px;right:10px;background:var(--accent);color:#fff;font-size:.65rem;font-weight:800;padding:2px 8px;border-radius:10px}
 .pay-total{display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;border:2px solid rgba(43,154,214,0.2)}

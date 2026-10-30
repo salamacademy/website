@@ -51,12 +51,16 @@ exports.onSubscriptionUpdate = fx.firestore.document('subscriptions/{id}').onUpd
 exports.dailyReminders = fx.pubsub.schedule('0 9 * * *').timeZone('Asia/Kuwait').onRun(async () => {
   const now = new Date();
   const snap = await db.collection('subscriptions').where('status', '==', 'active').get();
+  const soon = [];
   for (const doc of snap.docs) {
     const s = doc.data(); if (!s.subscriptionEnd) continue;
     const days = Math.ceil((s.subscriptionEnd.toDate() - now) / 864e5);
+    if (days >= 0 && days <= 3) soon.push([days, `• <b>${s.childName}</b> — ${days === 0 ? 'ينتهي اليوم' : `متبقٍ ${days} يوم`} · ${s.phone}`]);
     if (days === 3 || days === 1) await sendTo(s.fcmTokens, '⏳ اشتراكك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, '/website/client/dashboard.html');
     if (days < 0) await doc.ref.update({ status: 'expired' });
   }
+  // admin heads-up on Telegram (works even when the admin app is closed)
+  if (soon.length && TG_TOKEN) { try { await tgcore.notifyAdmins(db, tg, `⏳ <b>اشتراكات تنتهي خلال 3 أيام (${soon.length})</b>\n\n${soon.sort((a, b) => a[0] - b[0]).map(x => x[1]).join('\n')}\n\nأرسل رابط التجديد من لوحة الإدارة ← تنتهي قريباً`); } catch (e) { console.error('tg expiry', e); } }
   return null;
 });
 
@@ -110,7 +114,14 @@ exports.createPayment = fx.https.onRequest(async (req, res) => {
     const b = req.body || {}; const phone = norm(b.phone); if (phone.length !== 8) throw new Error('phone');
     const wanted = Array.isArray(b.items) ? b.items : []; if (!wanted.length) throw new Error('no items');
     const items = [];
-    for (const w of wanted) { const d = await db.collection('payItems').doc(String(w.id)).get(); if (!d.exists || d.data().active === false) continue; const it = d.data(); const qty = Math.max(1, Math.min(20, parseInt(w.qty) || 1)); items.push({ id: d.id, name: it.name, icon: it.icon || '', price: +it.price, qty: it.allowQty ? qty : 1, packageType: it.packageType || null, category: it.category || 'أخرى' }); }
+    for (const w of wanted) {
+      const d = await db.collection('payItems').doc(String(w.id)).get(); if (!d.exists || d.data().active === false) continue; const it = d.data(); const qty = Math.max(1, Math.min(20, parseInt(w.qty) || 1));
+      if (it.customAmount) { // parent typed the amount — validate it server-side, never trust the browser
+        const amt = Math.round(parseFloat(w.amount) * 1000) / 1000; if (!(amt >= 0.5 && amt <= 2000)) throw new Error('المبلغ يجب أن يكون بين 0.5 و 2000 د.ك');
+        items.push({ id: d.id, name: it.name, icon: it.icon || '', price: amt, qty: 1, packageType: null, category: it.category || 'أخرى', customAmount: true }); continue;
+      }
+      items.push({ id: d.id, name: it.name, icon: it.icon || '', price: +it.price, qty: it.allowQty ? qty : 1, packageType: it.packageType || null, category: it.category || 'أخرى' });
+    }
     if (!items.length) throw new Error('items unavailable');
     const amount = +items.reduce((a, i) => a + i.price * i.qty, 0).toFixed(3); if (amount <= 0) throw new Error('amount');
     const ref = db.collection('payments').doc(); const orderId = ref.id;

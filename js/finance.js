@@ -134,7 +134,7 @@ async function loadPayItems() {
   catch (e) { const el = document.getElementById('payItemsList'); if (el) el.innerHTML = `<div class="empty" style="padding:14px;color:var(--bad)">❌ تعذر تحميل المنتجات<br/><small>${e.code === 'permission-denied' ? 'لم يتم نشر قواعد Firestore بعد — نفّذ: firebase deploy --only firestore:rules' : e.message}</small></div>`; return; }
   payItemsAdmin = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0));
   const el = document.getElementById('payItemsList'); if (!el) return;
-  el.innerHTML = payItemsAdmin.length ? payItemsAdmin.map(i => `<div class="pay-row ${i.active ? '' : 'off'}" onclick="openPayItem('${i.id}')"><div class="pi">${i.icon || '🏷️'}</div><div class="m"><b>${i.name}</b><small>${i.packageType ? '🔁 يفعّل باقة ' + (PKG_NAMES[i.packageType] || i.packageType) + ' · ' : ''}${i.category || ''}${i.allowQty ? ' · كمية' : ''}${i.active ? '' : ' · مخفي'}</small></div><div class="pp">${(+i.price).toFixed(3)} <small style="font-size:.65rem;color:var(--text-light)">د.ك</small></div></div>`).join('')
+  el.innerHTML = payItemsAdmin.length ? payItemsAdmin.map(i => `<div class="pay-row ${i.active ? '' : 'off'}" onclick="openPayItem('${i.id}')"><div class="pi">${i.icon || '🏷️'}</div><div class="m"><b>${i.name}</b><small>${i.packageType ? '🔁 يفعّل باقة ' + (PKG_NAMES[i.packageType] || i.packageType) + ' · ' : ''}${i.category || ''}${i.allowQty ? ' · كمية' : ''}${i.customAmount ? ' · ✍️ مبلغ مفتوح' : ''}${i.active ? '' : ' · مخفي'}</small></div><div class="pp">${i.customAmount ? '✍️' : `${(+i.price).toFixed(3)} <small style="font-size:.65rem;color:var(--text-light)">د.ك</small>`}</div></div>`).join('')
     : `<div class="empty" style="padding:14px">لا توجد منتجات بعد<br/><button class="link" style="margin-top:10px" onclick="seedPayItems()">✨ إنشاء القائمة الافتراضية</button></div>`;
 }
 async function seedPayItems() { try { const b = db.batch(); DEFAULT_ITEMS.forEach(i => b.set(db.collection('payItems').doc(), { ...i, createdAt: firebase.firestore.FieldValue.serverTimestamp() })); await b.commit(); showToast('✅ تم الإنشاء'); loadPayItems(); } catch (e) { showToast('❌ ' + (e.code === 'permission-denied' ? 'غير مصرح — انشر قواعد Firestore أولاً' : e.message)); } }
@@ -143,19 +143,25 @@ function openPayItem(id) {
   document.getElementById('piId').value = id || ''; document.getElementById('piTitle').textContent = i ? '✏️ تعديل المنتج' : '➕ منتج دفع';
   document.getElementById('piIcon').value = i ? (i.icon || '') : ''; document.getElementById('piPrice').value = i ? i.price : ''; document.getElementById('piName').value = i ? i.name : '';
   document.getElementById('piPkg').value = i ? (i.packageType || '') : ''; document.getElementById('piOrder').value = i ? (i.order || 10) : (payItemsAdmin.length + 1); document.getElementById('piCat').value = i ? (i.category || 'أخرى') : 'اشتراكات';
-  document.getElementById('piQty').checked = !!(i && i.allowQty); document.getElementById('piActive').checked = i ? i.active !== false : true;
-  document.getElementById('piDel').style.display = i ? 'flex' : 'none'; document.getElementById('payItemModal').classList.add('open');
+  document.getElementById('piQty').checked = !!(i && i.allowQty); document.getElementById('piCustom').checked = !!(i && i.customAmount); document.getElementById('piActive').checked = i ? i.active !== false : true;
+  document.getElementById('piDel').style.display = i ? 'flex' : 'none'; document.getElementById('payItemModal').classList.add('open'); document.querySelector('#payItemModal .sheet').scrollTop = 0;
 }
 function closePayItem() { document.getElementById('payItemModal').classList.remove('open'); }
-async function savePayItem() {
-  const name = document.getElementById('piName').value.trim(), price = parseFloat(document.getElementById('piPrice').value);
-  if (!name || !(price >= 0)) return showToast('❌ أدخل الاسم والسعر');
-  const data = { name, price, icon: document.getElementById('piIcon').value.trim() || '🏷️', packageType: document.getElementById('piPkg').value || null, category: document.getElementById('piCat').value, order: +document.getElementById('piOrder').value || 10, allowQty: document.getElementById('piQty').checked, active: document.getElementById('piActive').checked, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-  const id = document.getElementById('piId').value;
+async function savePayItem(btn) {
+  const custom = document.getElementById('piCustom').checked;
+  const name = document.getElementById('piName').value.trim(), price = parseFloat(document.getElementById('piPrice').value) || 0;
+  if (!name) return showToast('❌ اكتب اسم المنتج');
+  if (!custom && !(price > 0)) return showToast('❌ أدخل السعر (أو فعّل: ولي الأمر يكتب المبلغ)');
+  const data = { name, price, customAmount: custom, icon: document.getElementById('piIcon').value.trim() || '🏷️', packageType: document.getElementById('piPkg').value || null, category: document.getElementById('piCat').value, order: +document.getElementById('piOrder').value || 10, allowQty: document.getElementById('piQty').checked, active: document.getElementById('piActive').checked, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  if (custom) { data.allowQty = false; data.packageType = null; } // open amount = one payment, never activates a package
+  const id = document.getElementById('piId').value || (document.getElementById('piId').value = db.collection('payItems').doc().id); // fixed id → retry never duplicates
+  const isNew = !payItemsAdmin.some(x => x.id === id);
+  btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
   try {
-    if (id) await db.collection('payItems').doc(id).update(data); else await db.collection('payItems').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    await withTimeout(db.collection('payItems').doc(id).set(isNew ? { ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() } : data, { merge: true }));
     closePayItem(); showToast('✅ تم الحفظ'); loadPayItems();
-  } catch (e) { showToast('❌ ' + (e.code === 'permission-denied' ? 'غير مصرح — انشر قواعد Firestore أولاً' : e.message)); }
+  } catch (e) { showToast(e.message === 'timeout' ? SLOW_MSG : '❌ ' + (e.code === 'permission-denied' ? 'غير مصرح — انشر قواعد Firestore أولاً' : e.message)); }
+  finally { btn.disabled = false; btn.textContent = '💾 حفظ'; }
 }
 async function deletePayItem() { const id = document.getElementById('piId').value; if (!id || !confirm('حذف هذا المنتج؟')) return; await db.collection('payItems').doc(id).delete(); closePayItem(); showToast('تم الحذف'); loadPayItems(); }
 

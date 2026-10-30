@@ -14,7 +14,7 @@ async function loadAllData() {
     const snap = await db.collection('subscriptions').orderBy('createdAt', 'desc').get();
     allSubscriptions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     const ps = await db.collection('portal').get(); allPortals = ps.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderStats(); renderRecent(); filterSubscriptions(); renderExpiring(); renderPaused(); renderReview();
+    renderStats(); renderRecent(); filterSubscriptions(); renderExpiring(); renderPaused(); renderReview(); expiryAlert();
     syncPortalsIfNeeded();
   } catch (e) { console.error(e); showToast('❌ تعذر تحميل البيانات'); }
 }
@@ -107,6 +107,17 @@ function renderExpiring() {
   document.getElementById('expiringList').innerHTML = list.length ? list.map(s => memberCard(s)).join('') : emptyBox('✅', 'لا توجد اشتراكات تنتهي قريباً');
 }
 
+// 3-day warning: banner on the home page + one notification per day
+function expiryAlert() {
+  const soon = allSubscriptions.filter(s => s.status === 'active' && (d => d !== null && d >= 0 && d <= 3)(calcDaysLeft(s))).sort((a, b) => calcDaysLeft(a) - calcDaysLeft(b));
+  const el = document.getElementById('expAlert'); if (!el) return;
+  const left = s => { const d = calcDaysLeft(s); return d === 0 ? 'ينتهي اليوم' : `${d} يوم`; };
+  el.innerHTML = soon.length ? `<div class="exp-alert" onclick="go('expiring')"><b>⏳ ${soon.length} اشتراك ينتهي خلال 3 أيام</b><small>${soon.slice(0, 4).map(s => `${s.childName} (${left(s)})`).join('، ')}${soon.length > 4 ? '…' : ''}</small><span>أرسل رابط التجديد ←</span></div>` : '';
+  if (!soon.length) return;
+  try { const k = 'expAlert-' + todayIso(); if (localStorage.getItem(k)) return; localStorage.setItem(k, '1'); } catch (_) { return; }
+  Notif.show('⏳ اشتراكات تنتهي خلال 3 أيام', soon.map(s => `${s.childName} (${left(s)})`).join('، '), 'dashboard.html');
+}
+
 // ---------- PAUSED ----------
 function pauseRequests() { const out = []; allPortals.forEach(p => (p.pauseRequests || []).forEach((r, i) => { if (r.status === 'pending') out.push({ ...r, phone: p.id, idx: i, parentName: p.parentName }); })); return out; }
 function renderPaused() {
@@ -115,7 +126,7 @@ function renderPaused() {
   const list = allSubscriptions.filter(s => pausesOf(s).length).sort((a, b) => pausesOf(b).length - pausesOf(a).length);
   document.getElementById('pausedList').innerHTML = reqHtml + (list.length ? list.map(s => `<div class="mcard ${isPausedNow(s) ? 's-paused' : ''}"><div class="mcard-top"><div><div class="mcard-name">${s.childName}</div><div class="mcard-sub">👤 ${s.parentName} · <span dir="ltr">${s.phone}</span></div></div>${isPausedNow(s) ? '<span class="chip info">⏸️ متوقف اليوم</span>' : `<span class="chip">${pausesOf(s).length}/3</span>`}</div>
       <div class="mcard-meta">${pausesOf(s).map(p => `<span class="chip ${p.date === dayKey(new Date()) ? 'info' : p.date > dayKey(new Date()) ? 'gold' : 'ok'}">📅 ${p.date}${p.reason ? ' · ' + p.reason : ''}</span>`).join('')}<span class="chip copper">${PKG_NAMES[s.packageType] || ''}</span></div>
-      <div class="mcard-actions">${pausesOf(s).some(p => p.date >= dayKey(new Date())) ? `<button class="abtn bad" onclick="cancelPause('${s.id}')">إلغاء آخر إيقاف</button>` : ''}<button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}','_blank')">💬 واتساب</button></div></div>`).join('') : emptyBox('⏸️', 'لا توجد إيقافات'));
+      <div class="mcard-actions"><button class="abtn primary" onclick="openEditModal('${s.id}',true)">✏️ تعديل الإيقافات</button><button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}','_blank')">💬 واتساب</button></div></div>`).join('') : emptyBox('⏸️', 'لا توجد إيقافات'));
 }
 async function approvePause(phone, idx) {
   const p = allPortals.find(x => x.id === phone); const r = p?.pauseRequests?.[idx]; if (!r) return;
@@ -226,7 +237,19 @@ function fillEditPackages(s) {
   if (s.packageType && ![...sel.options].some(o => o.value === s.packageType)) sel.insertAdjacentHTML('beforeend', `<option value="${s.packageType}" data-name="${s.packageName || ''}">${PKG_NAMES[s.packageType] || s.packageName || s.packageType}</option>`);
   sel.value = s.packageType || '';
 }
-function openEditModal(id) {
+let editPauses = [];
+function renderEditPauses() {
+  document.getElementById('editPauses').innerHTML = editPauses.length ? editPauses.map((p, i) => `<div class="pause-row"><input type="date" value="${p.date || ''}" onchange="editPauses[${i}].date=this.value"/><input type="text" value="${(p.reason || '').replace(/"/g, '&quot;')}" placeholder="السبب" onchange="editPauses[${i}].reason=this.value"/><button type="button" onclick="removeEditPause(${i})" title="حذف">🗑️</button></div>`).join('') : '<div class="hint">لا توجد إيقافات</div>';
+  document.getElementById('editPauseCount').textContent = `${editPauses.length}/3`;
+}
+function shiftEditEnd(days) { const e = document.getElementById('editEndDate'); if (e.value) e.value = addDaysIso(e.value, days); }
+function addEditPause() {
+  if (editPauses.length >= 3 && !confirm('استخدم 3 إيقافات هذا الشهر. إضافة إيقاف آخر على أي حال؟')) return;
+  editPauses.push({ date: todayIso(), reason: '', approvedAt: new Date().toISOString(), by: 'admin' }); shiftEditEnd(1); renderEditPauses();
+  showToast('➕ أُضيف إيقاف — مُدّد الاشتراك يوماً');
+}
+function removeEditPause(i) { editPauses.splice(i, 1); shiftEditEnd(-1); renderEditPauses(); showToast('🗑️ حُذف الإيقاف — أُرجع تاريخ النهاية يوماً'); }
+function openEditModal(id, toPauses) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;
   const set = (k, val) => document.getElementById(k).value = val ?? '';
   set('editSubId', id); document.getElementById('editName').textContent = `${s.childName} — ${s.packageName || ''}`;
@@ -234,7 +257,9 @@ function openEditModal(id) {
   fillEditPackages(s); set('editAmount', s.amount);
   set('editStatus', s.status || 'active'); set('editNotes', s.notes);
   set('editStartDate', isoDate(s.subscriptionStart)); set('editEndDate', isoDate(s.subscriptionEnd));
+  editPauses = pausesOf(s).map(p => ({ ...p })); renderEditPauses();
   document.getElementById('editModal').classList.add('open');
+  const sh = document.querySelector('#editModal .sheet'); if (toPauses) setTimeout(() => document.getElementById('editPauses').scrollIntoView({ block: 'center' }), 50); else sh.scrollTop = 0;
 }
 function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
 async function saveEdit(btn) {
@@ -250,6 +275,8 @@ async function saveEdit(btn) {
   if (o && o.value) { upd.packageType = o.value; upd.packageName = o.dataset.name || s.packageName || ''; }
   if (sv) upd.subscriptionStart = tsFromIso(sv);
   if (ev) { upd.subscriptionEnd = tsFromIso(ev); upd.daysRemaining = Math.max(0, Math.ceil((new Date(ev + 'T00:00:00Z') - new Date()) / 864e5)); }
+  const pauses = editPauses.filter(p => p.date).sort((a, b) => a.date.localeCompare(b.date));
+  if (JSON.stringify(pauses) !== JSON.stringify(pausesOf(s))) { upd.pauses = pauses; upd.pauseUsed = pauses.length >= 3; upd.pauseStart = firebase.firestore.FieldValue.delete(); upd.pauseEnd = firebase.firestore.FieldValue.delete(); }
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
   try {
     await withTimeout(db.collection('subscriptions').doc(id).update(upd));
@@ -329,24 +356,32 @@ function setupAdminNotifications(user) {
       if (ch.type === 'added' && d.status === 'pending_review') Notif.show('📝 طلب تسجيل جديد', `${d.childName} — ${d.packageName}`, 'dashboard.html');
       if (ch.type === 'modified' && d.pauseStart) { const prev = allSubscriptions.find(x => x.id === ch.doc.id); if (prev && !prev.pauseStart) Notif.show('⏸️ إيقاف مؤقت جديد', `${d.childName} — من ${fmtDate(d.pauseStart)}`, 'dashboard.html'); }
     });
-    loadAllData();
+    scheduleLoad();
   });
   let prReady = false;
   db.collection('portal').onSnapshot(snap => {
     if (!prReady) { prReady = true; return; }
-    snap.docChanges().forEach(ch => { if (ch.type !== 'modified') return; const d = ch.doc.data(); const prev = allPortals.find(x => x.id === ch.doc.id); const n = (d.pauseRequests || []).filter(r => r.status === 'pending').length, m = (prev?.pauseRequests || []).filter(r => r.status === 'pending').length; if (n > m) { const r = (d.pauseRequests || []).filter(x => x.status === 'pending').pop(); Notif.show('🕒 طلب إيقاف يوم', `${r.childName} — ${r.start} · ${r.reason || ''}`, 'dashboard.html'); } });
-    loadAllData();
+    let reqChanged = false;
+    snap.docChanges().forEach(ch => { if (ch.type !== 'modified') return; const d = ch.doc.data(); const prev = allPortals.find(x => x.id === ch.doc.id); if (JSON.stringify(d.pauseRequests || []) !== JSON.stringify(prev?.pauseRequests || [])) reqChanged = true; const n = (d.pauseRequests || []).filter(r => r.status === 'pending').length, m = (prev?.pauseRequests || []).filter(r => r.status === 'pending').length; if (n > m) { const r = (d.pauseRequests || []).filter(x => x.status === 'pending').pop(); Notif.show('🕒 طلب إيقاف يوم', `${r.childName} — ${r.start} · ${r.reason || ''}`, 'dashboard.html'); } });
+    if (reqChanged) scheduleLoad(); // other portal writes are just mirrors of subscriptions — no reload needed
   });
 }
 
 // ---------- PORTAL SYNC ----------
-let lastSyncSig = '';
-async function syncPortalsIfNeeded() {
-  const sig = JSON.stringify(allSubscriptions.map(s => [s.id, s.status, s.subscriptionEnd?.seconds, s.pauseEnd?.seconds, s.amount, s.adminNote, s.phone]));
-  const missing = allSubscriptions.some(s => !allPortals.find(p => p.id === PortalSync.norm(s.phone)));
-  if (sig === lastSyncSig && !missing) return; lastSyncSig = sig;
-  try { await PortalSync.syncAll(db, allSubscriptions); } catch (e) { console.warn('portal sync', e); }
+// The syncPortal Cloud Function refreshes portal/{phone} on every subscription write. Here we only create
+// portal docs that are missing. (The old version re-synced every family on every portal change → an endless
+// write loop that blocked the admin's own saves.)
+let portalSyncing = false;
+async function syncPortalsIfNeeded(full) {
+  if (portalSyncing) return; portalSyncing = true;
+  try {
+    const phones = [...new Set(allSubscriptions.map(s => PortalSync.norm(s.phone)).filter(p => p.length === 8 && (full || !allPortals.some(x => x.id === p))))];
+    for (const p of phones) await withTimeout(PortalSync.syncPhone(db, p, allSubscriptions));
+  } catch (e) { console.warn('portal sync', e); }
+  finally { portalSyncing = false; }
 }
+let loadTimer = null;
+function scheduleLoad() { clearTimeout(loadTimer); loadTimer = setTimeout(loadAllData, 800); } // many snapshot events → one reload
 
 // ---------- MISC ----------
 function adminLogout() { if (confirm('تسجيل الخروج؟')) auth.signOut().then(() => location.href = 'login.html'); }

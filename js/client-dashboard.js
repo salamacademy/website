@@ -115,7 +115,8 @@ function alertAction() {
 }
 
 // ---------- PAY (catalog → UPayment) ----------
-let payItems = [], cart = {};
+let payItems = [], cart = {}, customAmt = {};
+const itemPrice = i => i.customAmount ? (+customAmt[i.id] || 0) : +i.price;
 async function loadPayItems() {
   try { const snap = await db.collection('payItems').where('active', '==', true).get(); payItems = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0)); }
   catch (e) { console.warn('payItems', e); payItems = []; }
@@ -128,16 +129,18 @@ function renderPayGrid() {
   $('payKid').textContent = sub ? '👦 ' + (sub.childName || '').split(' ')[0] : '';
   const g = $('payGrid');
   if (!payItems.length) { g.innerHTML = '<div class="empty" style="grid-column:1/-1"><b>🛒</b>لا توجد منتجات متاحة حالياً</div>'; updateTotal(); return; }
-  g.innerHTML = payItems.map(i => { const q = cart[i.id] || 0; return `<div class="pay-item ${q ? 'on' : ''} ${sug && sug.id === i.id ? 'sug' : ''}" onclick="toggleItem('${i.id}')"><span class="tick">✓</span><div class="pi">${i.icon || '🏷️'}</div><div class="pn">${i.name}</div><div class="pp">${(+i.price).toFixed(3)} <small>د.ك</small></div>${i.allowQty ? `<div class="qty" onclick="event.stopPropagation()"><button onclick="setQty('${i.id}',-1)">−</button><b>${q}</b><button onclick="setQty('${i.id}',1)">+</button></div>` : ''}</div>`; }).join('');
+  g.innerHTML = payItems.map(i => { const q = cart[i.id] || 0; return `<div class="pay-item ${q ? 'on' : ''} ${sug && sug.id === i.id ? 'sug' : ''}" onclick="toggleItem('${i.id}')"><span class="tick">✓</span><div class="pi">${i.icon || '🏷️'}</div><div class="pn">${i.name}</div>${i.customAmount ? `<div class="pp">✍️ <small>اكتب المبلغ</small></div><div class="amt" onclick="event.stopPropagation()"><input type="number" inputmode="decimal" min="0.5" max="2000" step="0.5" placeholder="0.000" value="${customAmt[i.id] || ''}" oninput="setAmt('${i.id}',this.value)"/><small>د.ك</small></div>` : `<div class="pp">${(+i.price).toFixed(3)} <small>د.ك</small></div>`}${i.allowQty ? `<div class="qty" onclick="event.stopPropagation()"><button onclick="setQty('${i.id}',-1)">−</button><b>${q}</b><button onclick="setQty('${i.id}',1)">+</button></div>` : ''}</div>`; }).join('');
   updateTotal();
 }
-function toggleItem(id) { if (cart[id]) delete cart[id]; else cart[id] = 1; renderPayGrid(); }
+function toggleItem(id) { if (cart[id]) delete cart[id]; else cart[id] = 1; renderPayGrid(); const inp = cart[id] && document.querySelector(`.pay-item.on .amt input[oninput*="${id}"]`); if (inp) inp.focus(); }
+function setAmt(id, val) { customAmt[id] = val; if (!cart[id]) cart[id] = 1; updateTotal(); } // no re-render → keyboard stays open
 function setQty(id, d) { cart[id] = Math.max(0, (cart[id] || 0) + d); if (!cart[id]) delete cart[id]; renderPayGrid(); }
-function cartTotal() { return Object.entries(cart).reduce((a, [id, q]) => { const i = payItems.find(x => x.id === id); return a + (i ? +i.price * q : 0); }, 0); }
-function updateTotal() { const t = cartTotal(); $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = t <= 0; b.style.opacity = t <= 0 ? '.6' : '1'; }
+function cartTotal() { return Object.entries(cart).reduce((a, [id, q]) => { const i = payItems.find(x => x.id === id); return a + (i ? itemPrice(i) * q : 0); }, 0); }
+const badCustom = () => Object.keys(cart).some(id => { const i = payItems.find(x => x.id === id); return i && i.customAmount && !(itemPrice(i) >= 0.5 && itemPrice(i) <= 2000); });
+function updateTotal() { const t = cartTotal(), off = t <= 0 || badCustom(); $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = off; b.style.opacity = off ? '.6' : '1'; }
 function renewSubscription() { go('renew'); }
 async function startPayment() {
-  const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => ({ id, qty })); if (!items.length) return;
+  const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => { const i = payItems.find(x => x.id === id); return i && i.customAmount ? { id, qty: 1, amount: itemPrice(i) } : { id, qty }; }); if (!items.length || badCustom()) return;
   const btn = $('payBtn'); btn.disabled = true; btn.innerHTML = '⏳ جاري تحويلك إلى UPayment...';
   try {
     if (typeof PAYMENT_API_URL === 'undefined' || !PAYMENT_API_URL || PAYMENT_API_URL.includes('YOUR_')) throw new Error('not-configured');
@@ -145,7 +148,7 @@ async function startPayment() {
     const j = await r.json(); if (!j.ok || !j.link) throw new Error(j.error || 'فشل إنشاء الدفع');
     location.href = j.link;
   } catch (e) {
-    const list = items.map(({ id, qty }) => { const i = payItems.find(x => x.id === id); return `• ${i.name}${qty > 1 ? ' ×' + qty : ''} — ${(i.price * qty).toFixed(3)} د.ك`; }).join('\n');
+    const list = items.map(({ id, qty }) => { const i = payItems.find(x => x.id === id); return `• ${i.name}${qty > 1 ? ' ×' + qty : ''} — ${(itemPrice(i) * qty).toFixed(3)} د.ك`; }).join('\n');
     window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أريد الدفع${sub ? ' لـ ' + sub.childName : ''}:\n${list}\nالإجمالي: ${cartTotal().toFixed(3)} د.ك\nيرجى إرسال رابط الدفع.`), '_blank');
     btn.disabled = false; btn.innerHTML = '<img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span>';
     if (e.message !== 'not-configured') alert('تعذر إنشاء رابط الدفع: ' + e.message + '\nتم تحويلك للواتساب');
