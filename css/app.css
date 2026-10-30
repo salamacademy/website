@@ -292,6 +292,25 @@ body.app-body,body.app-body.admin{background:#EEF1EA}
 .pause-row input{flex:1;min-width:0;padding:10px;border:2px solid rgba(184,84,30,0.12);border-radius:12px;background:var(--copper-xpale);font-size:.9rem}
 .pause-row input[type=date]{flex:1.2;-webkit-appearance:none;appearance:none;min-height:44px}
 .pause-row button{flex:none;width:40px;height:40px;border:none;border-radius:12px;background:#FDECEA;font-size:1rem}
+.cal{margin-bottom:14px}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-nav b{font-size:.95rem;color:var(--green)}
+.cal-nav button{width:34px;height:34px;border-radius:50%;border:none;background:var(--copper-xpale);color:var(--copper-dark);font-size:1.3rem;font-weight:900;line-height:1}
+.cal-nav button:disabled{opacity:.3}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal-h{text-align:center;font-size:.68rem;font-weight:800;color:var(--text-light);padding:2px 0}
+.cal-d{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:.85rem;font-weight:800;color:#C9BBAE;background:transparent}
+.cal-d.empty{visibility:hidden}
+.cal-d.train{background:#E8F5E9;color:var(--green);border:2px solid #A5D6A7;cursor:pointer}
+.cal-d.train.past{opacity:.45;cursor:default}
+.cal-d.picked{background:#2B9AD6;color:#fff;cursor:pointer;box-shadow:0 0 0 3px rgba(43,154,214,.25)}
+.cal-d.pending{background:#FFF4E5;color:#B26A00;border:2px solid #F5A623;cursor:pointer}
+.cal-d.paused{background:#1565C0;color:#fff}
+.cal-d.today{outline:2px dashed var(--copper);outline-offset:1px}
+.cal-legend{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;margin-top:10px;font-size:.72rem;color:var(--text-mid);font-weight:700}
+.cal-legend span{display:flex;align-items:center;gap:4px}
+.cal-legend i{width:12px;height:12px;border-radius:4px;display:inline-block}
+.cal-legend i.train{background:#E8F5E9;border:2px solid #A5D6A7} .cal-legend i.picked{background:#2B9AD6} .cal-legend i.pending{background:#FFF4E5;border:2px solid #F5A623} .cal-legend i.paused{background:#1565C0}
 .fg .hint{font-size:.8rem;color:var(--text-light);padding:4px 2px}
 .pay-item .qty button{width:28px;height:28px;border-radius:50%;border:none;background:#E3F2FD;color:#1565C0;font-weight:900;font-size:1rem}
 .pay-item.sug::after{content:'باقتك';position:absolute;top:-9px;right:10px;background:var(--accent);color:#fff;font-size:.65rem;font-weight:800;padding:2px 8px;border-radius:10px}

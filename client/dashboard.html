@@ -89,12 +89,12 @@
     <div class="page-title"><h3>⏸️ إيقاف مؤقت</h3></div>
     <div class="card">
       <div id="pauseInfo">
-        <p class="note" style="margin-bottom:14px">يمكنك إيقاف الاشتراك <strong>3 مرات في الشهر، كل مرة يوم واحد</strong> — في حال الغياب أو المرض. كل يوم موافق عليه يُمدِّد تاريخ الانتهاء يوماً واحداً.</p>
+        <p class="note" style="margin-bottom:14px">يمكنك إيقاف <strong>3 أيام تدريب في الشهر</strong> — اخترها معاً أو كل يوم على حدة. كل يوم موافق عليه يُمدِّد تاريخ الانتهاء يوماً واحداً.</p>
         <div id="pauseQuota" style="display:flex;gap:6px;justify-content:center;margin-bottom:14px"></div>
-        <div class="fg"><label>يوم الإيقاف</label><input type="date" id="pauseStartInput"/></div>
+        <div id="pauseCal" class="cal"></div>
         <div class="fg"><label>السبب (اختياري)</label><input type="text" id="pauseReason" placeholder="مثال: سفر، مرض..."/></div>
-        <div class="note" style="margin-bottom:14px">يوم الإيقاف: <strong id="pauseEndPreview">--</strong><br/>تاريخ الانتهاء الجديد بعد الموافقة: <strong id="newEndPreview">--</strong></div>
-        <button class="btn primary" id="pauseBtn" onclick="requestPause()">⏸️ طلب إيقاف هذا اليوم</button>
+        <div class="note" id="pausePicked" style="margin-bottom:14px"></div>
+        <button class="btn primary" id="pauseBtn" onclick="requestPause()">⏸️ طلب الإيقاف</button>
       </div>
       <div id="pauseActive" style="display:none;text-align:center"><div style="font-size:3rem">⏸️</div><h4 style="color:var(--green);margin:8px 0">الاشتراك متوقف اليوم</h4><p style="color:var(--text-mid);line-height:1.8"><strong id="pauseFrom"></strong><br/>يستأنف التدريب غداً.</p><div id="pauseHistory" style="margin-top:10px"></div></div>
       <div id="pauseUsed" style="display:none;text-align:center"><div style="font-size:3rem">✅</div><p style="color:var(--text-mid);line-height:1.8">تم استخدام الإيقافات الثلاثة لهذا الشهر.<br/>ستتاح مجدداً مع التجديد القادم.</p></div>

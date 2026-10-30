@@ -161,46 +161,82 @@ const dayKey = d => (d instanceof Date ? d : new Date(d)).toISOString().split('T
 function pausesOf(s) { return Array.isArray(s.pauses) ? s.pauses : (s.pauseStart ? [{ date: dayKey(toD(s.pauseStart)) }] : []); }
 function isPausedNow(s) { const t = dayKey(new Date()); return pausesOf(s).some(p => p.date === t); }
 function pendingPausesFor(subId) { return (portalDoc?.pauseRequests || []).filter(r => r.subId === subId && r.status === 'pending'); }
+// training weekdays per package (0 = Sunday … 6 = Saturday) — only these days can be paused
+const TRAIN_DAYS = { football: [6], confidence: [0, 2, 4], excellence: [6, 0, 2, 4], excellence_loyal: [6, 0, 2, 4], premium: [6, 0, 1, 2, 3, 4] };
+const WEEK = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة']; // Kuwait week starts Saturday
+const localToday = () => new Date().toLocaleDateString('en-CA');
+const dLabel = k => new Date(k + 'T00:00:00Z').toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+let calMonth = null, calSubId = null, pickDays = new Set();
 function renderPause(sub) {
   ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pausedBanner').style.display = 'none';
   const used = pausesOf(sub), pend = pendingPausesFor(sub.id), left = PAUSE_MAX - used.length - pend.length;
   const quota = $('pauseQuota'); if (quota) quota.innerHTML = Array.from({ length: PAUSE_MAX }, (_, i) => `<span class="chip ${i < used.length ? 'info' : i < used.length + pend.length ? 'gold' : 'ok'}">${i < used.length ? '⏸️ ' + used[i].date : i < used.length + pend.length ? '🕒 ' + pend[i - used.length].start : '○ متاح'}</span>`).join('');
+  if (sub.status !== 'active') {
+    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = 'ℹ️'; $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.'; return;
+  }
   if (isPausedNow(sub)) {
     $('pauseActive').style.display = 'block'; $('pauseFrom').textContent = new Date().toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
     $('pausedBanner').style.display = 'flex'; $('pausedUntil').textContent = ''; status('⏸️ الاشتراك متوقف اليوم', 'يستأنف التدريب غداً');
     $('pauseHistory').innerHTML = `<small style="color:var(--text-light);font-weight:800">المتبقي: ${Math.max(0, left)} من ${PAUSE_MAX} هذا الشهر</small>`;
-  } else if (sub.status !== 'active') {
-    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = 'ℹ️'; $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.';
-  } else if (left <= 0) {
-    $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = '✅';
-    $('pauseUsed').querySelector('p').innerHTML = pend.length ? `لديك ${pend.length} طلب إيقاف <b>بانتظار موافقة الإدارة</b> (${pend.map(r => r.start).join('، ')}).` : 'تم استخدام الإيقافات الثلاثة لهذا الشهر.<br/>ستتاح مجدداً مع التجديد القادم.';
-  } else {
-    $('pauseInfo').style.display = 'block';
-    const inp = $('pauseStartInput'), today = dayKey(new Date());
-    inp.min = today; if (!inp.value || inp.value < today) inp.value = today; const e = toD(sub.subscriptionEnd); if (e) inp.max = dayKey(e);
-    inp.oninput = () => previewPause(sub); previewPause(sub);
-    $('pauseBtn').textContent = `⏸️ طلب إيقاف هذا اليوم (متبقٍ ${left})`;
   }
+  $('pauseInfo').style.display = 'block';
+  if (calSubId !== sub.id) { calSubId = sub.id; calMonth = null; pickDays = new Set(); }
+  renderPauseCal(sub);
 }
-function previewPause(sub) {
-  const v = $('pauseStartInput').value; if (!v) return;
-  $('pauseEndPreview').textContent = new Date(v).toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
-  const ne = toD(sub.subscriptionEnd); if (ne) { ne.setDate(ne.getDate() + 1); $('newEndPreview').textContent = ne.toLocaleDateString('ar-KW'); }
+function calMove(n) { const [y, m] = calMonth.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); calMonth = d.toISOString().slice(0, 7); renderPauseCal(currentSubscription); }
+function renderPauseCal(sub) {
+  const today = localToday(), start = sub.subscriptionStart ? dayKey(toD(sub.subscriptionStart)) : today, end = sub.subscriptionEnd ? dayKey(toD(sub.subscriptionEnd)) : null;
+  const train = TRAIN_DAYS[sub.packageType] || [6, 0, 1, 2, 3, 4];
+  const used = pausesOf(sub).map(p => p.date), pend = pendingPausesFor(sub.id).map(r => r.start);
+  const left = PAUSE_MAX - used.length - pend.length;
+  pickDays = new Set([...pickDays].filter(k => !used.includes(k) && !pend.includes(k) && k >= today && (!end || k <= end)));
+  if (!calMonth) calMonth = (today >= start ? today : start).slice(0, 7);
+  const [y, m] = calMonth.split('-').map(Number), n = new Date(Date.UTC(y, m, 0)).getUTCDate(), offset = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 1) % 7;
+  let cells = WEEK.map(w => `<div class="cal-h">${w.replace('ال', '').slice(0, 3)}</div>`).join('') + '<div class="cal-d empty"></div>'.repeat(offset);
+  for (let d = 1; d <= n; d++) {
+    const k = `${calMonth}-${String(d).padStart(2, '0')}`, dow = new Date(k + 'T00:00:00Z').getUTCDay();
+    const inSub = k >= start && (!end || k <= end), isTrain = train.includes(dow) && inSub;
+    let cls = 'off', act = '';
+    if (used.includes(k)) cls = 'paused';
+    else if (pend.includes(k)) { cls = 'pending'; act = `onclick="cancelPauseReq('${k}')"`; }
+    else if (pickDays.has(k)) { cls = 'picked'; act = `onclick="togglePick('${k}')"`; }
+    else if (isTrain && k >= today) { cls = 'train'; act = `onclick="togglePick('${k}')"`; }
+    else if (isTrain) cls = 'train past';
+    cells += `<div class="cal-d ${cls}${k === today ? ' today' : ''}" ${act}>${d}</div>`;
+  }
+  const prevOk = calMonth > start.slice(0, 7), nextOk = !end || calMonth < end.slice(0, 7);
+  const monthName = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('ar-KW', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  $('pauseCal').innerHTML = `<div class="cal-nav"><button ${prevOk ? '' : 'disabled'} onclick="calMove(-1)" aria-label="الشهر السابق">›</button><b>${monthName}</b><button ${nextOk ? '' : 'disabled'} onclick="calMove(1)" aria-label="الشهر التالي">‹</button></div><div class="cal-grid">${cells}</div>
+    <div class="cal-legend"><span><i class="train"></i>أيام تدريب باقتك</span><span><i class="picked"></i>اخترته</span><span><i class="pending"></i>بانتظار الموافقة</span><span><i class="paused"></i>موقوف</span></div>`;
+  const picked = [...pickDays].sort();
+  $('pausePicked').innerHTML = picked.length ? `الأيام المختارة: <strong>${picked.map(dLabel).join('، ')}</strong>${end ? `<br/>تاريخ الانتهاء الجديد بعد الموافقة: <strong>${dLabel(new Date(Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8) + picked.length)).toISOString().slice(0, 10))}</strong>` : ''}`
+    : (left > 0 ? `اضغط على أيام التدريب الملونة لاختيار حتى <strong>${left}</strong> ${left === 1 ? 'يوم' : 'أيام'}` : 'استخدمت الإيقافات الثلاثة — اضغط على يوم <b>بانتظار الموافقة</b> لإلغائه وتغييره');
+  const btn = $('pauseBtn'); btn.disabled = !picked.length; btn.style.opacity = picked.length ? '1' : '.6';
+  btn.textContent = picked.length ? `⏸️ طلب إيقاف ${picked.length} ${picked.length === 1 ? 'يوم' : 'أيام'} (متبقٍ ${left})` : `⏸️ اختر الأيام من التقويم (متبقٍ ${Math.max(0, left)})`;
+}
+function togglePick(k) {
+  const sub = currentSubscription; if (!sub) return;
+  if (pickDays.has(k)) pickDays.delete(k);
+  else { const left = PAUSE_MAX - pausesOf(sub).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return alert(left <= 0 ? 'استخدمت الإيقافات الثلاثة لهذا الشهر' : `يمكنك اختيار ${left} ${left === 1 ? 'يوم' : 'أيام'} فقط`); pickDays.add(k); }
+  renderPauseCal(sub);
+}
+async function cancelPauseReq(k) {
+  const sub = currentSubscription; if (!sub || !confirm(`إلغاء طلب إيقاف يوم ${dLabel(k)}؟\nيمكنك بعدها اختيار يوم آخر.`)) return;
+  const reqs = (portalDoc?.pauseRequests || []).filter(r => !(r.subId === sub.id && r.start === k && r.status === 'pending'));
+  try { await db.collection('portal').doc(PHONE).update({ pauseRequests: reqs }); } catch (err) { alert('تعذر الإلغاء: ' + err.message); }
 }
 async function requestPause() {
   const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
-  const v = $('pauseStartInput').value; if (!v) return alert('اختر يوم الإيقاف');
-  if (pausesOf(sub).some(p => p.date === v) || pendingPausesFor(sub.id).some(r => r.start === v)) return alert('هذا اليوم مطلوب أو موقوف مسبقاً');
-  const used = pausesOf(sub).length + pendingPausesFor(sub.id).length; if (used >= PAUSE_MAX) return alert('استنفدت الإيقافات الثلاثة لهذا الشهر');
-  const dLabel = new Date(v).toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
-  if (!confirm(`طلب إيقاف اشتراك ${sub.childName} يوم ${dLabel}؟`)) return;
+  const picked = [...pickDays].sort(); if (!picked.length) return alert('اختر يوم الإيقاف من التقويم');
+  if (pausesOf(sub).length + pendingPausesFor(sub.id).length + picked.length > PAUSE_MAX) return alert('تجاوزت عدد الإيقافات المسموح (3 شهرياً)');
+  if (!confirm(`طلب إيقاف اشتراك ${sub.childName}:\n${picked.map(dLabel).join('\n')}`)) return;
   const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...';
-  const reason = $('pauseReason').value.trim();
+  const reason = $('pauseReason').value.trim(), at = new Date().toISOString();
   try {
-    await db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion({ subId: sub.id, childName: sub.childName, start: v, end: v, days: 1, reason, status: 'pending', requestedAt: new Date().toISOString() }) });
-    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أطلب إيقاف اشتراك ${sub.childName} يوم ${dLabel}${reason ? '\nالسبب: ' + reason : ''}`), '_blank');
-    $('pauseReason').value = ''; go('overview');
-  } catch (err) { alert('تعذر إرسال الطلب: ' + err.message); btn.disabled = false; btn.textContent = '⏸️ طلب إيقاف هذا اليوم'; }
+    await db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion(...picked.map(k => ({ subId: sub.id, childName: sub.childName, start: k, end: k, days: 1, reason, status: 'pending', requestedAt: at }))) });
+    window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أطلب إيقاف اشتراك ${sub.childName}:\n${picked.map(k => '• ' + dLabel(k)).join('\n')}${reason ? '\nالسبب: ' + reason : ''}`), '_blank');
+    pickDays = new Set(); $('pauseReason').value = ''; go('overview');
+  } catch (err) { alert('تعذر إرسال الطلب: ' + err.message); renderPauseCal(sub); }
 }
 
 // ---------- NOTIFICATIONS ----------

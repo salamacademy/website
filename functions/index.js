@@ -207,7 +207,8 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
   if (!TG_TOKEN) return;
   const b = chg.before.data() || {}, a = chg.after.data() || {};
   const pend = x => (x.pauseRequests || []).filter(r => r.status === 'pending');
-  if (pend(a).length <= pend(b).length) return;
-  const r = pend(a).pop();
-  return tgcore.notifyAdmins(db, tg, `🕒 <b>طلب إيقاف يوم</b>\n\n<b>${r.childName}</b> — ${r.start}${r.reason ? '\n📝 ' + r.reason : ''}\n👤 ${a.parentName || ''} · ${chg.after.id}\n\nوافق من لوحة الإدارة → ⏸️ الإيقافات`);
+  const key = r => r.subId + '|' + r.start, had = new Set(pend(b).map(key));
+  const fresh = pend(a).filter(r => !had.has(key(r))); if (!fresh.length) return;
+  const r = fresh[0];
+  return tgcore.notifyAdmins(db, tg, `🕒 <b>طلب إيقاف ${fresh.length > 1 ? fresh.length + ' أيام' : 'يوم'}</b>\n\n<b>${r.childName}</b> — ${fresh.map(x => x.start).join('، ')}${r.reason ? '\n📝 ' + r.reason : ''}\n👤 ${a.parentName || ''} · ${chg.after.id}\n\nوافق من لوحة الإدارة → ⏸️ الإيقافات`);
 });
