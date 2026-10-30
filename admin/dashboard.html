@@ -23,6 +23,7 @@
         <div class="head-title">إدارة سلام<small>ADMIN</small></div>
       </div>
       <div class="head-actions">
+        <button class="icon-btn" onclick="openNotifs()" title="الإشعارات">🔔<span class="dot" id="notifBadge">0</span></button>
         <button class="icon-btn" onclick="go('review')" title="طلبات المراجعة">📝<span class="dot" id="reviewBadge">0</span></button>
         <button class="icon-btn" onclick="go('notify')" title="رسائل">📨</button>
         <button class="icon-btn" onclick="refreshApp()" title="تحديث">🔄</button>
@@ -219,6 +220,15 @@
   <button class="tab" data-page="members" onclick="go('members')"><i>👥</i>الأعضاء</button>
   <button class="tab" data-page="finance" onclick="go('finance')"><i>💰</i>المالية</button>
 </div></nav>
+
+<!-- NOTIFICATIONS SHEET -->
+<div class="sheet-bg" id="notifModal" onclick="if(event.target===this)closeNotifs()">
+  <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeNotifs()" aria-label="إغلاق">✕</button>
+    <h3>🔔 الإشعارات</h3><p class="sub" id="notifSub"></p>
+    <button type="button" class="btn ghost" id="readAllBtn" onclick="readAllNotifs(this)" style="margin-bottom:12px">✔️ قراءة الكل</button>
+    <div id="notifList"></div>
+  </div>
+</div>
 
 <!-- EDIT SHEET -->
 <div class="sheet-bg" id="editModal" onclick="if(event.target===this)closeEditModal()">

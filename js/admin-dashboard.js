@@ -353,8 +353,6 @@ function setupAdminNotifications(user) {
     if (!notifReady) { notifReady = true; return; }
     snap.docChanges().forEach(ch => {
       const d = ch.doc.data();
-      if (ch.type === 'added' && d.status === 'pending_review') Notif.show('📝 طلب تسجيل جديد', `${d.childName} — ${d.packageName}`, 'dashboard.html');
-      if (ch.type === 'modified' && d.pauseStart) { const prev = allSubscriptions.find(x => x.id === ch.doc.id); if (prev && !prev.pauseStart) Notif.show('⏸️ إيقاف مؤقت جديد', `${d.childName} — من ${fmtDate(d.pauseStart)}`, 'dashboard.html'); }
     });
     scheduleLoad();
   });
@@ -362,9 +360,40 @@ function setupAdminNotifications(user) {
   db.collection('portal').onSnapshot(snap => {
     if (!prReady) { prReady = true; return; }
     let reqChanged = false;
-    snap.docChanges().forEach(ch => { if (ch.type !== 'modified') return; const d = ch.doc.data(); const prev = allPortals.find(x => x.id === ch.doc.id); if (JSON.stringify(d.pauseRequests || []) !== JSON.stringify(prev?.pauseRequests || [])) reqChanged = true; const n = (d.pauseRequests || []).filter(r => r.status === 'pending').length, m = (prev?.pauseRequests || []).filter(r => r.status === 'pending').length; if (n > m) { const r = (d.pauseRequests || []).filter(x => x.status === 'pending').pop(); Notif.show('🕒 طلب إيقاف يوم', `${r.childName} — ${r.start} · ${r.reason || ''}`, 'dashboard.html'); } });
+    snap.docChanges().forEach(ch => { if (ch.type !== 'modified') return; const d = ch.doc.data(); const prev = allPortals.find(x => x.id === ch.doc.id); if (JSON.stringify(d.pauseRequests || []) !== JSON.stringify(prev?.pauseRequests || [])) reqChanged = true; });
     if (reqChanged) scheduleLoad(); // other portal writes are just mirrors of subscriptions — no reload needed
   });
+}
+
+// ---------- 🔔 NOTIFICATION FEED (adminNotifs, written by Cloud Functions) ----------
+let adminNotifs = [], notifFeedReady = false;
+function listenNotifs() {
+  db.collection('adminNotifs').orderBy('createdAt', 'desc').limit(60).onSnapshot(snap => {
+    if (notifFeedReady) snap.docChanges().forEach(ch => { if (ch.type === 'added') { const n = ch.doc.data(); if (!n.read) Notif.show(`${n.icon || '🔔'} ${n.title}`, n.body || '', 'dashboard.html'); } });
+    notifFeedReady = true; adminNotifs = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderNotifs();
+  }, e => console.warn('notifs', e));
+}
+function ago(ts) { const d = toD(ts); if (!d) return 'الآن'; const m = Math.round((Date.now() - d) / 6e4); return m < 1 ? 'الآن' : m < 60 ? `منذ ${m} د` : m < 1440 ? `منذ ${Math.round(m / 60)} س` : d.toLocaleDateString('ar-KW', { day: 'numeric', month: 'short' }); }
+function renderNotifs() {
+  const unread = adminNotifs.filter(n => !n.read).length, b = document.getElementById('notifBadge');
+  b.textContent = unread > 99 ? '99+' : unread; b.style.display = unread ? 'inline-flex' : 'none';
+  document.getElementById('notifSub').textContent = unread ? `${unread} غير مقروء` : 'لا توجد إشعارات جديدة';
+  document.getElementById('readAllBtn').style.display = unread ? 'flex' : 'none';
+  document.getElementById('notifList').innerHTML = adminNotifs.length ? adminNotifs.map(n => `<div class="notif-item ${n.read ? '' : 'unread'}" onclick="openNotif('${n.id}')"><div class="ni">${n.icon || '🔔'}</div><div class="nb"><b>${n.title || ''}</b><p>${(n.body || '').replace(/</g, '&lt;')}</p><small>${ago(n.createdAt)}</small></div></div>`).join('') : emptyBox('🔔', 'لا توجد إشعارات بعد');
+}
+function openNotifs() { renderNotifs(); document.getElementById('notifModal').classList.add('open'); }
+function closeNotifs() { document.getElementById('notifModal').classList.remove('open'); }
+function openNotif(id) {
+  const n = adminNotifs.find(x => x.id === id); if (!n) return; closeNotifs();
+  if (!n.read) { n.read = true; renderNotifs(); db.collection('adminNotifs').doc(id).update({ read: true }).catch(e => console.warn(e)); }
+  if (n.page) go(n.page);
+}
+async function readAllNotifs(btn) {
+  const un = adminNotifs.filter(n => !n.read); if (!un.length) return;
+  btn.disabled = true; btn.textContent = '⏳ ...';
+  try { for (let i = 0; i < un.length; i += 400) { const batch = db.batch(); un.slice(i, i + 400).forEach(n => batch.update(db.collection('adminNotifs').doc(n.id), { read: true })); await withTimeout(batch.commit()); } un.forEach(n => n.read = true); renderNotifs(); showToast('✔️ تم تعليم الكل كمقروء'); }
+  catch (e) { showToast(e.message === 'timeout' ? SLOW_MSG : '❌ ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '✔️ قراءة الكل'; }
 }
 
 // ---------- PORTAL SYNC ----------
@@ -396,6 +425,7 @@ auth.onAuthStateChanged(async (user) => {
   if (!a.exists) { await auth.signOut(); location.href = 'login.html'; return; }
   loadAllData();
   setupAdminNotifications(user);
+  listenNotifs();
 });
 
 async function recordIncomeForSub(s, amount, method, txId) {

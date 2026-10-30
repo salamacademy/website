@@ -21,6 +21,12 @@ async function sendTo(tokens, title, body, url) {
   });
   return res;
 }
+// Admin notification feed (🔔 in the admin app) — written here so nothing is missed while the app is closed
+async function addNotif(n, id) {
+  const data = { read: false, createdAt: admin.firestore.FieldValue.serverTimestamp(), ...n };
+  try { if (id) await db.collection('adminNotifs').doc(id).create(data); else await db.collection('adminNotifs').add(data); }
+  catch (e) { if (e.code !== 6) console.error('notif', e.message); } // 6 = ALREADY_EXISTS (deduped)
+}
 async function adminTokens() {
   const snap = await db.collection('admins').get();
   return snap.docs.flatMap(d => d.data().fcmTokens || []);
@@ -30,6 +36,7 @@ async function adminTokens() {
 exports.onNewRequest = fx.firestore.document('subscriptions/{id}').onCreate(async (snap) => {
   const d = snap.data();
   if (d.status !== 'pending_review') return;
+  await addNotif({ icon: '📝', title: 'طلب تسجيل جديد', body: `${d.childName || ''} — ${d.packageName || ''}`, page: 'review' });
   return sendTo(await adminTokens(), '📝 طلب تسجيل جديد', `${d.childName} — ${d.packageName}`, '/website/admin/dashboard.html');
 });
 
@@ -60,6 +67,7 @@ exports.dailyReminders = fx.pubsub.schedule('0 9 * * *').timeZone('Asia/Kuwait')
     if (days < 0) await doc.ref.update({ status: 'expired' });
   }
   // admin heads-up on Telegram (works even when the admin app is closed)
+  if (soon.length) await addNotif({ icon: '⏳', title: `${soon.length} اشتراك ينتهي خلال 3 أيام`, body: soon.sort((a, b) => a[0] - b[0]).map(x => x[1].replace(/<[^>]+>/g, '').replace(/^• /, '')).join('\n'), page: 'expiring' }, 'exp_' + new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10));
   if (soon.length && TG_TOKEN) { try { await tgcore.notifyAdmins(db, tg, `⏳ <b>اشتراكات تنتهي خلال 3 أيام (${soon.length})</b>\n\n${soon.sort((a, b) => a[0] - b[0]).map(x => x[1]).join('\n')}\n\nأرسل رابط التجديد من لوحة الإدارة ← تنتهي قريباً`); } catch (e) { console.error('tg expiry', e); } }
   return null;
 });
@@ -166,6 +174,7 @@ async function finalizePayment(orderId, gw) {
   (p.items || []).forEach(i => batch.set(db.collection('transactions').doc(), { type: 'income', amount: +(i.price * i.qty).toFixed(3), category: i.category || 'أخرى', note: `${i.name}${i.qty > 1 ? ' ×' + i.qty : ''} — ${p.childName || p.phone} (UPayment)`, method: 'upayment', date: today, paymentId: orderId, createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'upayment' }));
   batch.update(ref, { status: 'paid', activated, gateway: gw, paymentType: gw.payment_type || gw.paymentType || null, paidAt: admin.firestore.FieldValue.serverTimestamp() });
   await batch.commit();
+  await addNotif({ icon: '💳', title: `دفعة ${(+p.amount).toFixed(3)} د.ك`, body: `${p.childName || p.phone} — ${(p.items || []).map(i => i.name).join('، ')}${activated ? ' · ✅ تم التفعيل' : ''}`, page: 'finance' }, 'pay_' + orderId);
   try { await tgcore.notifyAdmins(db, tg, `💳 <b>دفعة UPayment</b>\n${p.childName || p.phone} — <b>${(+p.amount).toFixed(3)} د.ك</b>\n${(p.items || []).map(i => '• ' + i.name).join('\n')}${activated ? '\n✅ تم تفعيل الاشتراك' : ''}`); } catch (_) {}
   if (p.phone) { try { const pd = await db.collection('portal').doc(p.phone).get(); await sendTo(pd.exists ? pd.data().fcmTokens : [], '✅ تم استلام الدفع', `${(+p.amount).toFixed(3)} د.ك${activated ? ' · تم تفعيل الاشتراك' : ''}`, '/website/client/dashboard.html'); } catch (_) {} }
   return 'paid';
@@ -200,13 +209,58 @@ exports.verifyPayment = fx.https.onRequest(async (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
-// Pause request from a parent (portal/{phone}.pauseRequests) → Telegram alert
+// Parent pauses (portal/{phone}.pauseRequests) — approved automatically, no admin step.
+// Checks: active subscription, training day of the package, today..end date, max 3. Each pause adds 1 day.
+// A request with type 'cancel' removes a future pause (−1 day). Everything runs in one transaction.
+const TRAIN_DAYS = { football: [6], confidence: [0, 2, 4], excellence: [6, 0, 2, 4], excellence_loyal: [6, 0, 2, 4], premium: [6, 0, 1, 2, 3, 4] };
+const kwToday = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+const isoOf = ts => ts && ts.toDate ? ts.toDate().toISOString().slice(0, 10) : '';
 exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(async (chg) => {
-  if (!TG_TOKEN) return;
-  const b = chg.before.data() || {}, a = chg.after.data() || {};
-  const pend = x => (x.pauseRequests || []).filter(r => r.status === 'pending');
-  const key = r => r.subId + '|' + r.start, had = new Set(pend(b).map(key));
-  const fresh = pend(a).filter(r => !had.has(key(r))); if (!fresh.length) return;
-  const r = fresh[0];
-  return tgcore.notifyAdmins(db, tg, `🕒 <b>طلب إيقاف ${fresh.length > 1 ? fresh.length + ' أيام' : 'يوم'}</b>\n\n<b>${r.childName}</b> — ${fresh.map(x => x.start).join('، ')}${r.reason ? '\n📝 ' + r.reason : ''}\n👤 ${a.parentName || ''} · ${chg.after.id}\n\nوافق من لوحة الإدارة → ⏸️ الإيقافات`);
+  if (!(chg.after.data().pauseRequests || []).some(r => r.status === 'pending')) return;
+  const portalRef = chg.after.ref; const done = [];
+  await db.runTransaction(async t => {
+    done.length = 0;
+    const pd = (await t.get(portalRef)).data() || {}; const reqs = (pd.pauseRequests || []).map(r => ({ ...r }));
+    const pending = reqs.filter(r => r.status === 'pending'); if (!pending.length) return;
+    const subs = {};
+    for (const id of [...new Set(pending.map(r => r.subId))]) { const sd = await t.get(db.collection('subscriptions').doc(String(id))); subs[id] = sd.exists ? { ref: sd.ref, s: sd.data() } : null; }
+    const today = kwToday(), now = new Date().toISOString(), upd = {};
+    for (const r of pending.sort((x, y) => (x.type === 'cancel' ? 0 : 1) - (y.type === 'cancel' ? 0 : 1))) { // cancels first → frees quota
+      const x = subs[r.subId]; let note = '';
+      if (!x) note = 'الاشتراك غير موجود';
+      else {
+        const s = x.s, cur = upd[r.subId] || { pauses: Array.isArray(s.pauses) ? s.pauses.slice() : (s.pauseStart ? [{ date: isoOf(s.pauseStart) }] : []), end: s.subscriptionEnd ? s.subscriptionEnd.toDate() : null };
+        const endKey = cur.end ? cur.end.toISOString().slice(0, 10) : '';
+        if (r.type === 'cancel') {
+          const i = cur.pauses.findIndex(p => p.date === r.start);
+          if (i < 0) note = 'لا يوجد إيقاف في هذا اليوم'; else if (r.start < today) note = 'لا يمكن إلغاء يوم مضى';
+          else { cur.pauses.splice(i, 1); if (cur.end) cur.end = new Date(cur.end.getTime() - 864e5); }
+        } else {
+          const dow = new Date(r.start + 'T00:00:00Z').getUTCDay();
+          if (s.status !== 'active') note = 'الاشتراك غير نشط';
+          else if (!/^\d{4}-\d\d-\d\d$/.test(r.start || '') || r.start < today) note = 'لا يمكن إيقاف يوم مضى';
+          else if (endKey && r.start > endKey) note = 'بعد نهاية الاشتراك';
+          else if (!(TRAIN_DAYS[s.packageType] || [6, 0, 1, 2, 3, 4]).includes(dow)) note = 'ليس من أيام تدريب الباقة';
+          else if (cur.pauses.some(p => p.date === r.start)) note = 'هذا اليوم موقوف مسبقاً';
+          else if (cur.pauses.length >= 3) note = 'استُخدمت الإيقافات الثلاثة';
+          else { cur.pauses.push({ date: r.start, reason: r.reason || '', approvedAt: now, by: 'parent' }); if (cur.end) cur.end = new Date(cur.end.getTime() + 864e5); }
+        }
+        if (!note) upd[r.subId] = cur;
+      }
+      Object.assign(r, { status: note ? 'rejected' : 'approved', decidedAt: now, auto: true }, note ? { adminNote: note } : {});
+      done.push({ r, ok: !note });
+    }
+    for (const [id, u] of Object.entries(upd)) {
+      const pauses = u.pauses.sort((a, b) => a.date.localeCompare(b.date));
+      t.update(subs[id].ref, { pauses, pauseUsed: pauses.length >= 3, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(u.end), daysRemaining: Math.max(0, Math.ceil((u.end - new Date()) / 864e5)) } : {}) });
+    }
+    const cutoff = new Date(Date.now() - 60 * 864e5).toISOString(); // keep history short
+    t.update(portalRef, { pauseRequests: reqs.filter(r => r.status === 'pending' || !r.decidedAt || r.decidedAt > cutoff) });
+  });
+  const ok = done.filter(d => d.ok); if (!ok.length) return; // syncPortal refreshes the parent's view after the subscription write
+  const fd = k => `${['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][new Date(k + 'T00:00:00Z').getUTCDay()]} ${+k.slice(8)}/${+k.slice(5, 7)}`;
+  const r = ok[0].r, adds = ok.filter(d => d.r.type !== 'cancel').map(d => fd(d.r.start)), cancels = ok.filter(d => d.r.type === 'cancel').map(d => fd(d.r.start));
+  const body = `${r.childName || ''}${adds.length ? ' — إيقاف: ' + adds.join('، ') : ''}${cancels.length ? ' — إلغاء: ' + cancels.join('، ') : ''}${r.reason ? ' · ' + r.reason : ''}`;
+  await addNotif({ icon: '⏸️', title: adds.length ? `إيقاف ${adds.length > 1 ? adds.length + ' أيام' : 'يوم'}` : 'إلغاء إيقاف', body, page: 'paused' });
+  if (TG_TOKEN) await tgcore.notifyAdmins(db, tg, `⏸️ <b>${adds.length ? 'إيقاف تلقائي' : 'إلغاء إيقاف'}</b>\n\n<b>${r.childName || ''}</b>${adds.length ? '\nأيام الإيقاف: ' + adds.join('، ') : ''}${cancels.length ? '\nأُلغي: ' + cancels.join('، ') : ''}${r.reason ? '\n📝 ' + r.reason : ''}\n👤 ${chg.after.data().parentName || ''} · ${chg.after.id}\n(تم تمديد الاشتراك تلقائياً)`);
 });

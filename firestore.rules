@@ -22,6 +22,7 @@ service cloud.firestore {
     match /transactions/{id} { allow read, write: if isAdmin(); }
     match /settings/{id}     { allow read, write: if isAdmin(); }
     match /botState/{id}     { allow read, write: if false; }
+    match /adminNotifs/{id}  { allow read, write: if isAdmin(); } // 🔔 feed, written by Cloud Functions
     // Pay catalog: public read (prices are public), admin write
     match /payItems/{id}     { allow read: if true; allow write: if isAdmin(); }
     // Payments: created/updated only by Cloud Functions; parent can fetch their own order by id; admin lists
