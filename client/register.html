@@ -35,15 +35,15 @@
         <label>الاسم الثلاثي للطفل <b>*</b></label>
         <input type="text" id="childName" required placeholder="الاسم الأول — اسم الأب — اسم الجد"/>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>تاريخ الميلاد <b>*</b></label>
-          <input type="date" id="birthDate" required/>
+      <div class="form-group">
+        <label>تاريخ الميلاد <b>*</b></label>
+        <div class="dob">
+          <select id="dobDay" required><option value="">اليوم</option></select>
+          <select id="dobMonth" required><option value="">الشهر</option></select>
+          <select id="dobYear" required><option value="">السنة</option></select>
         </div>
-        <div class="form-group">
-          <label>العمر</label>
-          <input type="text" id="ageDisplay" readonly placeholder="يُحسب تلقائياً"/>
-        </div>
+        <input type="hidden" id="birthDate"/>
+        <div class="dob-age" id="ageDisplay"></div>
       </div>
       <div class="form-group">
         <label>اسم ولي الأمر <b>*</b></label>
@@ -131,8 +131,8 @@
         <label>شروط الأكاديمية <b>*</b> — يرجى الموافقة على جميع البنود</label>
         <label class="check-row"><input type="checkbox" class="term" required/><span>يجب الالتزام بالزي الخاص بالأكاديمية</span></label>
         <label class="check-row"><input type="checkbox" class="term" required/><span>الأكاديمية غير مسؤولة عن فقدان الطفل للأغراض الشخصية سواء داخل الأكاديمية أو أثناء الرحلات التي تنظمها الأكاديمية</span></label>
-        <label class="check-row"><input type="checkbox" class="term" required/><span>لا مانع من تصوير ابني بوسائل التواصل الاجتماعي أو الصور الخاصة بالأكاديمية</span></label>
-        <label class="check-row"><input type="checkbox" class="term" required/><span>أفهم أن الرياضات تنطوي على بعض مخاطر الإصابة وأن الأكاديمية غير مسؤولة عن الإصابات التي قد يتعرض لها اللاعب نتيجة المشاركة الرياضية</span></label>
+        <label class="check-row"><input type="checkbox" class="term" required/><span>📸 <strong>الموافقة على التصوير والنشر:</strong> أوافق على تصوير ابني أثناء التدريبات والأنشطة ونشر الصور والفيديوهات في حسابات التواصل الاجتماعي والمواد الخاصة بالأكاديمية</span></label>
+        <label class="check-row"><input type="checkbox" class="term" required/><span>🩹 <strong>الإصابات:</strong> أفهم أن الأنشطة الرياضية قد تنطوي على مخاطر الإصابة، وأن الأكاديمية غير مسؤولة عن أي إصابة قد يتعرض لها ابني لا قدّر الله أثناء التدريبات أو الأنشطة أو الرحلات</span></label>
         <label class="check-row"><input type="checkbox" class="term" required/><span>متابعة حساب الإنستغرام الخاص بأكاديمية سلام <a href="https://www.instagram.com/salam_academy_kwt" target="_blank">@salam_academy_kwt</a> لمتابعة الإعلانات وجميع المستجدات</span></label>
       </div>
 

@@ -15,19 +15,36 @@ let currentStep = 1;
   if (p.get('parent') || p.get('phone')) { const h = document.querySelector('.reg-header p'); if (h) h.textContent = '👦 تسجيل طفل آخر لنفس ولي الأمر — بيانات التواصل معبّأة مسبقاً'; }
 })();
 
-// Age auto-calc
-document.getElementById('birthDate').addEventListener('change', function () {
-  const bd = new Date(this.value); if (isNaN(bd)) return;
+// Birth date: day / month / year lists (no calendar scrolling)
+const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+(function () {
+  const y = new Date().getFullYear(), add = (sel, val, txt) => sel.add(new Option(txt, val));
+  MONTHS.forEach((m, i) => add(dobMonth, i + 1, `${i + 1} - ${m}`));
+  for (let k = y - 2; k >= y - 20; k--) add(dobYear, k, k);
+  fillDays();
+  [dobDay, dobMonth, dobYear].forEach(s => s.addEventListener('change', () => { if (s !== dobDay) fillDays(); updateDob(); }));
+})();
+function fillDays() {
+  const keep = dobDay.value, n = new Date(+dobYear.value || 2000, +dobMonth.value || 1, 0).getDate();
+  dobDay.length = 1;
+  for (let d = 1; d <= n; d++) dobDay.add(new Option(d, d));
+  if (+keep <= n) dobDay.value = keep;
+}
+function updateDob() {
+  const out = document.getElementById('ageDisplay'), bdEl = document.getElementById('birthDate');
+  if (!dobDay.value || !dobMonth.value || !dobYear.value) { bdEl.value = ''; out.textContent = ''; return; }
+  const p2 = n => String(n).padStart(2, '0');
+  bdEl.value = `${dobYear.value}-${p2(dobMonth.value)}-${p2(dobDay.value)}`;
   const now = new Date();
-  let age = now.getFullYear() - bd.getFullYear();
-  const m = now.getMonth() - bd.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
-  document.getElementById('ageDisplay').value = age + ' سنة';
-});
+  let age = now.getFullYear() - dobYear.value;
+  const m = now.getMonth() + 1 - dobMonth.value;
+  if (m < 0 || (m === 0 && now.getDate() < dobDay.value)) age--;
+  out.textContent = '🎂 العمر: ' + age + ' سنة';
+}
 
 function validateStep(n) {
   const sec = document.querySelector(`.reg-step[data-step="${n}"]`);
-  const fields = sec.querySelectorAll('input[required], textarea[required]');
+  const fields = sec.querySelectorAll('input[required], textarea[required], select[required]');
   for (const f of fields) {
     if (f.type === 'radio') {
       if (!sec.querySelector(`input[name="${f.name}"]:checked`)) { f.closest('.form-group, .reg-step').scrollIntoView({behavior:'smooth'}); return showError('يرجى اختيار إجابة لـ: ' + f.closest('.form-group').querySelector('label').textContent.replace('*','').trim()); }
@@ -67,7 +84,7 @@ document.getElementById('regForm').addEventListener('submit', async function (e)
   const data = {
     childName: v('childName'),
     birthDate: v('birthDate'),
-    childAge: parseInt(document.getElementById('ageDisplay').value) || null,
+    childAge: parseInt(document.getElementById('ageDisplay').textContent.replace(/\D/g, '')) || null,
     parentName: v('parentName'),
     phone: v('phone').replace(/\D/g, ''),
     phone2: v('phone2').replace(/\D/g, ''),
@@ -81,6 +98,8 @@ document.getElementById('regForm').addEventListener('submit', async function (e)
     amount: parseFloat(pkgEl.dataset.price),
     loyaltyMember: document.getElementById('loyal').checked,
     termsAccepted: true,
+    photoConsent: true,
+    injuryWaiver: true,
     status: 'pending_review',
     source: 'website_survey',
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),

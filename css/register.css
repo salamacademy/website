@@ -44,3 +44,8 @@
 .reg-nav > * { width: auto !important; margin: 0 !important; }
 .reg-nav .btn-portal-primary { flex: 1 1 auto; }
 .reg-nav .btn-portal-ghost { flex: 0 0 auto; padding-left: 18px; padding-right: 18px; white-space: nowrap; }
+
+/* Birth date: three lists instead of a calendar */
+.dob { display: grid; grid-template-columns: minmax(0,.8fr) minmax(0,1.4fr) minmax(0,1fr); gap: 8px; }
+.dob select { min-width: 0; padding-left: 6px; padding-right: 6px; }
+.dob-age { margin-top: 6px; font-size: .9rem; font-weight: 700; color: var(--copper-dark, #8a3d14); min-height: 1.2em; }
