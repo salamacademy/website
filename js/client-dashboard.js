@@ -9,7 +9,7 @@ const SCHEDULES = {
   excellence_loyal: { name: 'باقة التميز – أسرة سلام', icon: '🏅', rows: [['📅', '4 أيام بالأسبوع'], ['⚽', 'كرة القدم: السبت · الروضة'], ['🥋', 'الكيوكشن: أحد/ثلاثاء/خميس · جنوب السرة']] },
   premium: { name: 'الباقة المميزة', icon: '⚡', rows: [['📅', '6 أيام'], ['📍', 'الروضة + السلام']] }
 };
-const TITLES = { overview: 'هذا ملخص اشتراك طفلك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: '3 أيام إيقاف كل شهر', renew: 'ادفع أو جدد اشتراكك' };
+const TITLES = { overview: 'هذا ملخص اشتراك ابنك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: '3 أيام إيقاف كل شهر', renew: 'ادفع أو جدد اشتراكك' };
 const toD = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : null;
 const fmt = ts => { const d = toD(ts); return d ? d.toLocaleDateString('ar-KW') : '--'; };
 const $ = id => document.getElementById(id);

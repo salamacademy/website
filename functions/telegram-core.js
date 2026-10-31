@@ -94,7 +94,7 @@ async function pauses(db) {
   return '⏸️ <b>الإيقافات المؤقتة</b>\n\n' + list.map(s => `• <b>${s.childName}</b> ${pausedNow(s) ? '(جارٍ)' : '(قادم)'}\n  من ${fmtD(s.pauseStart)} إلى ${fmtD(s.pauseEnd)}${s.pauseReason ? ' · ' + s.pauseReason : ''}\n  👤 ${s.parentName} · ${s.phone}`).join('\n');
 }
 function requestCard(s) {
-  return `📝 <b>طلب تسجيل</b>\n\n👦 <b>${s.childName}</b>${s.childAge ? ` (${s.childAge} سنة)` : ''} · 🎂 ${s.birthDate || '--'}\n👤 ${s.parentName}\n📱 <a href="https://wa.me/965${s.phone}">${s.phone}</a>${s.phone2 ? ' · ' + s.phone2 : ''}\n📧 ${s.email || '--'}\n\n📦 ${s.packageName} — <b>${s.amount} د.ك</b>${s.loyaltyMember ? '\n🏅 أسرة سلام' : ''}\n🏆 البطولات: ${s.tournamentsConsent || '--'}\n🩺 صحة: ${s.healthIssues || '--'}\n🤧 حساسية: ${s.allergies || '--'}\n🎯 السبب: ${s.reason || '--'}`;
+  return `📝 <b>طلب تسجيل</b>\n\n👦 <b>${s.childName}</b>${s.childAge ? ` (${s.childAge} سنة)` : ''} · 🎂 ${s.birthDate || '--'}\n👤 ${s.parentName}\n📱 <a href="https://wa.me/965${s.phone}">${s.phone}</a>${s.phone2 ? ' · ' + s.phone2 : ''}\n📧 ${s.email || '--'}\n\n📦 ${s.packageName} — <b>${s.amount} د.ك</b>${s.loyaltyMember ? '\n🏅 أسرة سلام' : ''}\n📣 عرف عنا من: ${s.heardFrom || '--'}\n🏆 البطولات: ${s.tournamentsConsent || '--'}\n🩺 صحة: ${s.healthIssues || '--'}\n🤧 حساسية: ${s.allergies || '--'}\n🎯 السبب: ${s.reason || '--'}`;
 }
 const requestKb = id => ({ inline_keyboard: [[{ text: '✅ موافقة', callback_data: `approve|${id}` }, { text: '⛔ رفض', callback_data: `reject|${id}` }]] });
 async function pendingRequests(db, tg, chat) {

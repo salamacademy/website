@@ -165,6 +165,7 @@ function surveyBody(s) {
     <div><label>📧 البريد</label>${s.email || '--'}</div>
     <div><label>🎂 الميلاد</label><span dir="ltr">${s.birthDate || '--'}</span>${s.childAge ? ` (${s.childAge} سنة)` : ''}</div>
     <div><label>🏆 البطولات</label>${s.tournamentsConsent || '--'}</div>
+    <div><label>📣 عرف عنا من</label>${s.heardFrom || '--'}</div>
     <div class="w"><label>🩺 مشاكل صحية</label>${s.healthIssues || '--'}</div>
     <div class="w"><label>🤧 حساسية</label>${s.allergies || '--'}</div>
     <div class="w"><label>🎯 سبب التسجيل</label>${s.reason || '--'}</div>
@@ -174,12 +175,19 @@ function surveyBody(s) {
 function renderReview() {
   const list = allSubscriptions.filter(s => s.status === 'pending_review');
   set('reviewCount', list.length ? list.length + ' طلب' : '');
-  document.getElementById('reviewList').innerHTML = list.length ? list.map(s => `<div class="mcard s-pending">
+  document.getElementById('reviewList').innerHTML = heardSummary() + (list.length ? list.map(s => `<div class="mcard s-pending">
     <div class="mcard-top"><div><div class="mcard-name">${s.childName}<small>${s.childAge ? s.childAge + ' سنة' : ''}</small></div><div class="mcard-sub">👤 ${s.parentName} · ${fmtDate(s.createdAt)}</div></div><span class="chip gold">📝 جديد</span></div>
     <div class="mcard-meta"><span class="chip copper">${PKG_ICON[s.packageType] || ''} ${s.packageName || ''} · ${s.amount} د.ك</span>${s.loyaltyMember ? '<span class="chip gold">🏅 أسرة سلام</span>' : ''}</div>
     ${surveyBody(s)}
     <div class="mcard-actions"><button class="abtn ok" style="flex:2" onclick="openApprove('${s.id}')">✅ موافقة</button><button class="abtn bad" onclick="rejectRequest('${s.id}')">⛔ رفض</button><button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}?text=${encodeURIComponent('مرحباً ' + s.parentName + '، بخصوص طلب تسجيل ' + s.childName + ' في أكاديمية سلام')}','_blank')">💬</button></div>
-  </div>`).join('') : emptyBox('🎉', 'لا توجد طلبات بانتظار المراجعة');
+  </div>`).join('') : emptyBox('🎉', 'لا توجد طلبات بانتظار المراجعة'));
+}
+// 📣 How families heard about the academy (from the registration form) — where to focus marketing
+function heardSummary() {
+  const c = {}; allSubscriptions.forEach(s => { if (s.heardFrom) { const k = s.heardFrom.startsWith('أخرى') ? 'أخرى' : s.heardFrom; c[k] = (c[k] || 0) + 1; } });
+  const rows = Object.entries(c).sort((x, y) => y[1] - x[1]); if (!rows.length) return '';
+  const total = rows.reduce((t, r) => t + r[1], 0);
+  return `<div class="card" style="margin-bottom:12px"><div style="font-weight:800;margin-bottom:8px">📣 كيف عرفوا عن الأكاديمية <small style="color:var(--text-light);font-weight:600">(${total} تسجيل)</small></div>${rows.map(([k, n]) => `<div class="bar"><div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700"><span>${k}</span><span>${n} · ${Math.round(n * 100 / total)}%</span></div><div class="b"><i style="width:${n * 100 / total}%"></i></div></div>`).join('')}</div>`;
 }
 function viewSurvey(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;

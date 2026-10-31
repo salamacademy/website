@@ -53,3 +53,7 @@
 /* Child name: first / father / family — all three required */
 .name3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .name3 input { min-width: 0; }
+
+/* How did you hear about us: 2 × 2 pills */
+.radio-row.heard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.radio-row.heard .radio-pill span { padding: 10px 6px; font-size: .9rem; }

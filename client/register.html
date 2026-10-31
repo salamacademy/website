@@ -79,6 +79,17 @@
       <h2>🩺 الصحة والأهداف</h2>
 
       <div class="form-group">
+        <label>كيف عرفت عن الأكاديمية؟ <b>*</b></label>
+        <div class="radio-row heard">
+          <label class="radio-pill"><input type="radio" name="heard" value="الأهل" required/><span>👨‍👩‍👦 الأهل</span></label>
+          <label class="radio-pill"><input type="radio" name="heard" value="الأصدقاء"/><span>🤝 الأصدقاء</span></label>
+          <label class="radio-pill"><input type="radio" name="heard" value="إعلانات انستقرام"/><span>📸 إعلانات انستقرام</span></label>
+          <label class="radio-pill"><input type="radio" name="heard" value="أخرى"/><span>✍️ أخرى</span></label>
+        </div>
+        <input type="text" id="heardOther" placeholder="اكتب كيف عرفت عنا" style="margin-top:8px" hidden/>
+      </div>
+
+      <div class="form-group">
         <label>هل يعاني ابنكم من أي مشاكل ترغب في ذكرها؟</label>
         <textarea id="healthIssues" rows="3" placeholder="اكتب (لا يوجد) إن لم يكن هناك شيء"></textarea>
       </div>

@@ -92,6 +92,7 @@ document.getElementById('regForm').addEventListener('submit', async function (e)
     healthIssues: v('healthIssues') || 'لا يوجد',
     allergies: v('allergies') || 'لا يوجد',
     reason: v('reason'),
+    heardFrom: heardValue(),
     tournamentsConsent: document.querySelector('input[name="tournaments"]:checked').value,
     packageType: pkgEl.value,
     packageName: pkgEl.dataset.name,
@@ -123,6 +124,9 @@ document.getElementById('regForm').addEventListener('submit', async function (e)
   }
 });
 
+// How did you hear about us — "أخرى" opens a text box
+document.querySelectorAll('input[name="heard"]').forEach(r => r.addEventListener('change', () => { const o = document.getElementById('heardOther'); o.hidden = r.value !== 'أخرى' || !r.checked; if (!o.hidden) o.focus(); }));
+function heardValue() { const r = document.querySelector('input[name="heard"]:checked'); if (!r) return ''; return r.value === 'أخرى' && v('heardOther') ? 'أخرى: ' + v('heardOther') : r.value; }
 function v(id) { return (document.getElementById(id).value || '').trim(); }
 function showError(m) { const e = document.getElementById('msgBox'); e.textContent = m; e.style.display = 'block'; e.style.background = '#ffebee'; e.style.color = '#c62828'; setTimeout(hideError, 6000); return false; }
 function hideError() { document.getElementById('msgBox').style.display = 'none'; }
