@@ -123,8 +123,18 @@ async function loadPayItems() {
   renderPayGrid();
 }
 function suggestedItem(sub) { if (!sub) return null; return payItems.find(i => i.packageType && sub.packageType && i.packageType === sub.packageType) || null; }
+// Payment only after the admin approves the registration (approved / active / expired renewals)
+const PAY_OK = ['approved', 'pending_payment', 'active', 'expired'];
+function payLock(sub) {
+  if (!sub) return '📝 لا يوجد طلب تسجيل لهذا الرقم. يرجى تعبئة نموذج التسجيل والموافقة على الشروط أولاً، وبعد موافقة الإدارة يمكنك الدفع.';
+  if (sub.status === 'pending_review') return '⏳ طلبك قيد المراجعة من الإدارة. سيظهر الدفع هنا بعد الموافقة على الطلب.';
+  if (!PAY_OK.includes(sub.status)) return '⛔ الطلب غير مقبول حالياً. يرجى التواصل مع الإدارة عبر الواتساب 93000607.';
+  return '';
+}
 function renderPayGrid() {
   const sub = currentSubscription; const sug = suggestedItem(sub);
+  const lock = payLock(sub);
+  if (lock) { cart = {}; $('payKid').textContent = sub ? '👦 ' + (sub.childName || '').split(' ')[0] : ''; $('payGrid').innerHTML = `<div class="empty" style="grid-column:1/-1;line-height:1.8"><b>🔒</b>${lock}</div>`; updateTotal(); return; }
   if (sub && Object.keys(cart).length === 0 && sug) cart[sug.id] = 1;
   $('payKid').textContent = sub ? '👦 ' + (sub.childName || '').split(' ')[0] : '';
   const g = $('payGrid');
@@ -137,15 +147,16 @@ function setAmt(id, val) { customAmt[id] = val; if (!cart[id]) cart[id] = 1; upd
 function setQty(id, d) { cart[id] = Math.max(0, (cart[id] || 0) + d); if (!cart[id]) delete cart[id]; renderPayGrid(); }
 function cartTotal() { return Object.entries(cart).reduce((a, [id, q]) => { const i = payItems.find(x => x.id === id); return a + (i ? itemPrice(i) * q : 0); }, 0); }
 const badCustom = () => Object.keys(cart).some(id => { const i = payItems.find(x => x.id === id); return i && i.customAmount && !(itemPrice(i) >= 0.5 && itemPrice(i) <= 2000); });
-function updateTotal() { const t = cartTotal(), off = t <= 0 || badCustom(); $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = off; b.style.opacity = off ? '.6' : '1'; }
+function updateTotal() { const t = cartTotal(), off = t <= 0 || badCustom() || !!payLock(currentSubscription); $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = off; b.style.opacity = off ? '.6' : '1'; }
 function renewSubscription() { go('renew'); }
 async function startPayment() {
-  const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => { const i = payItems.find(x => x.id === id); return i && i.customAmount ? { id, qty: 1, amount: itemPrice(i) } : { id, qty }; }); if (!items.length || badCustom()) return;
+  const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => { const i = payItems.find(x => x.id === id); return i && i.customAmount ? { id, qty: 1, amount: itemPrice(i) } : { id, qty }; }); if (!items.length || badCustom() || payLock(sub)) return;
   const btn = $('payBtn'); btn.disabled = true; btn.innerHTML = '⏳ جاري تحويلك إلى UPayment...';
   try {
     if (typeof PAYMENT_API_URL === 'undefined' || !PAYMENT_API_URL || PAYMENT_API_URL.includes('YOUR_')) throw new Error('not-configured');
     const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, subId: sub ? sub.id : null, childName: sub ? sub.childName : '', parentName: sub ? sub.parentName : (portalDoc?.parentName || ''), email: sub ? sub.email : '', items, returnBase: location.origin + location.pathname.replace(/[^/]*$/, '') }) });
-    const j = await r.json(); if (!j.ok || !j.link) throw new Error(j.error || 'فشل إنشاء الدفع');
+    const j = await r.json(); if (j.code === 'not_approved') { alert(j.error); btn.disabled = false; btn.innerHTML = '<img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span>'; return; }
+    if (!j.ok || !j.link) throw new Error(j.error || 'فشل إنشاء الدفع');
     location.href = j.link;
   } catch (e) {
     const list = items.map(({ id, qty }) => { const i = payItems.find(x => x.id === id); return `• ${i.name}${qty > 1 ? ' ×' + qty : ''} — ${(itemPrice(i) * qty).toFixed(3)} د.ك`; }).join('\n');

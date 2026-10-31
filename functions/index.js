@@ -121,6 +121,11 @@ exports.createPayment = fx.https.onRequest(async (req, res) => {
     if (!UP.key) throw new Error('UPayments key not configured');
     const b = req.body || {}; const phone = norm(b.phone); if (phone.length !== 8) throw new Error('phone');
     const wanted = Array.isArray(b.items) ? b.items : []; if (!wanted.length) throw new Error('no items');
+    // Only families whose registration the admin approved may pay (new → register + terms → admin approval → pay)
+    const PAY_OK = ['approved', 'pending_payment', 'active', 'expired'];
+    const subs = (await db.collection('subscriptions').where('phone', '==', phone).get()).docs;
+    const own = b.subId ? subs.filter(d => d.id === b.subId) : subs;
+    if (!own.some(d => PAY_OK.includes(d.data().status))) return res.status(403).json({ ok: false, code: 'not_approved', error: subs.length ? 'طلب التسجيل لم تتم الموافقة عليه بعد. يمكنك الدفع بعد موافقة الإدارة.' : 'لا يوجد طلب تسجيل لهذا الرقم. يرجى تعبئة نموذج التسجيل أولاً وانتظار موافقة الإدارة.' });
     const items = [];
     for (const w of wanted) {
       const d = await db.collection('payItems').doc(String(w.id)).get(); if (!d.exists || d.data().active === false) continue; const it = d.data(); const qty = Math.max(1, Math.min(20, parseInt(w.qty) || 1));
