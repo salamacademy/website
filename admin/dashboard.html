@@ -237,7 +237,7 @@
     <div class="fg2"><div class="fg"><label>اسم المشترك</label><input type="text" id="editChildName"/></div><div class="fg"><label>العمر</label><input type="number" id="editChildAge" min="3" max="18"/></div></div>
     <div class="fg2"><div class="fg"><label>ولي الأمر</label><input type="text" id="editParentName"/></div><div class="fg"><label>الهاتف</label><input type="tel" id="editPhone" maxlength="8" inputmode="numeric"/></div></div>
     <div class="fg"><label>البريد</label><input type="email" id="editEmail"/></div>
-    <div class="fg2"><div class="fg"><label>الباقة</label><select id="editPackage" onchange="updatePackagePrice('editPackage','editAmount')"></select></div><div class="fg"><label>المبلغ (د.ك)</label><input type="number" id="editAmount" step="0.5"/></div></div>
+    <div class="fg2"><div class="fg"><label>الباقة</label><select id="editPackage" onchange="updatePackagePrice('editPackage','editAmount');renderEditPauses()"></select></div><div class="fg"><label>المبلغ (د.ك)</label><input type="number" id="editAmount" step="0.5"/></div></div>
     <div class="fg"><label>الحالة</label><select id="editStatus">
       <option value="active">✅ نشط</option><option value="approved">💳 موافق عليه - بانتظار الدفع</option><option value="pending_review">📝 قيد المراجعة</option><option value="expired">❌ منتهي</option><option value="rejected">⛔ مرفوض</option><option value="cancelled">🚫 ملغي</option></select></div>
     <div class="fg2"><div class="fg"><label>البداية</label><input type="date" id="editStartDate" onchange="autoEndDate('editStartDate','editEndDate')"/></div><div class="fg"><label>النهاية</label><input type="date" id="editEndDate"/></div></div>

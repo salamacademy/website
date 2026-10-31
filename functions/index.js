@@ -247,7 +247,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
           else if (endKey && r.start > endKey) note = 'بعد نهاية الاشتراك';
           else if (!(TRAIN_DAYS[s.packageType] || [6, 0, 1, 2, 3, 4]).includes(dow)) note = 'ليس من أيام تدريب الباقة';
           else if (cur.pauses.some(p => p.date === r.start)) note = 'هذا اليوم موقوف مسبقاً';
-          else if (cur.pauses.length >= 3) note = 'استُخدمت الإيقافات الثلاثة';
+          else if (cur.pauses.length >= (s.packageType === 'football' ? 1 : 3)) note = s.packageType === 'football' ? 'كرة القدم: إيقاف واحد فقط في الشهر' : 'استُخدمت الإيقافات الثلاثة';
           else { cur.pauses.push({ date: r.start, reason: r.reason || '', approvedAt: now, by: 'parent' }); if (cur.end) cur.end = new Date(cur.end.getTime() + 864e5); }
         }
         if (!note) upd[r.subId] = cur;

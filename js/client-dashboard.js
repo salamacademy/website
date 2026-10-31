@@ -170,8 +170,8 @@ async function startPayment() {
   }
 }
 
-// ---------- PAUSE: 3 × one-day pauses per subscription month (request → admin approves) ----------
-const PAUSE_MAX = 3;
+// ---------- PAUSE: one-day pauses per subscription month (football 1, other packages 3) ----------
+const pauseMax = sub => sub && sub.packageType === 'football' ? 1 : 3;
 const dayKey = d => (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0];
 function pausesOf(s) { return Array.isArray(s.pauses) ? s.pauses : (s.pauseStart ? [{ date: dayKey(toD(s.pauseStart)) }] : []); }
 function isPausedNow(s) { const t = dayKey(new Date()); return pausesOf(s).some(p => p.date === t); }
@@ -185,17 +185,18 @@ const dLabel = k => new Date(k + 'T00:00:00Z').toLocaleDateString('ar-KW', { wee
 let calMonth = null, calSubId = null, pickDays = new Set();
 function renderPause(sub) {
   ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pausedBanner').style.display = 'none';
-  const used = pausesOf(sub), pend = pendingPausesFor(sub.id), left = PAUSE_MAX - used.length - pend.length;
-  const quota = $('pauseQuota'); if (quota) quota.innerHTML = Array.from({ length: PAUSE_MAX }, (_, i) => `<span class="chip ${i < used.length ? 'info' : i < used.length + pend.length ? 'gold' : 'ok'}">${i < used.length ? '⏸️ ' + used[i].date : i < used.length + pend.length ? '🕒 ' + pend[i - used.length].start : '○ متاح'}</span>`).join('');
+  const used = pausesOf(sub), pend = pendingPausesFor(sub.id), left = pauseMax(sub) - used.length - pend.length;
+  const quota = $('pauseQuota'); if (quota) quota.innerHTML = Array.from({ length: pauseMax(sub) }, (_, i) => `<span class="chip ${i < used.length ? 'info' : i < used.length + pend.length ? 'gold' : 'ok'}">${i < used.length ? '⏸️ ' + used[i].date : i < used.length + pend.length ? '🕒 ' + pend[i - used.length].start : '○ متاح'}</span>`).join('');
   if (sub.status !== 'active') {
     $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = 'ℹ️'; $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.'; return;
   }
   if (isPausedNow(sub)) {
     $('pauseActive').style.display = 'block'; $('pauseFrom').textContent = new Date().toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
     $('pausedBanner').style.display = 'flex'; $('pausedUntil').textContent = ''; status('⏸️ الاشتراك متوقف اليوم', 'يستأنف التدريب غداً');
-    $('pauseHistory').innerHTML = `<small style="color:var(--text-light);font-weight:800">المتبقي: ${Math.max(0, left)} من ${PAUSE_MAX} هذا الشهر</small>`;
+    $('pauseHistory').innerHTML = `<small style="color:var(--text-light);font-weight:800">المتبقي: ${Math.max(0, left)} من ${pauseMax(sub)} هذا الشهر</small>`;
   }
   $('pauseInfo').style.display = 'block';
+  $('pauseRule').innerHTML = pauseMax(sub) === 1 ? 'يمكنك إيقاف <strong>يوم تدريب واحد في الشهر</strong> لمعسكر كرة القدم.' : 'يمكنك إيقاف <strong>3 أيام تدريب في الشهر</strong> — اخترها معاً أو كل يوم على حدة.';
   if (calSubId !== sub.id) { calSubId = sub.id; calMonth = null; pickDays = new Set(); }
   renderPauseCal(sub);
 }
@@ -204,7 +205,7 @@ function renderPauseCal(sub) {
   const today = localToday(), start = sub.subscriptionStart ? dayKey(toD(sub.subscriptionStart)) : today, end = sub.subscriptionEnd ? dayKey(toD(sub.subscriptionEnd)) : null;
   const train = TRAIN_DAYS[sub.packageType] || [6, 0, 1, 2, 3, 4];
   const used = pausesOf(sub).map(p => p.date), pend = pendingPausesFor(sub.id).map(r => r.start), pendCancel = pendingCancels(sub.id);
-  const left = PAUSE_MAX - used.length - pend.length;
+  const left = pauseMax(sub) - used.length - pend.length;
   pickDays = new Set([...pickDays].filter(k => !used.includes(k) && !pend.includes(k) && k >= today && (!end || k <= end)));
   if (!calMonth) calMonth = (today >= start ? today : start).slice(0, 7);
   const [y, m] = calMonth.split('-').map(Number), n = new Date(Date.UTC(y, m, 0)).getUTCDate(), offset = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 1) % 7;
@@ -234,7 +235,7 @@ function renderPauseCal(sub) {
 function togglePick(k) {
   const sub = currentSubscription; if (!sub) return;
   if (pickDays.has(k)) pickDays.delete(k);
-  else { const left = PAUSE_MAX - pausesOf(sub).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return alert(left <= 0 ? 'استخدمت الإيقافات الثلاثة لهذا الشهر' : `يمكنك اختيار ${left} ${left === 1 ? 'يوم' : 'أيام'} فقط`); pickDays.add(k); }
+  else { const left = pauseMax(sub) - pausesOf(sub).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return alert(left <= 0 ? (pauseMax(sub) === 1 ? 'استخدمت الإيقاف المسموح لهذا الشهر' : 'استخدمت الإيقافات الثلاثة لهذا الشهر') : `يمكنك اختيار ${left} ${left === 1 ? 'يوم' : 'أيام'} فقط`); pickDays.add(k); }
   renderPauseCal(sub);
 }
 // pauses are approved automatically by the server (Cloud Function) within seconds — no admin step
@@ -246,7 +247,7 @@ async function cancelPause(k) {
 async function requestPause() {
   const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
   const picked = [...pickDays].sort(); if (!picked.length) return alert('اختر يوم الإيقاف من التقويم');
-  if (pausesOf(sub).length + pendingPausesFor(sub.id).length + picked.length > PAUSE_MAX) return alert('تجاوزت عدد الإيقافات المسموح (3 شهرياً)');
+  if (pausesOf(sub).length + pendingPausesFor(sub.id).length + picked.length > pauseMax(sub)) return alert(`تجاوزت عدد الإيقافات المسموح (${pauseMax(sub)} شهرياً)`);
   if (!confirm(`إيقاف اشتراك ${sub.childName}:\n${picked.map(dLabel).join('\n')}\n\nسيُمدَّد الاشتراك ${picked.length} ${picked.length === 1 ? 'يوماً' : 'أيام'}.`)) return;
   const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الإيقاف...';
   const reason = $('pauseReason').value.trim(), at = new Date().toISOString();

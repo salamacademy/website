@@ -11,7 +11,6 @@ let currentStep = 1;
   if (p.get('loyal') === '1') document.getElementById('loyal').checked = true;
   if (p.get('parent')) document.getElementById('parentName').value = p.get('parent');
   if (p.get('phone')) document.getElementById('phone').value = p.get('phone');
-  if (p.get('email')) document.getElementById('email').value = p.get('email');
   if (p.get('parent') || p.get('phone')) { const h = document.querySelector('.reg-header p'); if (h) h.textContent = '👦 تسجيل طفل آخر لنفس ولي الأمر — بيانات التواصل معبّأة مسبقاً'; }
 })();
 
@@ -88,7 +87,7 @@ document.getElementById('regForm').addEventListener('submit', async function (e)
     parentName: v('parentName'),
     phone: v('phone').replace(/\D/g, ''),
     phone2: v('phone2').replace(/\D/g, ''),
-    email: v('email'),
+    email: '',
     healthIssues: v('healthIssues') || 'لا يوجد',
     allergies: v('allergies') || 'لا يوجد',
     reason: v('reason'),

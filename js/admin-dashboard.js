@@ -248,11 +248,12 @@ function fillEditPackages(s) {
 let editPauses = [];
 function renderEditPauses() {
   document.getElementById('editPauses').innerHTML = editPauses.length ? editPauses.map((p, i) => `<div class="pause-row"><input type="date" value="${p.date || ''}" onchange="editPauses[${i}].date=this.value"/><input type="text" value="${(p.reason || '').replace(/"/g, '&quot;')}" placeholder="السبب" onchange="editPauses[${i}].reason=this.value"/><button type="button" onclick="removeEditPause(${i})" title="حذف">🗑️</button></div>`).join('') : '<div class="hint">لا توجد إيقافات</div>';
-  document.getElementById('editPauseCount').textContent = `${editPauses.length}/3`;
+  document.getElementById('editPauseCount').textContent = `${editPauses.length}/${editPauseMax()}`;
 }
 function shiftEditEnd(days) { const e = document.getElementById('editEndDate'); if (e.value) e.value = addDaysIso(e.value, days); }
+const editPauseMax = () => (document.getElementById('editPackage').value === 'football' ? 1 : 3);
 function addEditPause() {
-  if (editPauses.length >= 3 && !confirm('استخدم 3 إيقافات هذا الشهر. إضافة إيقاف آخر على أي حال؟')) return;
+  if (editPauses.length >= editPauseMax() && !confirm(`استخدم ${editPauses.length} من ${editPauseMax()} إيقاف هذا الشهر. إضافة إيقاف آخر على أي حال؟`)) return;
   editPauses.push({ date: todayIso(), reason: '', approvedAt: new Date().toISOString(), by: 'admin' }); shiftEditEnd(1); renderEditPauses();
   showToast('➕ أُضيف إيقاف — مُدّد الاشتراك يوماً');
 }
