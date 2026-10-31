@@ -100,14 +100,13 @@
     <div class="page-title"><h3>➕ إضافة اشتراك يدوي</h3></div>
     <form class="card" onsubmit="saveSubscription(event)">
       <div class="fg2">
-        <div class="fg"><label>اسم الطفل</label><input type="text" id="newChildName" required placeholder="الاسم"/></div>
+        <div class="fg"><label>اسم المشترك</label><input type="text" id="newChildName" required placeholder="الاسم"/></div>
         <div class="fg"><label>العمر</label><input type="number" id="newChildAge" required min="4" max="18" placeholder="السن"/></div>
       </div>
       <div class="fg2">
         <div class="fg"><label>ولي الأمر</label><input type="text" id="newParentName" required placeholder="الاسم"/></div>
         <div class="fg"><label>الهاتف</label><input type="tel" id="newPhone" required placeholder="XXXXXXXX" maxlength="8" inputmode="numeric"/></div>
       </div>
-      <div class="fg"><label>البريد (اختياري)</label><input type="email" id="newEmail"/></div>
       <div class="fg2">
         <div class="fg"><label>الباقة</label>
           <select id="newPackage" onchange="updatePackagePrice()" required>
@@ -235,7 +234,7 @@
   <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeEditModal()" aria-label="إغلاق">✕</button>
     <h3>✏️ تعديل الاشتراك</h3><p class="sub" id="editName"></p>
     <input type="hidden" id="editSubId"/>
-    <div class="fg2"><div class="fg"><label>اسم الطفل</label><input type="text" id="editChildName"/></div><div class="fg"><label>العمر</label><input type="number" id="editChildAge" min="3" max="18"/></div></div>
+    <div class="fg2"><div class="fg"><label>اسم المشترك</label><input type="text" id="editChildName"/></div><div class="fg"><label>العمر</label><input type="number" id="editChildAge" min="3" max="18"/></div></div>
     <div class="fg2"><div class="fg"><label>ولي الأمر</label><input type="text" id="editParentName"/></div><div class="fg"><label>الهاتف</label><input type="tel" id="editPhone" maxlength="8" inputmode="numeric"/></div></div>
     <div class="fg"><label>البريد</label><input type="email" id="editEmail"/></div>
     <div class="fg2"><div class="fg"><label>الباقة</label><select id="editPackage" onchange="updatePackagePrice('editPackage','editAmount')"></select></div><div class="fg"><label>المبلغ (د.ك)</label><input type="number" id="editAmount" step="0.5"/></div></div>

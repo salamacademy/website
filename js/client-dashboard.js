@@ -22,7 +22,11 @@ let portalDoc = null, portalUnsub = null;
 function loadClientData() {
   document.getElementById('topPhone') && (document.getElementById('topPhone').textContent = PHONE);
   portalUnsub = db.collection('portal').doc(PHONE).onSnapshot(doc => {
-    if (!doc.exists) { portalDoc = null; kids = []; showNoSubscription(); return; }
+    if (!doc.exists) {
+      // number not registered → back to login with a message (wait for the server answer, not an empty offline cache)
+      if (!doc.metadata.fromCache) { localStorage.removeItem('salamPhone'); return location.replace('login.html?unreg=' + PHONE); }
+      portalDoc = null; kids = []; showNoSubscription(); return;
+    }
     portalDoc = doc.data();
     const rank = { active: 0, approved: 1, pending_payment: 1, pending_review: 2 };
     const best = (a, b) => { const ra = rank[a.status] ?? 5, rb = rank[b.status] ?? 5; if (ra !== rb) return ra - rb; return (toD(b.createdAt)?.getTime() || 0) - (toD(a.createdAt)?.getTime() || 0); };
@@ -95,7 +99,7 @@ function ringIcon(ch, color, ratio) { $('daysRemaining').textContent = ch; $('da
 function renderDetails(sub) {
   const ST = { active: ['ok', '✅ نشط'], pending_review: ['gold', '📝 قيد المراجعة'], approved: ['info', '💳 بانتظار الدفع'], pending_payment: ['info', '💳 بانتظار الدفع'], rejected: ['bad', '⛔ مرفوض'], expired: ['bad', '❌ منتهي'] }[sub.status] || ['copper', sub.status];
   const row = (k, v) => `<div class="sched"><span style="width:auto;color:var(--text-light);font-size:0.8rem;min-width:90px">${k}</span><b>${v || '--'}</b></div>`;
-  $('subscriptionDetails').innerHTML = row('اسم الطفل', sub.childName) + row('ولي الأمر', sub.parentName) + row('الهاتف', `<span dir="ltr">${sub.phone || ''}</span>`) + row('الباقة', sub.packageName) + row('الرسوم الشهرية', (sub.amount || '--') + ' د.ك') + row('الحالة', `<span class="chip ${ST[0]}">${ST[1]}</span>`) + (sub.subscriptionStart ? row('بداية الاشتراك', fmt(sub.subscriptionStart)) + row('نهاية الاشتراك', fmt(sub.subscriptionEnd)) : '') + (sub.loyaltyMember ? row('العضوية', '<span class="chip gold">🏅 أسرة سلام</span>') : '');
+  $('subscriptionDetails').innerHTML = row('اسم المشترك', sub.childName) + row('ولي الأمر', sub.parentName) + row('الهاتف', `<span dir="ltr">${sub.phone || ''}</span>`) + row('الباقة', sub.packageName) + row('الرسوم الشهرية', (sub.amount || '--') + ' د.ك') + row('الحالة', `<span class="chip ${ST[0]}">${ST[1]}</span>`) + (sub.subscriptionStart ? row('بداية الاشتراك', fmt(sub.subscriptionStart)) + row('نهاية الاشتراك', fmt(sub.subscriptionEnd)) : '') + (sub.loyaltyMember ? row('العضوية', '<span class="chip gold">🏅 أسرة سلام</span>') : '');
 }
 function renderSchedule(type) {
   const s = SCHEDULES[type]; if (!s) { $('scheduleDisplay').innerHTML = '<div class="empty">لا يوجد جدول</div>'; $('scheduleMini').innerHTML = ''; return; }

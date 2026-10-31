@@ -265,7 +265,7 @@ function closeEditModal() { document.getElementById('editModal').classList.remov
 async function saveEdit(btn) {
   const id = v('editSubId'); const s = allSubscriptions.find(x => x.id === id); if (!s) return;
   const phone = v('editPhone').replace(/\D/g, '');
-  if (!v('editChildName')) return showToast('❌ اكتب اسم الطفل');
+  if (!v('editChildName')) return showToast('❌ اكتب اسم المشترك');
   if (phone.length !== 8) return showToast('❌ رقم الهاتف يجب أن يكون 8 أرقام');
   const sv = v('editStartDate'), ev = v('editEndDate');
   if (sv && ev && ev <= sv) return showToast('❌ تاريخ النهاية يجب أن يكون بعد البداية');
@@ -305,7 +305,7 @@ async function saveSubscription(e) {
     if (!sv) throw new Error('حدد تاريخ البداية');
     if (ev <= sv) throw new Error('تاريخ النهاية يجب أن يكون بعد البداية');
     const end = new Date(ev + 'T00:00:00Z');
-    const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: v('newEmail'), packageType: o.value, packageName: o.dataset.name, amount: +v('newAmount'), paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: tsFromIso(sv), subscriptionEnd: tsFromIso(ev), daysRemaining: Math.max(0, Math.ceil((end - new Date()) / 864e5)), pauseUsed: false, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
+    const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: '', packageType: o.value, packageName: o.dataset.name, amount: +v('newAmount'), paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: tsFromIso(sv), subscriptionEnd: tsFromIso(ev), daysRemaining: Math.max(0, Math.ceil((end - new Date()) / 864e5)), pauseUsed: false, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
     const ref = pendingAddId ? db.collection('subscriptions').doc(pendingAddId) : db.collection('subscriptions').doc(); pendingAddId = ref.id;
     await withTimeout(ref.set(data));
     pendingAddId = null;
@@ -316,7 +316,7 @@ async function saveSubscription(e) {
   finally { btn.disabled = false; btn.textContent = '💾 حفظ وتفعيل الاشتراك'; }
 }
 function v(id) { return (document.getElementById(id).value || '').trim(); }
-function clearAddForm() { ['newChildName', 'newChildAge', 'newParentName', 'newPhone', 'newEmail', 'newPackage', 'newAmount', 'newNotes'].forEach(i => document.getElementById(i).value = ''); pendingAddId = null; document.getElementById('newStartDate').value = todayIso(); autoEndDate('newStartDate', 'newEndDate'); }
+function clearAddForm() { ['newChildName', 'newChildAge', 'newParentName', 'newPhone', 'newPackage', 'newAmount', 'newNotes'].forEach(i => document.getElementById(i).value = ''); pendingAddId = null; document.getElementById('newStartDate').value = todayIso(); autoEndDate('newStartDate', 'newEndDate'); }
 clearAddForm();
 
 // ---------- WHATSAPP ----------

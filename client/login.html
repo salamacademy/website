@@ -29,7 +29,7 @@
             <input type="tel" id="loginPhone" placeholder="XXXXXXXX" maxlength="8" inputmode="numeric" autocomplete="tel" autofocus/>
           </div>
         </div>
-        <button class="btn-portal-primary" onclick="enter()">دخول ←</button>
+        <button class="btn-portal-primary" id="enterBtn" onclick="enter()">دخول ←</button>
         <div id="msgBox" class="error-msg"></div>
         <div class="divider"><span>ليس لديك اشتراك؟</span></div>
         <a href="register.html" class="btn-portal-ghost" style="display:block;text-align:center;text-decoration:none;margin-top:0">📝 نموذج التسجيل</a>
@@ -38,17 +38,28 @@
       </div>
     </div>
   </div>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="../js/firebase-config.js"></script>
   <script>
     const qp = new URLSearchParams(location.search); const qPhone = (qp.get('phone') || '').replace(/\D/g, '').slice(-8);
+    const unreg = (qp.get('unreg') || '').replace(/\D/g, '');
+    if (unreg) showMsg('هذا الرقم (' + unreg + ') غير مسجّل في الأكاديمية. يرجى تعبئة نموذج التسجيل والموافقة على الشروط أولاً، ثم انتظار موافقة الإدارة.');
     if (/^[569]\d{7}$/.test(qPhone)) { localStorage.setItem('salamPhone', qPhone); location.replace('dashboard.html' + (qp.get('go') ? '#' + qp.get('go') : '')); }
     const saved = localStorage.getItem('salamPhone');
     if (saved && /^\d{8}$/.test(saved)) location.replace('dashboard.html' + (qp.get('go') ? '#' + qp.get('go') : ''));
     const inp = document.getElementById('loginPhone');
     inp.addEventListener('input', () => { inp.value = inp.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '').slice(0, 8); });
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') enter(); });
-    function enter() {
+    function showMsg(t) { const m = document.getElementById('msgBox'); m.textContent = t; m.style.display = 'block'; m.style.background = '#ffebee'; m.style.color = '#c62828'; }
+    async function enter() {
       const p = inp.value.trim();
-      if (!/^[569]\d{7}$/.test(p)) { const m = document.getElementById('msgBox'); m.textContent = 'أدخل رقم هاتف كويتي صحيح (8 أرقام)'; m.style.display = 'block'; m.style.background = '#ffebee'; m.style.color = '#c62828'; return; }
+      if (!/^[569]\d{7}$/.test(p)) return showMsg('أدخل رقم هاتف كويتي صحيح (8 أرقام)');
+      const btn = document.getElementById('enterBtn'); btn.disabled = true; btn.textContent = '⏳ جاري التحقق...';
+      try {
+        const doc = await db.collection('portal').doc(p).get();
+        if (!doc.exists) { btn.disabled = false; btn.textContent = 'دخول ←'; return showMsg('هذا الرقم غير مسجّل في الأكاديمية. يرجى تعبئة نموذج التسجيل والموافقة على الشروط أولاً، ثم انتظار موافقة الإدارة.'); }
+      } catch (e) { btn.disabled = false; btn.textContent = 'دخول ←'; return showMsg('تعذر التحقق من الرقم. تأكد من الاتصال بالإنترنت وحاول مرة أخرى.'); }
       localStorage.setItem('salamPhone', p); location.href = 'dashboard.html';
     }
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});

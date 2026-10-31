@@ -40,6 +40,23 @@ if (isIOS && !isStandalone) {
 
 // ---------- App updates ----------
 // 🔄 button: fetch the newest app files, then reload
+// Pull down at the top of the page to refresh (installed apps have no browser reload button)
+(function () {
+  let y0 = null, dy = 0, el = null;
+  const sheetOpen = () => document.querySelector('.sheet-bg.open');
+  addEventListener('touchstart', e => { y0 = (scrollY <= 0 && e.touches.length === 1 && !sheetOpen()) ? e.touches[0].clientY : null; dy = 0; }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (y0 === null) return;
+    dy = e.touches[0].clientY - y0; if (dy <= 0 || scrollY > 0) { if (el) el.style.opacity = 0; return; }
+    if (!el) { el = document.createElement('div'); el.className = 'ptr'; el.textContent = '🔄'; document.body.appendChild(el); }
+    const d = Math.min(dy, 140); el.style.opacity = Math.min(1, d / 80); el.style.transform = `translateY(${d * 0.6 - 10}px) rotate(${d * 3}deg)`; el.classList.toggle('ready', dy > 90);
+  }, { passive: true });
+  addEventListener('touchend', () => {
+    if (y0 !== null && el && dy > 90 && scrollY <= 0) { el.classList.add('spin'); refreshApp(); }
+    else if (el) el.style.opacity = 0;
+    y0 = null;
+  });
+})();
 async function refreshApp() {
   if (typeof showToast === 'function') showToast('🔄 جاري تحديث التطبيق...');
   try { const r = await navigator.serviceWorker?.getRegistration(); if (r) await r.update(); } catch (_) {}
