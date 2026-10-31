@@ -49,3 +49,7 @@
 .dob { display: grid; grid-template-columns: minmax(0,.8fr) minmax(0,1.4fr) minmax(0,1fr); gap: 8px; }
 .dob select { min-width: 0; padding-left: 6px; padding-right: 6px; }
 .dob-age { margin-top: 6px; font-size: .9rem; font-weight: 700; color: var(--copper-dark, #8a3d14); min-height: 1.2em; }
+
+/* Child name: first / father / family — all three required */
+.name3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.name3 input { min-width: 0; }

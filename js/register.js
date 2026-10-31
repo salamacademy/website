@@ -82,7 +82,7 @@ document.getElementById('regForm').addEventListener('submit', async function (e)
 
   const pkgEl = document.querySelector('input[name="pkg"]:checked');
   const data = {
-    childName: v('childName'),
+    childName: [v('childFirst'), v('childFather'), v('childFamily')].map(x => x.replace(/\s+/g, ' ')).join(' '),
     birthDate: v('birthDate'),
     childAge: parseInt(document.getElementById('ageDisplay').textContent.replace(/\D/g, '')) || null,
     parentName: v('parentName'),
