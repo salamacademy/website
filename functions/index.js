@@ -160,6 +160,7 @@ async function finalizePayment(orderId, gw) {
   const ref = db.collection('payments').doc(orderId); const d = await ref.get(); if (!d.exists) return 'no-order';
   const p = d.data(); if (p.status === 'paid') return 'already';
   const paid = String(gw.result || gw.status || '').toUpperCase() === 'CAPTURED' || gw.status === 'success';
+  if (!paid && (!String(gw.result || gw.status || '').trim() || /PENDING|INITIATED|PROGRESS/i.test(String(gw.result || gw.status)))) return 'pending';
   if (!paid) { await ref.update({ status: 'failed', gateway: gw, updatedAt: admin.firestore.FieldValue.serverTimestamp() }); return 'failed'; }
   let activated = false;
   const pkgItem = (p.items || []).find(i => i.packageType);
@@ -172,13 +173,14 @@ async function finalizePayment(orderId, gw) {
       const start = s.status === 'active' && curEnd && curEnd > now ? curEnd : now; // renewal extends from current end
       const end = new Date(start); end.setDate(end.getDate() + 30);
       await subRef.update({ status: 'active', packageType: pkgItem.packageType, packageName: pkgItem.name, amount: pkgItem.price, subscriptionStart: admin.firestore.Timestamp.fromDate(s.status === 'active' && curEnd && curEnd > now ? (s.subscriptionStart.toDate ? s.subscriptionStart.toDate() : now) : now), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauses: [], pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId });
-      activated = true; await PortalSync.syncPhone(db, p.phone);
+      activated = true;
     }
   }
   const batch = db.batch(); const today = new Date(Date.now() + 3 * 3600e3).toISOString().split('T')[0];
   (p.items || []).forEach(i => batch.set(db.collection('transactions').doc(), { type: 'income', amount: +(i.price * i.qty).toFixed(3), category: i.category || 'أخرى', note: `${i.name}${i.qty > 1 ? ' ×' + i.qty : ''} — ${p.childName || p.phone} (UPayment)`, method: 'upayment', date: today, paymentId: orderId, createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'upayment' }));
   batch.update(ref, { status: 'paid', activated, gateway: gw, paymentType: gw.payment_type || gw.paymentType || null, paidAt: admin.firestore.FieldValue.serverTimestamp() });
   await batch.commit();
+  try { await PortalSync.syncPhone(db, p.phone); } catch (e) { console.warn('portal sync', e.message); } // subscription + payment history
   await addNotif({ icon: '💳', title: `دفعة ${(+p.amount).toFixed(3)} د.ك`, body: `${p.childName || p.phone} — ${(p.items || []).map(i => i.name).join('، ')}${activated ? ' · ✅ تم التفعيل' : ''}`, page: 'finance' }, 'pay_' + orderId);
   try { await tgcore.notifyAdmins(db, tg, `💳 <b>دفعة UPayment</b>\n${p.childName || p.phone} — <b>${(+p.amount).toFixed(3)} د.ك</b>\n${(p.items || []).map(i => '• ' + i.name).join('\n')}${activated ? '\n✅ تم تفعيل الاشتراك' : ''}`); } catch (_) {}
   if (p.phone) { try { const pd = await db.collection('portal').doc(p.phone).get(); await sendTo(pd.exists ? pd.data().fcmTokens : [], '✅ تم استلام الدفع', `${(+p.amount).toFixed(3)} د.ك${activated ? ' · تم تفعيل الاشتراك' : ''}`, '/website/client/dashboard.html'); } catch (_) {} }
@@ -207,10 +209,11 @@ exports.verifyPayment = fx.https.onRequest(async (req, res) => {
     let d = orderId ? await db.collection('payments').doc(orderId).get() : null;
     if ((!d || !d.exists) && track) { const q = await db.collection('payments').where('trackId', '==', String(track)).limit(1).get(); if (!q.empty) { d = q.docs[0]; orderId = d.id; } }
     if (!d || !d.exists) return res.json({ ok: false, error: 'order not found' });
-    const p = d.data(); if (p.status === 'paid') return res.json({ ok: true, orderId, status: 'paid' });
-    const tk = track || p.trackId; if (!tk || !UP.key) return res.json({ ok: true, orderId, status: p.status });
-    const out = await finalizePayment(orderId, gwFromStatus(await fetchStatus(tk)));
-    res.json({ ok: true, orderId, status: out });
+    const info = x => ({ ok: true, orderId, status: x.status, amount: x.amount, items: x.items || [], childName: x.childName || '', activated: !!x.activated });
+    const p = d.data(); if (p.status === 'paid') return res.json(info(p));
+    const tk = track || p.trackId; if (!tk || !UP.key) return res.json(info(p));
+    await finalizePayment(orderId, gwFromStatus(await fetchStatus(tk)));
+    res.json(info((await db.collection('payments').doc(orderId).get()).data()));
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 

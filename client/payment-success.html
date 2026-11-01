@@ -11,23 +11,30 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script><script src="../js/firebase-config.js"></script>
 <script>
 const q = new URLSearchParams(location.search);
-let order = q.get('order') || q.get('requested_order_id') || q.get('order_id') || ''; const track = q.get('track_id') || q.get('trackId'); const result = (q.get('result') || '').toUpperCase();
+let order = q.get('order') || q.get('requested_order_id') || q.get('order_id') || ''; const track = q.get('track_id') || q.get('trackId') || ''; const result = (q.get('result') || '').toUpperCase();
 const set = (i, t, m) => { document.getElementById('ico').textContent = i; document.getElementById('ttl').textContent = t; document.getElementById('msg').innerHTML = m; };
+const canceled = () => set('↩️', 'تم إلغاء الدفع', 'لم يتم خصم أي مبلغ. ارجع إلى حسابك للدفع.');
+async function check() {
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 12000);
+  try { const r = await fetch(PAYMENT_API_URL + '/verifyPayment?' + new URLSearchParams({ order, track_id: track }), { signal: ac.signal, cache: 'no-store' }); return await r.json(); }
+  catch (_) { return null; } finally { clearTimeout(t); }
+}
+function show(p) {
+  const box = document.getElementById('box'); box.style.display = 'block';
+  box.innerHTML = (p.items || []).map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${i.icon || ''} ${i.name}${i.qty > 1 ? ' ×' + i.qty : ''}</span><b>${(i.price * i.qty).toFixed(3)} د.ك</b></div>`).join('') + `<div style="display:flex;justify-content:space-between;border-top:1px dashed #ccc;margin-top:8px;padding-top:8px"><b>الإجمالي</b><b style="color:#1B5E20">${(+p.amount).toFixed(3)} د.ك</b></div>`;
+  if (p.status === 'paid') set('🎉', 'تم الدفع بنجاح!', `شكراً لك${p.childName ? ' — ' + p.childName : ''}. ${p.activated ? 'تم تفعيل الاشتراك تلقائياً ✅' : 'تم تسجيل الدفعة ✅'}`);
+  else if (p.status === 'failed') set('❌', 'لم تتم عملية الدفع', 'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى من حسابك.');
+  else set('⏳', 'بانتظار تأكيد الدفع', 'إذا أتممت الدفع فسيتم التأكيد خلال لحظات...');
+}
 (async () => {
-  try {
-    if (typeof PAYMENT_API_URL !== 'undefined' && PAYMENT_API_URL && !PAYMENT_API_URL.includes('YOUR_')) {
-      const r = await fetch(PAYMENT_API_URL + '/verifyPayment?' + new URLSearchParams({ order, track_id: track || '' })); const j = await r.json(); if (j.orderId) order = j.orderId;
-    }
-  } catch (_) {}
-  if (!order) { set(result === 'CANCELED' ? '↩️' : 'ℹ️', result === 'CANCELED' ? 'تم إلغاء الدفع' : 'لا يوجد طلب دفع', 'لم يتم خصم أي مبلغ. ارجع إلى حسابك للدفع.'); return; }
-  let tries = 0;
-  db.collection('payments').doc(order).onSnapshot(d => {
-    if (!d.exists) { if (++tries < 2) return; set('❓', 'لم نجد الطلب', 'تواصل معنا إذا تم خصم المبلغ.'); return; }
-    const p = d.data(); const box = document.getElementById('box');
-    box.style.display = 'block'; box.innerHTML = (p.items || []).map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${i.icon || ''} ${i.name}${i.qty > 1 ? ' ×' + i.qty : ''}</span><b>${(i.price * i.qty).toFixed(3)} د.ك</b></div>`).join('') + `<div style="display:flex;justify-content:space-between;border-top:1px dashed #ccc;margin-top:8px;padding-top:8px"><b>الإجمالي</b><b style="color:#1B5E20">${(+p.amount).toFixed(3)} د.ك</b></div>`;
-    if (p.status === 'paid') set('🎉', 'تم الدفع بنجاح!', `شكراً لك${p.childName ? ' — ' + p.childName : ''}. ${p.activated ? 'تم تفعيل الاشتراك تلقائياً ✅' : 'تم تسجيل الدفعة ✅'}`);
-    else if (p.status === 'failed' || result === 'NOT CAPTURED' || result === 'CANCELED') set('❌', 'لم تتم عملية الدفع', 'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى من حسابك.');
-    else set('⏳', 'بانتظار تأكيد الدفع', 'إذا أتممت الدفع فسيتم التأكيد خلال لحظات...');
-  });
+  if (!order && !track) return result === 'CANCELED' ? canceled() : set('ℹ️', 'لا يوجد طلب دفع', 'لم يتم خصم أي مبلغ. ارجع إلى حسابك للدفع.');
+  for (let n = 0; n < 20; n++) { // ~1 minute
+    const j = await check();
+    if (j && j.orderId) order = j.orderId;
+    if (j && j.ok === false && j.error === 'order not found') return set('❓', 'لم نجد الطلب', 'تواصل معنا إذا تم خصم المبلغ.');
+    if (j && j.status) { show(j); if (j.status === 'paid' || j.status === 'failed') return; if (result === 'CANCELED') return canceled(); }
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  set('⏳', 'بانتظار تأكيد الدفع', 'إذا تم خصم المبلغ فسيظهر في حسابك خلال دقائق. يمكنك الذهاب إلى حسابك الآن.');
 })();
 </script></body></html>

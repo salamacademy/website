@@ -6,6 +6,7 @@
 (function (root, factory) { if (typeof module === 'object' && module.exports) module.exports = factory(); else root.PortalSync = factory(); })(typeof self !== 'undefined' ? self : this, function () {
   const PUBLIC = ['childName', 'parentName', 'phone', 'email', 'packageType', 'packageName', 'amount', 'status', 'subscriptionStart', 'subscriptionEnd', 'plannedStart', 'plannedEnd', 'adminNote', 'pauseStart', 'pauseEnd', 'pauseUsed', 'pauseReason', 'pauses', 'loyaltyMember', 'createdAt'];
   const norm = p => String(p || '').replace(/\D/g, '').slice(-8);
+  const ms = t => t ? (t.toMillis ? t.toMillis() : +new Date(t)) : 0;
   function buildDoc(subs) {
     const kids = subs.map(s => { const o = { subId: s.id }; PUBLIC.forEach(k => { if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; }); return o; });
     const p = subs[0] || {};
@@ -21,6 +22,10 @@
     const doc = buildDoc(subs);
     const cur = await ref.get(); const curData = cur.exists ? cur.data() : null;
     if (curData) { doc.pauseRequests = curData.pauseRequests || []; doc.fcmTokens = curData.fcmTokens || []; }
+    try { // last 5 paid online payments of the family (shown to the parent)
+      const ps = (await db.collection('payments').where('phone', '==', phone).get()).docs.map(d => d.data()).filter(p => p.status === 'paid');
+      doc.payments = ps.sort((a, b) => ms(b.paidAt || b.createdAt) - ms(a.paidAt || a.createdAt)).slice(0, 5).map(p => ({ amount: +p.amount || 0, items: (p.items || []).map(i => i.name + (i.qty > 1 ? ' ×' + i.qty : '')), childName: p.childName || '', paidAt: p.paidAt || p.createdAt || null }));
+    } catch (_) { if (curData && curData.payments) doc.payments = curData.payments; }
     await ref.set(doc, { merge: false });
   }
   async function syncAll(db, allSubs) { const phones = [...new Set(allSubs.map(s => norm(s.phone)).filter(p => p.length === 8))]; for (const p of phones) await syncPhone(db, p, allSubs); }

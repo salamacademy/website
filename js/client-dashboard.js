@@ -27,7 +27,7 @@ function loadClientData() {
       if (!doc.metadata.fromCache) { localStorage.removeItem('salamPhone'); return location.replace('login.html?unreg=' + PHONE); }
       portalDoc = null; kids = []; showNoSubscription(); return;
     }
-    portalDoc = doc.data();
+    portalDoc = doc.data(); renderPayments();
     const rank = { active: 0, approved: 1, pending_payment: 1, pending_review: 2 };
     const best = (a, b) => { const ra = rank[a.status] ?? 5, rb = rank[b.status] ?? 5; if (ra !== rb) return ra - rb; return (toD(b.createdAt)?.getTime() || 0) - (toD(a.createdAt)?.getTime() || 0); };
     const byKid = {};
@@ -100,6 +100,11 @@ function renderDetails(sub) {
   const ST = { active: ['ok', '✅ نشط'], pending_review: ['gold', '📝 قيد المراجعة'], approved: ['info', '💳 بانتظار الدفع'], pending_payment: ['info', '💳 بانتظار الدفع'], rejected: ['bad', '⛔ مرفوض'], expired: ['bad', '❌ منتهي'] }[sub.status] || ['copper', sub.status];
   const row = (k, v) => `<div class="sched"><span style="width:auto;color:var(--text-light);font-size:0.8rem;min-width:90px">${k}</span><b>${v || '--'}</b></div>`;
   $('subscriptionDetails').innerHTML = row('اسم المشترك', sub.childName) + row('ولي الأمر', sub.parentName) + row('الهاتف', `<span dir="ltr">${sub.phone || ''}</span>`) + row('الباقة', sub.packageName) + row('الرسوم الشهرية', (sub.amount || '--') + ' د.ك') + row('الحالة', `<span class="chip ${ST[0]}">${ST[1]}</span>`) + (sub.subscriptionStart ? row('بداية الاشتراك', fmt(sub.subscriptionStart)) + row('نهاية الاشتراك', fmt(sub.subscriptionEnd)) : '') + (sub.loyaltyMember ? row('العضوية', '<span class="chip gold">🏅 أسرة سلام</span>') : '');
+}
+function renderPayments() { // last 5 online payments of the family (kept in portal/{phone}.payments by the server)
+  const esc = x => String(x || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ps = portalDoc?.payments || [];
+  $('paymentsList').innerHTML = ps.length ? ps.map(p => `<div class="sched"><span style="width:auto;color:var(--text-light);font-size:0.8rem;min-width:80px">${fmt(p.paidAt)}</span><div style="flex:1"><b>${(+p.amount).toFixed(3)} د.ك</b><div style="font-size:0.78rem;color:var(--text-light)">${esc((p.items || []).join('، '))}${p.childName ? ' — ' + esc(p.childName) : ''}</div></div><span class="chip ok">✅ مدفوع</span></div>`).join('') : '<div class="empty">لا توجد مدفوعات إلكترونية بعد</div>';
 }
 function renderSchedule(type) {
   const s = SCHEDULES[type]; if (!s) { $('scheduleDisplay').innerHTML = '<div class="empty">لا يوجد جدول</div>'; $('scheduleMini').innerHTML = ''; return; }
