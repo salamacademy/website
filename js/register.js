@@ -11,7 +11,7 @@ let currentStep = 1;
   if (p.get('loyal') === '1') document.getElementById('loyal').checked = true;
   if (p.get('parent')) document.getElementById('parentName').value = p.get('parent');
   if (p.get('phone')) document.getElementById('phone').value = p.get('phone');
-  if (p.get('parent') || p.get('phone')) { const h = document.querySelector('.reg-header p'); if (h) h.textContent = '👦 تسجيل طفل آخر لنفس ولي الأمر — بيانات التواصل معبّأة مسبقاً'; }
+  if (p.get('parent') || p.get('phone')) { const h = document.querySelector('.reg-header p'); if (h) h.textContent = '👦 تسجيل مشترك آخر لنفس ولي الأمر — بيانات التواصل معبّأة مسبقاً'; }
 })();
 
 // Birth date: day / month / year lists (no calendar scrolling)
@@ -112,7 +112,7 @@ document.getElementById('regForm').addEventListener('submit', async function (e)
     document.querySelector('.reg-steps').style.display = 'none';
     document.getElementById('succPhone').textContent = '+965 ' + data.phone;
     document.getElementById('succId').textContent = ref.id.slice(0, 8).toUpperCase();
-    const msg = `السلام عليكم، قمت بتعبئة نموذج التسجيل في أكاديمية سلام 🏆\n\nالطفل: ${data.childName}\nولي الأمر: ${data.parentName}\nالباقة: ${data.packageName}${data.loyaltyMember ? ' (أسرة سلام)' : ''}\nرقم الطلب: ${ref.id.slice(0,8).toUpperCase()}`;
+    const msg = `السلام عليكم، قمت بتعبئة نموذج التسجيل في أكاديمية سلام 🏆\n\nالمشترك: ${data.childName}\nولي الأمر: ${data.parentName}\nالباقة: ${data.packageName}${data.loyaltyMember ? ' (أسرة سلام)' : ''}\nرقم الطلب: ${ref.id.slice(0,8).toUpperCase()}`;
     document.getElementById('succWa').href = 'https://wa.me/96593000607?text=' + encodeURIComponent(msg);
     document.getElementById('successView').hidden = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });

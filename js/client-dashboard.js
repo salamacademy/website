@@ -290,7 +290,7 @@ function renderKidSwitch() {
   const link = $('addKidLink'); if (link) link.href = addHref;
   if (kids.length < 2) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
-  el.innerHTML = kids.map((s, i) => `<button class="kid ${i === kidIdx ? 'on' : ''}" onclick="selectKid(${i})"><span class="av">👦</span>${(s.childName || '').split(' ')[0]}<span class="st ${kidDot(s)}"></span></button>`).join('') + `<a class="kid add" href="${addHref}"><span class="av">➕</span>طفل آخر</a>`;
+  el.innerHTML = kids.map((s, i) => `<button class="kid ${i === kidIdx ? 'on' : ''}" onclick="selectKid(${i})"><span class="av">👦</span>${(s.childName || '').split(' ')[0]}<span class="st ${kidDot(s)}"></span></button>`).join('') + `<a class="kid add" href="${addHref}"><span class="av">➕</span>مشترك آخر</a>`;
 }
 function selectKid(i, first) {
   kidIdx = i; const s = kids[i]; if (!s) return;
