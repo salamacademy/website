@@ -11,7 +11,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script><script src="../js/firebase-config.js"></script>
 <script>
 const q = new URLSearchParams(location.search);
-let order = q.get('order') || q.get('requested_order_id') || q.get('order_id') || ''; const track = q.get('track_id') || q.get('trackId') || ''; const result = (q.get('result') || '').toUpperCase();
+const oid = v => (String(v || '').match(/^[A-Za-z0-9]{20}/) || [''])[0]; // Firestore id; UPayment glues "?payment_id=…" onto ?order=
+let order = oid(q.get('requested_order_id')) || oid(q.get('order')) || oid(q.get('reference')) || ''; const track = q.get('track_id') || q.get('trackId') || ''; const result = (q.get('result') || '').toUpperCase();
 const set = (i, t, m) => { document.getElementById('ico').textContent = i; document.getElementById('ttl').textContent = t; document.getElementById('msg').innerHTML = m; };
 const canceled = () => set('↩️', 'تم إلغاء الدفع', 'لم يتم خصم أي مبلغ. ارجع إلى حسابك للدفع.');
 async function check() {

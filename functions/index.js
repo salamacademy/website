@@ -205,7 +205,8 @@ exports.upaymentWebhook = fx.https.onRequest(async (req, res) => {
 exports.verifyPayment = fx.https.onRequest(async (req, res) => {
   if (CORS(req, res)) return;
   try {
-    let orderId = String(req.query.order || req.query.requested_order_id || req.query.order_id || '').trim(); const track = req.query.track_id || req.query.trackId;
+    const oid = v => (String(v || '').match(/^[A-Za-z0-9]{20}/) || [''])[0]; // UPayment appends "?payment_id=…" to ?order=
+    let orderId = oid(req.query.requested_order_id) || oid(req.query.order) || oid(req.query.order_id); const track = req.query.track_id || req.query.trackId;
     let d = orderId ? await db.collection('payments').doc(orderId).get() : null;
     if ((!d || !d.exists) && track) { const q = await db.collection('payments').where('trackId', '==', String(track)).limit(1).get(); if (!q.empty) { d = q.docs[0]; orderId = d.id; } }
     if (!d || !d.exists) return res.json({ ok: false, error: 'order not found' });

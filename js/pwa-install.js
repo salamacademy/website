@@ -74,3 +74,23 @@ if ('serviceWorker' in navigator) {
   // iPhone keeps the PWA in memory for days — check for a new version every time it comes back to the screen
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}); });
 }
+
+// WhatsApp links on iPhone: open the WhatsApp app directly (whatsapp://send) — wa.me inside the home-screen app
+// opens a blank in-app browser that loses the pre-written message and leaves the app on a white screen.
+(function () {
+  if (!isIOS) return;
+  const toApp = url => {
+    const m = String(url || '').match(/^https?:\/\/(?:wa\.me|api\.whatsapp\.com\/send)\/?(\d*)\/?(?:\?(.*))?$/i); if (!m) return null;
+    const q = new URLSearchParams(m[2] || ''); const ph = m[1] || q.get('phone') || ''; const text = q.get('text');
+    return 'whatsapp://send?' + [ph && 'phone=' + ph, text && 'text=' + encodeURIComponent(text)].filter(Boolean).join('&');
+  };
+  const origOpen = window.open.bind(window);
+  const go = (app, web) => {
+    let left = false; const mark = () => { left = true; };
+    document.addEventListener('visibilitychange', mark, { once: true }); window.addEventListener('pagehide', mark, { once: true });
+    location.href = app;
+    setTimeout(() => { if (!left && document.visibilityState === 'visible') origOpen(web, '_blank'); }, 2500); // WhatsApp not installed
+  };
+  window.open = function (url, ...rest) { const a = toApp(url); if (a) { go(a, url); return null; } return origOpen(url, ...rest); };
+  document.addEventListener('click', e => { const el = e.target.closest && e.target.closest('a[href]'); const a = el && toApp(el.href); if (a) { e.preventDefault(); go(a, el.href); } }, true);
+})();
