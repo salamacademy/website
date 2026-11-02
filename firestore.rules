@@ -28,6 +28,7 @@ service cloud.firestore {
     // Trips: public read (shown to parents), admin write. Bookings: admin only (paid bookings are written by Cloud Functions)
     match /trips/{id}        { allow read: if true; allow write: if isAdmin(); }
     match /tripBookings/{id} { allow read, write: if isAdmin(); }
+    match /closures/{id}     { allow read, write: if isAdmin(); } // academy-wide closures (admin only; parents see them as pauses in portal)
     // Payments: created/updated only by Cloud Functions; parent can fetch their own order by id; admin lists
     match /payments/{id}     { allow get: if true; allow list: if isAdmin(); allow write: if false; }
 

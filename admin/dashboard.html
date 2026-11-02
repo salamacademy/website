@@ -92,6 +92,7 @@
   <!-- ===== PAUSED ===== -->
   <section class="page" data-page="paused">
     <div class="page-title"><h3>⏸️ الإيقافات المؤقتة</h3></div>
+    <div id="closuresBox"></div>
     <div id="pausedList"><div class="empty">جاري التحميل...</div></div>
   </section>
 
@@ -313,6 +314,19 @@
   </div>
 </div>
 
+<!-- ACADEMY CLOSURE SHEET (إيقاف عام) -->
+<div class="sheet-bg" id="closureModal" onclick="if(event.target===this)closeClosure()">
+  <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeClosure()" aria-label="إغلاق">✕</button>
+    <h3>🏖️ إيقاف عام للأكاديمية</h3><p class="sub">عطلة رسمية، ظرف طارئ، صيانة الملعب... لا تُحسب الحصص على المشتركين وتُرحّل إلى نهاية الاشتراك، ولا تُخصم من إيقافاتهم.</p>
+    <div class="fg2"><div class="fg"><label>من</label><input type="date" id="clFrom" onchange="if(document.getElementById('clTo').value<this.value)document.getElementById('clTo').value=this.value;previewClosure()"/></div><div class="fg"><label>إلى</label><input type="date" id="clTo" onchange="previewClosure()"/></div></div>
+    <div class="fg"><label>السبب (يظهر لأولياء الأمور)</label><input type="text" id="clReason" placeholder="مثال: عطلة العيد الوطني" oninput="previewClosure()"/></div>
+    <div class="fg"><label>الباقات المشمولة</label><div id="clPkgs"></div></div>
+    <div id="clPreview"></div>
+    <button onclick="applyClosure(this)" class="btn primary" id="clApply" style="margin-top:12px">🏖️ تطبيق الإيقاف العام</button>
+    <button onclick="closeClosure()" class="btn ghost">إلغاء</button>
+  </div>
+</div>
+
 <!-- TRIP DETAIL SHEET -->
 <div class="sheet-bg" id="tripDetailModal" onclick="if(event.target===this)closeTripDetail()">
   <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeTripDetail()" aria-label="إغلاق">✕</button><div id="tripDetailBody"></div></div>
@@ -347,5 +361,6 @@
 <script src="../js/finance.js"></script>
 <script src="../js/trips-common.js"></script>
 <script src="../js/trips-admin.js"></script>
+<script src="../js/closures-admin.js"></script>
 </body>
 </html>

@@ -213,9 +213,13 @@ async function bookTrip(orderId, p, method) {
 const PKG_NAME = { football: 'معسكر كرة القدم', confidence: 'معسكر بناء الثقة والكيوكشن', excellence: 'باقة التميز', excellence_loyal: 'باقة التميز - أسرة سلام' };
 // One month of classes (football 4 · confidence 12 · excellence 16): an active subscription continues after its last class,
 // an expired / new one starts today. The end date is the date of the last class.
+// academy-wide closures still to come (holidays / emergencies) — their days don't count as classes
+async function upcomingClosures() { const q = await db.collection('closures').where('to', '>=', kwToday()).get(); return q.docs.map(d => ({ id: d.id, ...d.data() })); }
 async function renewSub(subRef, s, orderId, pkg) {
-  const now = new Date(), r = Classes.renewal({ ...s, ...(pkg || {}) }), end = Classes.toDate(r.end);
-  await subRef.update({ status: 'active', ...(pkg || {}), subscriptionStart: admin.firestore.Timestamp.fromDate(Classes.toDate(r.start)), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: Math.ceil((end - now) / 864e5), classesPerMonth: Classes.perMonth((pkg && pkg.packageType) || s.packageType), paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauses: [], pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId });
+  const t = (pkg && pkg.packageType) || s.packageType, closed = Classes.closedDays(await upcomingClosures().catch(() => []), t);
+  const now = new Date(), r = Classes.renewal({ ...s, ...(pkg || {}) }, 0, closed), end = Classes.toDate(r.end);
+  const keep = Classes.closurePauses(closed, Classes.today(), r.end); // closure days inside the old + new period
+  await subRef.update({ status: 'active', ...(pkg || {}), subscriptionStart: admin.firestore.Timestamp.fromDate(Classes.toDate(r.start)), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: Math.ceil((end - now) / 864e5), classesPerMonth: Classes.perMonth((pkg && pkg.packageType) || s.packageType), paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId, pauses: keep });
 }
 async function finalizePayment(orderId, gw) {
   const ref = db.collection('payments').doc(orderId); const d = await ref.get(); if (!d.exists) return 'no-order';
@@ -296,6 +300,17 @@ exports.verifyPayment = fx.https.onRequest(async (req, res) => {
 const TRAIN_DAYS = Classes.TRAIN_DAYS;
 const kwToday = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
 const isoOf = ts => ts && ts.toDate ? ts.toDate().toISOString().slice(0, 10) : '';
+// Academy closure (admin "إيقاف عام") → tell the affected parents their classes were moved to the end
+exports.onClosure = fx.firestore.document('closures/{id}').onCreate(async (snap) => {
+  const c = snap.data(), phones = [...new Set((c.affected || []).map(a => a.phone).filter(Boolean))];
+  const fmt = k => new Date(k + 'T00:00:00Z').toLocaleDateString('ar-KW', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const body = `${c.reason ? c.reason + ' — ' : ''}لا تدريب ${c.from === c.to ? 'يوم ' + fmt(c.from) : `من ${fmt(c.from)} إلى ${fmt(c.to)}`}. لن تُخصم الحصص وأُضيفت إلى نهاية الاشتراك ✅`;
+  for (const ph of phones) { try { const pd = await db.collection('portal').doc(ph).get(); if (pd.exists) await sendTo(pd.data().fcmTokens, '🏖️ إيقاف التدريب في الأكاديمية', body, '/website/client/dashboard.html'); } catch (e) { console.warn('closure push', ph, e.message); } }
+  if (TG_TOKEN) try { await tgcore.notifyAdmins(db, tg, `🏖️ <b>إيقاف عام</b>
+${body}
+👥 ${(c.affected || []).length} مشترك`); } catch (_) {}
+});
+
 exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(async (chg) => {
   if (!(chg.after.data().pauseRequests || []).some(r => r.status === 'pending')) return;
   const portalRef = chg.after.ref; const done = [];
@@ -314,7 +329,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
         const endKey = cur.end ? Classes.key(cur.end) : '';
         if (r.type === 'cancel') {
           const i = cur.pauses.findIndex(p => p.date === r.start);
-          if (i < 0) note = 'لا يوجد إيقاف في هذا اليوم'; else if (r.start < today) note = 'لا يمكن إلغاء يوم مضى';
+          if (i < 0) note = 'لا يوجد إيقاف في هذا اليوم'; else if (cur.pauses[i].closure) note = 'هذا يوم إغلاق من الأكاديمية'; else if (r.start < today) note = 'لا يمكن إلغاء يوم مضى';
           else { cur.pauses.splice(i, 1); if (cur.end) cur.end = Classes.toDate(Classes.prev(Classes.key(cur.end), s.packageType)); } // last class moves back
         } else {
           const dow = new Date(r.start + 'T00:00:00Z').getUTCDay();
@@ -323,7 +338,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
           else if (endKey && r.start > endKey) note = 'بعد نهاية الاشتراك';
           else if (!(TRAIN_DAYS[s.packageType] || [6, 0, 1, 2, 3, 4]).includes(dow)) note = 'ليس من أيام تدريب الباقة';
           else if (cur.pauses.some(p => p.date === r.start)) note = 'هذا اليوم موقوف مسبقاً';
-          else if (cur.pauses.length >= Classes.pauses(s.packageType)) note = s.packageType === 'football' ? 'كرة القدم: إيقاف واحد فقط في الشهر' : `استُخدمت الإيقافات المسموحة (${Classes.pauses(s.packageType)})`;
+          else if (Classes.own(cur.pauses).length >= Classes.pauses(s.packageType)) note = s.packageType === 'football' ? 'كرة القدم: إيقاف واحد فقط في الشهر' : `استُخدمت الإيقافات المسموحة (${Classes.pauses(s.packageType)})`;
           else { cur.pauses.push({ date: r.start, reason: r.reason || '', approvedAt: now, by: 'parent' }); if (cur.end) cur.end = Classes.toDate(Classes.next(Classes.key(cur.end), s.packageType)); } // +1 class at the end
         }
         if (!note) upd[r.subId] = cur;
@@ -333,7 +348,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
     }
     for (const [id, u] of Object.entries(upd)) {
       const pauses = u.pauses.sort((a, b) => a.date.localeCompare(b.date));
-      t.update(subs[id].ref, { pauses, pauseUsed: pauses.length >= Classes.pauses(subs[id].s.packageType), pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(u.end), daysRemaining: Math.max(0, Math.ceil((u.end - new Date()) / 864e5)) } : {}) });
+      t.update(subs[id].ref, { pauses, pauseUsed: Classes.own(pauses).length >= Classes.pauses(subs[id].s.packageType), pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(u.end), daysRemaining: Math.max(0, Math.ceil((u.end - new Date()) / 864e5)) } : {}) });
     }
     const cutoff = new Date(Date.now() - 60 * 864e5).toISOString(); // keep history short
     t.update(portalRef, { pauseRequests: reqs.filter(r => r.status === 'pending' || !r.decidedAt || r.decidedAt > cutoff) });

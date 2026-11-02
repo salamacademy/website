@@ -27,7 +27,9 @@ const addDaysIso = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUT
 const tsFromIso = iso => firebase.firestore.Timestamp.fromDate(new Date(iso + 'T00:00:00Z'));
 const todayIso = () => new Date().toLocaleDateString('en-CA');
 // end date = date of the last class (football 4 · confidence 12 · excellence 16 classes from the start)
-const classEnd = (startIso, pkg) => Classes.nth(startIso, Classes.perMonth(pkg), pkg);
+// academy closures (js/closures-admin.js) — their days don't count as classes
+const closedFor = pkg => Classes.closedDays(typeof closuresList !== 'undefined' ? closuresList : [], pkg);
+const classEnd = (startIso, pkg) => Classes.nth(startIso, Classes.perMonth(pkg), pkg, closedFor(pkg));
 function autoEndDate(startId, endId) { const sv = document.getElementById(startId).value, pkg = document.getElementById(startId.replace('StartDate', 'Package'))?.value; if (sv) document.getElementById(endId).value = classEnd(sv, pkg); }
 const clsLeft = s => Classes.left(s);
 // Firestore writes can hang on a weak connection — never leave a button spinning forever
@@ -71,7 +73,7 @@ function memberCard(s, opts = {}) {
   const st = ST[s.status] || ['copper', s.status];
   const cl = s.status === 'active' && days !== null && days >= 0 ? clsLeft(s) : 0;
   const daysChip = s.status !== 'active' || days === null ? '' : days < 0 ? `<span class="chip bad">منتهي</span>` : `<span class="chip ${cl <= 2 ? 'bad' : cl <= 4 ? 'warn' : 'ok'}">🎯 ${cl} حصة متبقية</span>`;
-  const paused = isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (pausesOf(s).length ? `<span class="chip">⏸️ ${pausesOf(s).length}/${Classes.pauses(s.packageType)}</span>` : '');
+  const paused = isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (Classes.own(pausesOf(s)).length ? `<span class="chip">⏸️ ${Classes.own(pausesOf(s)).length}/${Classes.pauses(s.packageType)}</span>` : '');
   const actions = [];
   if (s.status === 'pending_review') actions.push(`<button class="abtn ok" onclick="openApprove('${s.id}')">✅ موافقة</button><button class="abtn bad" onclick="rejectRequest('${s.id}')">⛔ رفض</button>`);
   if (s.status === 'approved' || s.status === 'pending_payment') actions.push(`<button class="abtn ok" onclick="activateSubscription('${s.id}')">▶️ تفعيل</button>`);
@@ -126,23 +128,23 @@ function expiryAlert() {
 function pauseRequests() { const out = []; allPortals.forEach(p => (p.pauseRequests || []).forEach((r, i) => { if (r.status === 'pending') out.push({ ...r, phone: p.id, idx: i, parentName: p.parentName }); })); return out; }
 function renderPaused() {
   const reqs = pauseRequests();
-  const reqHtml = reqs.length ? `<div class="page-title" style="margin-top:0"><h3>🕒 طلبات إيقاف بانتظار الموافقة</h3><span>${reqs.length}</span></div>` + reqs.map(r => { const s = allSubscriptions.find(x => x.id === r.subId); const used = s ? pausesOf(s).length : 0; return `<div class="mcard s-pending"><div class="mcard-top"><div><div class="mcard-name">${r.childName}</div><div class="mcard-sub">👤 ${r.parentName || ''} · <span dir="ltr">${r.phone}</span></div></div><span class="chip gold">🕒 طلب</span></div><div class="mcard-meta"><span class="chip info">📅 ${r.start}</span><span class="chip">يوم واحد</span><span class="chip ${used >= Classes.pauses(s?.packageType) ? 'bad' : ''}">مستخدم ${used}/${Classes.pauses(s?.packageType)}</span>${r.reason ? `<span class="chip">📝 ${r.reason}</span>` : ''}</div><div class="mcard-actions"><button class="abtn ok" style="flex:2" onclick="approvePause('${r.phone}',${r.idx})">✅ موافقة (+1 يوم)</button><button class="abtn bad" onclick="rejectPause('${r.phone}',${r.idx})">⛔ رفض</button><button class="abtn wa" onclick="window.open('https://wa.me/965${r.phone}','_blank')">💬</button></div></div>`; }).join('') + '<div class="page-title"><h3>⏸️ الإيقافات هذا الشهر</h3></div>' : '';
+  const reqHtml = reqs.length ? `<div class="page-title" style="margin-top:0"><h3>🕒 طلبات إيقاف بانتظار الموافقة</h3><span>${reqs.length}</span></div>` + reqs.map(r => { const s = allSubscriptions.find(x => x.id === r.subId); const used = s ? Classes.own(pausesOf(s)).length : 0; return `<div class="mcard s-pending"><div class="mcard-top"><div><div class="mcard-name">${r.childName}</div><div class="mcard-sub">👤 ${r.parentName || ''} · <span dir="ltr">${r.phone}</span></div></div><span class="chip gold">🕒 طلب</span></div><div class="mcard-meta"><span class="chip info">📅 ${r.start}</span><span class="chip">يوم واحد</span><span class="chip ${used >= Classes.pauses(s?.packageType) ? 'bad' : ''}">مستخدم ${used}/${Classes.pauses(s?.packageType)}</span>${r.reason ? `<span class="chip">📝 ${r.reason}</span>` : ''}</div><div class="mcard-actions"><button class="abtn ok" style="flex:2" onclick="approvePause('${r.phone}',${r.idx})">✅ موافقة (+1 يوم)</button><button class="abtn bad" onclick="rejectPause('${r.phone}',${r.idx})">⛔ رفض</button><button class="abtn wa" onclick="window.open('https://wa.me/965${r.phone}','_blank')">💬</button></div></div>`; }).join('') + '<div class="page-title"><h3>⏸️ الإيقافات هذا الشهر</h3></div>' : '';
   const list = allSubscriptions.filter(s => pausesOf(s).length).sort((a, b) => pausesOf(b).length - pausesOf(a).length);
-  document.getElementById('pausedList').innerHTML = reqHtml + (list.length ? list.map(s => `<div class="mcard ${isPausedNow(s) ? 's-paused' : ''}"><div class="mcard-top"><div><div class="mcard-name">${s.childName}</div><div class="mcard-sub">👤 ${s.parentName} · <span dir="ltr">${s.phone}</span></div></div>${isPausedNow(s) ? '<span class="chip info">⏸️ متوقف اليوم</span>' : `<span class="chip">${pausesOf(s).length}/${Classes.pauses(s.packageType)}</span>`}</div>
-      <div class="mcard-meta">${pausesOf(s).map(p => `<span class="chip ${p.date === dayKey(new Date()) ? 'info' : p.date > dayKey(new Date()) ? 'gold' : 'ok'}">📅 ${p.date}${p.reason ? ' · ' + p.reason : ''}</span>`).join('')}<span class="chip copper">${PKG_NAMES[s.packageType] || ''}</span></div>
+  document.getElementById('pausedList').innerHTML = reqHtml + (list.length ? list.map(s => `<div class="mcard ${isPausedNow(s) ? 's-paused' : ''}"><div class="mcard-top"><div><div class="mcard-name">${s.childName}</div><div class="mcard-sub">👤 ${s.parentName} · <span dir="ltr">${s.phone}</span></div></div>${isPausedNow(s) ? '<span class="chip info">⏸️ متوقف اليوم</span>' : `<span class="chip">${Classes.own(pausesOf(s)).length}/${Classes.pauses(s.packageType)}${pausesOf(s).some(p => p.closure) ? " · 🏖️" : ""}</span>`}</div>
+      <div class="mcard-meta">${pausesOf(s).map(p => `<span class="chip ${p.date === dayKey(new Date()) ? 'info' : p.date > dayKey(new Date()) ? 'gold' : 'ok'}">${p.closure ? '🏖️' : '📅'} ${p.date}${p.reason ? ' · ' + p.reason : ''}</span>`).join('')}<span class="chip copper">${PKG_NAMES[s.packageType] || ''}</span></div>
       <div class="mcard-actions"><button class="abtn primary" onclick="openEditModal('${s.id}',true)">✏️ تعديل الإيقافات</button><button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}','_blank')">💬 واتساب</button></div></div>`).join('') : emptyBox('⏸️', 'لا توجد إيقافات'));
 }
 async function approvePause(phone, idx) {
   const p = allPortals.find(x => x.id === phone); const r = p?.pauseRequests?.[idx]; if (!r) return;
   const s = allSubscriptions.find(x => x.id === r.subId); if (!s) return showToast('❌ الاشتراك غير موجود');
-  const used = pausesOf(s); if (used.length >= Classes.pauses(s.packageType)) return showToast(`❌ استنفد ${Classes.pauses(s.packageType)} إيقافات في هذا الاشتراك`);
+  const used = pausesOf(s); if (Classes.own(used).length >= Classes.pauses(s.packageType)) return showToast(`❌ استنفد ${Classes.pauses(s.packageType)} إيقافات في هذا الاشتراك`);
   if (!confirm(`الموافقة على إيقاف ${s.childName} يوم ${r.start}؟ ستُضاف حصة في نهاية الاشتراك.`)) return;
   const ne = s.subscriptionEnd ? Classes.toDate(Classes.next(Classes.key(s.subscriptionEnd), s.packageType)) : null;
   const reqs = p.pauseRequests.slice(); reqs[idx] = { ...r, status: 'approved', decidedAt: new Date().toISOString() };
   try {
-    await db.collection('subscriptions').doc(s.id).update({ pauses: [...used, { date: r.start, reason: r.reason || '', approvedAt: new Date().toISOString() }], pauseUsed: used.length + 1 >= Classes.pauses(s.packageType), ...(ne ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne) } : {}) });
+    await db.collection('subscriptions').doc(s.id).update({ pauses: [...used, { date: r.start, reason: r.reason || '', approvedAt: new Date().toISOString() }], pauseUsed: Classes.own(used).length + 1 >= Classes.pauses(s.packageType), ...(ne ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne) } : {}) });
     await db.collection('portal').doc(phone).update({ pauseRequests: reqs }); await PortalSync.syncPhone(db, phone);
-    window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`تمت الموافقة على إيقاف اشتراك ${s.childName} يوم ${r.start} ✅\nتمت إضافة حصة في نهاية الاشتراك${ne ? ' — آخر حصة الآن ' + ne.toLocaleDateString('ar-KW') : ''}.\nالمتبقي من الإيقافات هذا الشهر: ${Math.max(0, Classes.pauses(s.packageType) - 1 - used.length)}\nأكاديمية سلام`), '_blank');
+    window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`تمت الموافقة على إيقاف اشتراك ${s.childName} يوم ${r.start} ✅\nتمت إضافة حصة في نهاية الاشتراك${ne ? ' — آخر حصة الآن ' + ne.toLocaleDateString('ar-KW') : ''}.\nالمتبقي من الإيقافات هذا الشهر: ${Math.max(0, Classes.pauses(s.packageType) - 1 - Classes.own(used).length)}\nأكاديمية سلام`), '_blank');
     showToast('✅ تمت الموافقة'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
 }
@@ -236,7 +238,7 @@ async function activateSubscription(id) {
   if (!confirm(`تأكيد استلام الدفع وتفعيل اشتراك ${s.childName} (${Classes.perMonth(s.packageType)} حصة)؟`)) return;
   const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const end = Classes.toDate(classEnd(Classes.key(start), s.packageType));
   try {
-    await db.collection('subscriptions').doc(id).update({ status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauses: [], pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
+    await db.collection('subscriptions').doc(id).update({ status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauses: Classes.closurePauses(closedFor(s.packageType), Classes.key(start), Classes.key(end)), pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
     await recordIncomeForSub(s, s.amount); await PortalSync.syncPhone(db, s.phone);
     sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, end); showToast('✅ تم التفعيل'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
@@ -252,12 +254,12 @@ function fillEditPackages(s) {
 let editPauses = [];
 function renderEditPauses() {
   document.getElementById('editPauses').innerHTML = editPauses.length ? editPauses.map((p, i) => `<div class="pause-row"><input type="date" value="${p.date || ''}" onchange="editPauses[${i}].date=this.value"/><input type="text" value="${(p.reason || '').replace(/"/g, '&quot;')}" placeholder="السبب" onchange="editPauses[${i}].reason=this.value"/><button type="button" onclick="removeEditPause(${i})" title="حذف">🗑️</button></div>`).join('') : '<div class="hint">لا توجد إيقافات</div>';
-  document.getElementById('editPauseCount').textContent = `${editPauses.length}/${editPauseMax()}`;
+  document.getElementById('editPauseCount').textContent = `${Classes.own(editPauses).length}/${editPauseMax()}`;
 }
 function shiftEditEnd(days) { const e = document.getElementById('editEndDate'); if (e.value) e.value = addDaysIso(e.value, days); }
 const editPauseMax = () => Classes.pauses(document.getElementById('editPackage').value);
 function addEditPause() {
-  if (editPauses.length >= editPauseMax() && !confirm(`استخدم ${editPauses.length} من ${editPauseMax()} إيقاف هذا الشهر. إضافة إيقاف آخر على أي حال؟`)) return;
+  if (Classes.own(editPauses).length >= editPauseMax() && !confirm(`استخدم ${Classes.own(editPauses).length} من ${editPauseMax()} إيقاف هذا الشهر. إضافة إيقاف آخر على أي حال؟`)) return;
   editPauses.push({ date: todayIso(), reason: '', approvedAt: new Date().toISOString(), by: 'admin' }); shiftEditEnd(1); renderEditPauses();
   showToast('➕ أُضيف إيقاف — مُدّد الاشتراك يوماً');
 }
@@ -289,7 +291,7 @@ async function saveEdit(btn) {
   if (sv) upd.subscriptionStart = tsFromIso(sv);
   if (ev) { upd.subscriptionEnd = tsFromIso(ev); upd.daysRemaining = Math.max(0, Math.ceil((new Date(ev + 'T00:00:00Z') - new Date()) / 864e5)); }
   const pauses = editPauses.filter(p => p.date).sort((a, b) => a.date.localeCompare(b.date));
-  if (JSON.stringify(pauses) !== JSON.stringify(pausesOf(s))) { upd.pauses = pauses; upd.pauseUsed = pauses.length >= Classes.pauses(document.getElementById('editPackage').value); upd.pauseStart = firebase.firestore.FieldValue.delete(); upd.pauseEnd = firebase.firestore.FieldValue.delete(); }
+  if (JSON.stringify(pauses) !== JSON.stringify(pausesOf(s))) { upd.pauses = pauses; upd.pauseUsed = Classes.own(pauses).length >= Classes.pauses(document.getElementById('editPackage').value); upd.pauseStart = firebase.firestore.FieldValue.delete(); upd.pauseEnd = firebase.firestore.FieldValue.delete(); }
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
   try {
     await withTimeout(db.collection('subscriptions').doc(id).update(upd));
@@ -318,7 +320,7 @@ async function saveSubscription(e) {
     if (!sv) throw new Error('حدد تاريخ البداية');
     if (ev <= sv) throw new Error('تاريخ النهاية يجب أن يكون بعد البداية');
     const end = new Date(ev + 'T00:00:00Z');
-    const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: '', packageType: o.value, packageName: o.dataset.name, amount: +v('newAmount'), paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: tsFromIso(sv), subscriptionEnd: tsFromIso(ev), daysRemaining: Math.max(0, Math.ceil((end - new Date()) / 864e5)), pauseUsed: false, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
+    const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: '', packageType: o.value, packageName: o.dataset.name, amount: +v('newAmount'), paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: tsFromIso(sv), subscriptionEnd: tsFromIso(ev), daysRemaining: Math.max(0, Math.ceil((end - new Date()) / 864e5)), pauseUsed: false, pauses: Classes.closurePauses(closedFor(o.value), sv, ev), createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
     const ref = pendingAddId ? db.collection('subscriptions').doc(pendingAddId) : db.collection('subscriptions').doc(); pendingAddId = ref.id;
     await withTimeout(ref.set(data));
     pendingAddId = null;

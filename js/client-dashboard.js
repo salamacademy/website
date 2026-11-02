@@ -226,26 +226,33 @@ const dLabel = k => new Date(k + 'T00:00:00Z').toLocaleDateString('ar-KW', { wee
 let calMonth = null, calSubId = null, pickDays = new Set();
 function renderPause(sub) {
   ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pausedBanner').style.display = 'none';
-  const used = pausesOf(sub), pend = pendingPausesFor(sub.id), left = pauseMax(sub) - used.length - pend.length;
+  const used = Classes.own(pausesOf(sub)), pend = pendingPausesFor(sub.id), left = pauseMax(sub) - used.length - pend.length;
   const quota = $('pauseQuota'); if (quota) quota.innerHTML = Array.from({ length: pauseMax(sub) }, (_, i) => `<span class="chip ${i < used.length ? 'info' : i < used.length + pend.length ? 'gold' : 'ok'}">${i < used.length ? '⏸️ ' + used[i].date : i < used.length + pend.length ? '🕒 ' + pend[i - used.length].start : '○ متاح'}</span>`).join('');
   if (sub.status !== 'active') {
     $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = 'ℹ️'; $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح للاشتراكات النشطة فقط.'; return;
   }
   if (isPausedNow(sub)) {
     $('pauseActive').style.display = 'block'; $('pauseFrom').textContent = new Date().toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
-    $('pausedBanner').style.display = 'flex'; $('pausedUntil').textContent = ''; status('⏸️ الاشتراك متوقف اليوم', 'يستأنف التدريب غداً');
+    const cl = pausesOf(sub).find(p => p.closure && p.date === dayKey(new Date()));
+    $('pausedBanner').style.display = 'flex'; $('pausedUntil').textContent = ''; status(cl ? '🏖️ لا تدريب اليوم — الأكاديمية مغلقة' : '⏸️ الاشتراك متوقف اليوم', cl ? (cl.reason || '') + ' · الحصة أُضيفت لنهاية الاشتراك' : 'يستأنف التدريب غداً');
     $('pauseHistory').innerHTML = `<small style="color:var(--text-light);font-weight:800">المتبقي: ${Math.max(0, left)} من ${pauseMax(sub)} هذا الشهر</small>`;
   }
   $('pauseInfo').style.display = 'block';
-  $('pauseRule').innerHTML = `اشتراكك <strong>${Classes.perMonth(sub.packageType)} حصة متتالية</strong>، ويمكنك إيقاف <strong>${pauseMax(sub) === 1 ? 'حصة واحدة' : pauseMax(sub) + ' حصص'}</strong> فقط${pauseMax(sub) > 1 ? ' — اخترها معاً أو كل حصة على حدة' : ''}.`;
+  $('pauseRule').innerHTML = `اشتراكك <strong>${Classes.perMonth(sub.packageType)} حصة متتالية</strong>، ويمكنك إيقاف <strong>${pauseMax(sub) === 1 ? 'حصة واحدة' : pauseMax(sub) + ' حصص'}</strong> فقط${pauseMax(sub) > 1 ? ' — اخترها معاً أو كل حصة على حدة' : ''}.`
+    + closureNote(sub);
   if (calSubId !== sub.id) { calSubId = sub.id; calMonth = null; pickDays = new Set(); }
   renderPauseCal(sub);
+}
+// upcoming academy closures (admin "إيقاف عام") — shown so parents know those classes moved to the end
+function closureNote(sub) {
+  const t = dayKey(new Date()), cl = pausesOf(sub).filter(p => p.closure && p.date >= t); if (!cl.length) return '';
+  return `<div class="note" style="margin-top:8px;background:#FFF3E0">🏖️ <b>الأكاديمية مغلقة</b> ${cl.map(p => dLabel(p.date)).join('، ')}${cl[0].reason ? ' — ' + cl[0].reason : ''}<br/><small>أُضيفت ${cl.length === 1 ? 'الحصة' : cl.length === 2 ? 'حصتان' : cl.length + ' حصص'} إلى نهاية الاشتراك ولا تُحسب من إيقافاتك ✅</small></div>`;
 }
 function calMove(n) { const [y, m] = calMonth.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); calMonth = d.toISOString().slice(0, 7); renderPauseCal(currentSubscription); }
 function renderPauseCal(sub) {
   const today = localToday(), start = sub.subscriptionStart ? dayKey(toD(sub.subscriptionStart)) : today, end = sub.subscriptionEnd ? dayKey(toD(sub.subscriptionEnd)) : null;
   const train = TRAIN_DAYS[sub.packageType] || [6, 0, 1, 2, 3, 4];
-  const used = pausesOf(sub).map(p => p.date), pend = pendingPausesFor(sub.id).map(r => r.start), pendCancel = pendingCancels(sub.id);
+  const used = Classes.own(pausesOf(sub)).map(p => p.date), closed = pausesOf(sub).filter(p => p.closure).map(p => p.date), pend = pendingPausesFor(sub.id).map(r => r.start), pendCancel = pendingCancels(sub.id);
   const left = pauseMax(sub) - used.length - pend.length;
   pickDays = new Set([...pickDays].filter(k => !used.includes(k) && !pend.includes(k) && k >= today && (!end || k <= end)));
   if (!calMonth) calMonth = (today >= start ? today : start).slice(0, 7);
@@ -255,7 +262,8 @@ function renderPauseCal(sub) {
     const k = `${calMonth}-${String(d).padStart(2, '0')}`, dow = new Date(k + 'T00:00:00Z').getUTCDay();
     const inSub = k >= start && (!end || k <= end), isTrain = train.includes(dow) && inSub;
     let cls = 'off', act = '';
-    if (pendCancel.includes(k) || pend.includes(k)) cls = 'pending';
+    if (closed.includes(k)) cls = 'closed'; // academy closure — not the parent's pause
+    else if (pendCancel.includes(k) || pend.includes(k)) cls = 'pending';
     else if (used.includes(k)) { cls = 'paused'; if (k >= today) act = `onclick="cancelPause('${k}')"`; }
     else if (pickDays.has(k)) { cls = 'picked'; act = `onclick="togglePick('${k}')"`; }
     else if (isTrain && k >= today) { cls = 'train'; act = `onclick="togglePick('${k}')"`; }
@@ -265,7 +273,7 @@ function renderPauseCal(sub) {
   const prevOk = calMonth > start.slice(0, 7), nextOk = !end || calMonth < end.slice(0, 7);
   const monthName = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('ar-KW', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   $('pauseCal').innerHTML = `<div class="cal-nav"><button ${prevOk ? '' : 'disabled'} onclick="calMove(-1)" aria-label="الشهر السابق">›</button><b>${monthName}</b><button ${nextOk ? '' : 'disabled'} onclick="calMove(1)" aria-label="الشهر التالي">‹</button></div><div class="cal-grid">${cells}</div>
-    <div class="cal-legend"><span><i class="train"></i>أيام تدريب باقتك</span><span><i class="picked"></i>اخترته</span><span><i class="pending"></i>جاري التأكيد</span><span><i class="paused"></i>موقوف (اضغط للإلغاء)</span></div>`;
+    <div class="cal-legend"><span><i class="train"></i>أيام تدريب باقتك</span><span><i class="picked"></i>اخترته</span><span><i class="pending"></i>جاري التأكيد</span><span><i class="paused"></i>موقوف (اضغط للإلغاء)</span>${closed.length ? '<span><i class="closed"></i>إغلاق الأكاديمية</span>' : ''}</div>`;
   const picked = [...pickDays].sort(), dayAgo = new Date(Date.now() - 864e5).toISOString();
   const refused = (portalDoc?.pauseRequests || []).filter(r => r.subId === sub.id && r.status === 'rejected' && r.auto && r.decidedAt > dayAgo);
   $('pausePicked').innerHTML = refused.map(r => `<div style="color:#C62828;font-weight:800;margin-bottom:6px">⚠️ لم يتم ${r.type === 'cancel' ? 'إلغاء' : 'إيقاف'} ${dLabel(r.start)}: ${r.adminNote || ''}</div>`).join('') + (picked.length ? `الأيام المختارة: <strong>${picked.map(dLabel).join('، ')}</strong>${end ? `<br/>آخر حصة بعد الإيقاف: <strong>${dLabel(picked.reduce(k => Classes.next(k, sub.packageType), end))}</strong>` : ''}`
@@ -276,7 +284,7 @@ function renderPauseCal(sub) {
 function togglePick(k) {
   const sub = currentSubscription; if (!sub) return;
   if (pickDays.has(k)) pickDays.delete(k);
-  else { const left = pauseMax(sub) - pausesOf(sub).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return alert(left <= 0 ? (pauseMax(sub) === 1 ? 'استخدمت الإيقاف المسموح لهذا الشهر' : 'استخدمت الإيقافات الثلاثة لهذا الشهر') : `يمكنك اختيار ${left} ${left === 1 ? 'حصة' : 'حصص'} فقط`); pickDays.add(k); }
+  else { const left = pauseMax(sub) - Classes.own(pausesOf(sub)).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return alert(left <= 0 ? (pauseMax(sub) === 1 ? 'استخدمت الإيقاف المسموح لهذا الشهر' : 'استخدمت الإيقافات الثلاثة لهذا الشهر') : `يمكنك اختيار ${left} ${left === 1 ? 'حصة' : 'حصص'} فقط`); pickDays.add(k); }
   renderPauseCal(sub);
 }
 // pauses are approved automatically by the server (Cloud Function) within seconds — no admin step
@@ -288,7 +296,7 @@ async function cancelPause(k) {
 async function requestPause() {
   const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
   const picked = [...pickDays].sort(); if (!picked.length) return alert('اختر يوم الإيقاف من التقويم');
-  if (pausesOf(sub).length + pendingPausesFor(sub.id).length + picked.length > pauseMax(sub)) return alert(`تجاوزت عدد الإيقافات المسموح (${pauseMax(sub)} شهرياً)`);
+  if (Classes.own(pausesOf(sub)).length + pendingPausesFor(sub.id).length + picked.length > pauseMax(sub)) return alert(`تجاوزت عدد الإيقافات المسموح (${pauseMax(sub)} شهرياً)`);
   if (!confirm(`إيقاف اشتراك ${sub.childName}:\n${picked.map(dLabel).join('\n')}\n\nستُضاف ${picked.length === 1 ? 'حصة' : picked.length + ' حصص'} في نهاية الاشتراك بدلاً منها.`)) return;
   const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الإيقاف...';
   const reason = $('pauseReason').value.trim(), at = new Date().toISOString();
