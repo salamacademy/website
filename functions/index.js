@@ -132,7 +132,9 @@ exports.createPayment = fx.https.onRequest(async (req, res) => {
       const d = await db.collection('payItems').doc(String(w.id)).get(); if (!d.exists || d.data().active === false) continue; const it = d.data(); const qty = Math.max(1, Math.min(20, parseInt(w.qty) || 1));
       if (it.customAmount) { // parent typed the amount — validate it server-side, never trust the browser
         const amt = Math.round(parseFloat(w.amount) * 1000) / 1000; if (!(amt >= 0.5 && amt <= 2000)) throw new Error('المبلغ يجب أن يكون بين 0.5 و 2000 د.ك');
-        items.push({ id: d.id, name: it.name, icon: it.icon || '', price: amt, qty: 1, packageType: null, category: it.category || 'أخرى', customAmount: true }); continue;
+        const purpose = PKG_NAME[w.purpose] || w.purpose === 'other' ? w.purpose : null, note = String(w.note || '').slice(0, 80);
+        const label = purpose === 'other' ? (note ? 'أخرى: ' + note : 'أخرى') : purpose ? 'تجديد ' + PKG_NAME[purpose] : '';
+        items.push({ id: d.id, name: it.name + (label ? ' — ' + label : ''), icon: it.icon || '', price: amt, qty: 1, packageType: null, category: purpose && purpose !== 'other' ? 'اشتراكات' : it.category || 'أخرى', customAmount: true, purpose, note }); continue;
       }
       items.push({ id: d.id, name: it.name, icon: it.icon || '', price: +it.price, qty: it.allowQty ? qty : 1, packageType: it.packageType || null, category: it.category || 'أخرى' });
     }
@@ -205,6 +207,7 @@ async function bookTrip(orderId, p, method) {
 }
 
 // 2) Finalise a paid order: activate subscription (if a package item), book income, sync portal — idempotent
+const PKG_NAME = { football: 'معسكر كرة القدم', confidence: 'معسكر بناء الثقة والكيوكشن', excellence: 'باقة التميز', excellence_loyal: 'باقة التميز - أسرة سلام' };
 // +30 days: an active subscription extends from its current end date; an expired / new one starts today
 async function renewSub(subRef, s, orderId, pkg) {
   const now = new Date(), curEnd = s.subscriptionEnd && s.subscriptionEnd.toDate ? s.subscriptionEnd.toDate() : null;
@@ -225,17 +228,20 @@ async function finalizePayment(orderId, gw) {
     if (!sub || !sub.exists) { const q = await db.collection('subscriptions').where('phone', '==', p.phone).get(); const docs = q.docs.filter(x => !p.childName || x.data().childName === p.childName); if (docs.length) { subRef = docs[0].ref; sub = docs[0]; } }
     if (sub && sub.exists) { await renewSub(subRef, sub.data(), orderId, { packageType: pkgItem.packageType, packageName: pkgItem.name, amount: pkgItem.price }); activated = true; }
   }
-  // Open amount ("ادخال مبلغ يدوي") = renewal when it matches the child's own monthly fee, or the whole family's fees together
+  // Open amount ("ادخال مبلغ يدوي"): the parent chose what it is for — a package (renew +30 days) or "other" (no renewal)
   let renewNote = '';
   const custom = (p.items || []).filter(i => i.customAmount);
-  if (!pkgItem && custom.length && custom.length === (p.items || []).length) {
+  if (!pkgItem && custom.length && custom.length === (p.items || []).length && !custom.every(i => i.purpose === 'other')) {
     const amt = custom.reduce((a, i) => a + i.price * i.qty, 0), eq = (a, b) => Math.abs(a - b) < 0.001;
-    const subs = (await db.collection('subscriptions').where('phone', '==', p.phone).get()).docs.filter(x => ['active', 'expired', 'approved', 'pending_payment'].includes(x.data().status) && +x.data().amount > 0);
-    const own = subs.find(x => x.id === p.subId);
-    const targets = own && eq(+own.data().amount, amt) ? [own] : subs.length > 1 && eq(subs.reduce((a, x) => a + +x.data().amount, 0), amt) ? subs : [];
-    for (const x of targets) await renewSub(x.ref, x.data(), orderId);
+    const pkg = (custom.find(i => PKG_NAME[i.purpose]) || {}).purpose; // undefined = older app without the choice
+    const subs = (await db.collection('subscriptions').where('phone', '==', p.phone).get()).docs.filter(x => ['active', 'expired', 'approved', 'pending_payment'].includes(x.data().status));
+    const own = subs.find(x => x.id === p.subId), fee = x => +x.data().amount || 0;
+    let targets = [], ownPkg = null;
+    if (subs.length > 1 && subs.every(x => fee(x) > 0) && eq(subs.reduce((a, x) => a + fee(x), 0), amt)) targets = subs; // one payment for all siblings
+    else if (own && (pkg ? amt >= fee(own) - 0.001 : fee(own) > 0 && eq(fee(own), amt))) { targets = [own]; ownPkg = pkg; }
+    for (const x of targets) await renewSub(x.ref, x.data(), orderId, x === own && ownPkg && ownPkg !== x.data().packageType ? { packageType: ownPkg, packageName: PKG_NAME[ownPkg], ...(fee(x) ? {} : { amount: amt }) } : (fee(x) ? null : { amount: amt }));
     if (targets.length) { activated = true; if (targets.length > 1) renewNote = targets.map(x => x.data().childName).join('، '); }
-    else renewNote = '⚠️ المبلغ لا يطابق رسوم الاشتراك — لم يُجدَّد تلقائياً، تحقق وجدّد يدوياً';
+    else renewNote = pkg ? `⚠️ المبلغ أقل من رسوم الاشتراك (${own ? fee(own) : '?'} د.ك) — لم يُجدَّد تلقائياً، تحقق وجدّد يدوياً` : '⚠️ المبلغ لا يطابق رسوم الاشتراك — لم يُجدَّد تلقائياً، تحقق وجدّد يدوياً';
   }
   let tripFull = false;
   if (p.tripId) { try { tripFull = await bookTrip(orderId, p, 'upayment'); } catch (e) { console.error('trip booking', orderId, e); } }

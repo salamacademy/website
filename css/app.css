@@ -368,3 +368,11 @@ body.app-body,body.app-body.admin{background:#EEF1EA}
 .trip-promo .go{margin-inline-start:auto;background:#fff;color:var(--green);border-radius:12px;padding:8px 12px;font-weight:900;font-size:.82rem;white-space:nowrap}
 .img-pick{border:2px dashed rgba(46,125,50,0.35);border-radius:14px;padding:10px;text-align:center;background:var(--green-xpale)}
 .img-pick img{max-width:100%;max-height:240px;border-radius:10px;display:block;margin:0 auto 8px}
+/* open amount: required "what for" */
+.pay-item.wide.on{grid-column:1/-1}
+.pay-item .purpose{display:none;margin-top:8px;text-align:right}
+.pay-item.on .purpose{display:block}
+.pay-item .purpose label{display:block;font-size:.78rem;font-weight:800;color:var(--text);margin-bottom:4px}
+.pay-item .purpose select,.pay-item .purpose input{width:100%;padding:9px 10px;border:2px solid #2B9AD6;border-radius:12px;font-size:.88rem;font-weight:700;background:#fff;font-family:inherit;direction:rtl;margin-bottom:6px}
+.pay-item .purpose select.need{border-color:#C62828;background:#FFF5F5}
+.pay-item .purpose small.ok{display:block;font-size:.74rem;font-weight:800;color:var(--ok)}

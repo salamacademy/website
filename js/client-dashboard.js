@@ -126,7 +126,9 @@ function alertAction() {
 }
 
 // ---------- PAY (catalog → UPayment) ----------
-let payItems = [], cart = {}, customAmt = {};
+let payItems = [], cart = {}, customAmt = {}, customFor = {}, customNote = {};
+// open amount must say what it is for: a package renewal (+30 days) or something else
+const PURPOSES = [['football', '⚽ تجديد كرة القدم'], ['confidence', '🥋 تجديد بناء الثقة والكيوكشن'], ['excellence', '⚡ تجديد باقة التميز'], ['excellence_loyal', '🏅 تجديد التميز – أسرة سلام'], ['other', '📦 أخرى (ليس تجديد اشتراك)']];
 const itemPrice = i => i.customAmount ? (+customAmt[i.id] || 0) : +i.price;
 async function loadPayItems() {
   try { const snap = await db.collection('payItems').where('active', '==', true).get(); payItems = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0)); }
@@ -150,18 +152,26 @@ function renderPayGrid() {
   $('payKid').textContent = sub ? '👦 ' + (sub.childName || '').split(' ')[0] : '';
   const g = $('payGrid');
   if (!payItems.length) { g.innerHTML = '<div class="empty" style="grid-column:1/-1"><b>🛒</b>لا توجد منتجات متاحة حالياً</div>'; updateTotal(); return; }
-  g.innerHTML = payItems.map(i => { const q = cart[i.id] || 0; return `<div class="pay-item ${q ? 'on' : ''} ${sug && sug.id === i.id ? 'sug' : ''}" onclick="toggleItem('${i.id}')"><span class="tick">✓</span><div class="pi">${i.icon || '🏷️'}</div><div class="pn">${i.name}</div>${i.customAmount ? `<div class="pp">✍️ <small>اكتب المبلغ</small></div><div class="amt" onclick="event.stopPropagation()"><input type="number" inputmode="decimal" min="0.5" max="2000" step="0.5" placeholder="0.000" value="${customAmt[i.id] || ''}" oninput="setAmt('${i.id}',this.value)"/><small>د.ك</small></div>` : `<div class="pp">${(+i.price).toFixed(3)} <small>د.ك</small></div>`}${i.allowQty ? `<div class="qty" onclick="event.stopPropagation()"><button onclick="setQty('${i.id}',-1)">−</button><b>${q}</b><button onclick="setQty('${i.id}',1)">+</button></div>` : ''}</div>`; }).join('');
+  g.innerHTML = payItems.map(i => { const q = cart[i.id] || 0; return `<div class="pay-item ${q ? 'on' : ''} ${i.customAmount ? 'wide' : ''} ${sug && sug.id === i.id ? 'sug' : ''}" onclick="toggleItem('${i.id}')"><span class="tick">✓</span><div class="pi">${i.icon || '🏷️'}</div><div class="pn">${i.name}</div>${i.customAmount ? `<div class="pp">✍️ <small>اكتب المبلغ</small></div><div class="amt" onclick="event.stopPropagation()"><input type="number" inputmode="decimal" min="0.5" max="2000" step="0.5" placeholder="0.000" value="${customAmt[i.id] || ''}" oninput="setAmt('${i.id}',this.value)"/><small>د.ك</small></div>${purposeBox(i)}` : `<div class="pp">${(+i.price).toFixed(3)} <small>د.ك</small></div>`}${i.allowQty ? `<div class="qty" onclick="event.stopPropagation()"><button onclick="setQty('${i.id}',-1)">−</button><b>${q}</b><button onclick="setQty('${i.id}',1)">+</button></div>` : ''}</div>`; }).join('');
   updateTotal();
 }
 function toggleItem(id) { if (cart[id]) delete cart[id]; else cart[id] = 1; renderPayGrid(); const inp = cart[id] && document.querySelector(`.pay-item.on .amt input[oninput*="${id}"]`); if (inp) inp.focus(); }
+function purposeBox(i) {
+  const cur = currentSubscription?.packageType, v = customFor[i.id] || '';
+  const opts = [...PURPOSES].sort((a, b) => (b[0] === cur) - (a[0] === cur)).map(([k, l]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${l}${k === cur ? ' (باقتك الحالية)' : ''}</option>`).join('');
+  return `<div class="purpose" onclick="event.stopPropagation()"><label>لماذا تدفع؟ <b style="color:#C62828">*</b></label><select onchange="setFor('${i.id}',this.value)" class="${v ? '' : 'need'}"><option value="">— اختر —</option>${opts}</select>
+    ${v === 'other' ? `<input type="text" maxlength="80" placeholder="اكتب الغرض (مثال: زي، بطولة...)" value="${(customNote[i.id] || '').replace(/"/g, '&quot;')}" oninput="customNote['${i.id}']=this.value"/>` : ''}
+    ${v && v !== 'other' ? `<small class="ok">✅ سيُجدَّد اشتراك ${(currentSubscription?.childName || '').split(' ')[0]} 30 يوماً بعد الدفع</small>` : ''}</div>`;
+}
+function setFor(id, val) { customFor[id] = val; if (!cart[id]) cart[id] = 1; renderPayGrid(); }
 function setAmt(id, val) { customAmt[id] = val; if (!cart[id]) cart[id] = 1; updateTotal(); } // no re-render → keyboard stays open
 function setQty(id, d) { cart[id] = Math.max(0, (cart[id] || 0) + d); if (!cart[id]) delete cart[id]; renderPayGrid(); }
 function cartTotal() { return Object.entries(cart).reduce((a, [id, q]) => { const i = payItems.find(x => x.id === id); return a + (i ? itemPrice(i) * q : 0); }, 0); }
-const badCustom = () => Object.keys(cart).some(id => { const i = payItems.find(x => x.id === id); return i && i.customAmount && !(itemPrice(i) >= 0.5 && itemPrice(i) <= 2000); });
+const badCustom = () => Object.keys(cart).some(id => { const i = payItems.find(x => x.id === id); return i && i.customAmount && (!(itemPrice(i) >= 0.5 && itemPrice(i) <= 2000) || !customFor[id]); });
 function updateTotal() { const t = cartTotal(), off = t <= 0 || badCustom() || !!payLock(currentSubscription); $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = off; b.style.opacity = off ? '.6' : '1'; }
 function renewSubscription() { go('renew'); }
 async function startPayment() {
-  const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => { const i = payItems.find(x => x.id === id); return i && i.customAmount ? { id, qty: 1, amount: itemPrice(i) } : { id, qty }; }); if (!items.length || badCustom() || payLock(sub)) return;
+  const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => { const i = payItems.find(x => x.id === id); return i && i.customAmount ? { id, qty: 1, amount: itemPrice(i), purpose: customFor[id], note: (customNote[id] || '').trim() } : { id, qty }; }); if (!items.length || badCustom() || payLock(sub)) return;
   const btn = $('payBtn'); btn.disabled = true; btn.innerHTML = '⏳ جاري تحويلك إلى UPayment...';
   try {
     if (typeof PAYMENT_API_URL === 'undefined' || !PAYMENT_API_URL || PAYMENT_API_URL.includes('YOUR_')) throw new Error('not-configured');
@@ -296,7 +306,7 @@ function renderKidSwitch() {
 }
 function selectKid(i, first) {
   kidIdx = i; const s = kids[i]; if (!s) return;
-  currentSubscription = s; renderDashboard(s); renderKidSwitch(); cart = {}; renderPayGrid();
+  currentSubscription = s; renderDashboard(s); renderKidSwitch(); cart = {}; customFor = {}; customNote = {}; renderPayGrid();
   setupClientNotifications();
   if (!first) go('overview');
 }
