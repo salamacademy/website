@@ -205,6 +205,13 @@ async function bookTrip(orderId, p, method) {
 }
 
 // 2) Finalise a paid order: activate subscription (if a package item), book income, sync portal — idempotent
+// +30 days: an active subscription extends from its current end date; an expired / new one starts today
+async function renewSub(subRef, s, orderId, pkg) {
+  const now = new Date(), curEnd = s.subscriptionEnd && s.subscriptionEnd.toDate ? s.subscriptionEnd.toDate() : null;
+  const extend = s.status === 'active' && curEnd && curEnd > now;
+  const end = new Date(extend ? curEnd : now); end.setDate(end.getDate() + 30);
+  await subRef.update({ status: 'active', ...(pkg || {}), subscriptionStart: admin.firestore.Timestamp.fromDate(extend && s.subscriptionStart && s.subscriptionStart.toDate ? s.subscriptionStart.toDate() : now), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: Math.ceil((end - now) / 864e5), paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauses: [], pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId });
+}
 async function finalizePayment(orderId, gw) {
   const ref = db.collection('payments').doc(orderId); const d = await ref.get(); if (!d.exists) return 'no-order';
   const p = d.data(); if (p.status === 'paid') return 'already';
@@ -216,14 +223,19 @@ async function finalizePayment(orderId, gw) {
   if (pkgItem) {
     let subRef = p.subId ? db.collection('subscriptions').doc(p.subId) : null; let sub = subRef ? (await subRef.get()) : null;
     if (!sub || !sub.exists) { const q = await db.collection('subscriptions').where('phone', '==', p.phone).get(); const docs = q.docs.filter(x => !p.childName || x.data().childName === p.childName); if (docs.length) { subRef = docs[0].ref; sub = docs[0]; } }
-    if (sub && sub.exists) {
-      const s = sub.data(); const now = new Date();
-      const curEnd = s.subscriptionEnd && s.subscriptionEnd.toDate ? s.subscriptionEnd.toDate() : null;
-      const start = s.status === 'active' && curEnd && curEnd > now ? curEnd : now; // renewal extends from current end
-      const end = new Date(start); end.setDate(end.getDate() + 30);
-      await subRef.update({ status: 'active', packageType: pkgItem.packageType, packageName: pkgItem.name, amount: pkgItem.price, subscriptionStart: admin.firestore.Timestamp.fromDate(s.status === 'active' && curEnd && curEnd > now ? (s.subscriptionStart.toDate ? s.subscriptionStart.toDate() : now) : now), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauses: [], pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId });
-      activated = true;
-    }
+    if (sub && sub.exists) { await renewSub(subRef, sub.data(), orderId, { packageType: pkgItem.packageType, packageName: pkgItem.name, amount: pkgItem.price }); activated = true; }
+  }
+  // Open amount ("ادخال مبلغ يدوي") = renewal when it matches the child's own monthly fee, or the whole family's fees together
+  let renewNote = '';
+  const custom = (p.items || []).filter(i => i.customAmount);
+  if (!pkgItem && custom.length && custom.length === (p.items || []).length) {
+    const amt = custom.reduce((a, i) => a + i.price * i.qty, 0), eq = (a, b) => Math.abs(a - b) < 0.001;
+    const subs = (await db.collection('subscriptions').where('phone', '==', p.phone).get()).docs.filter(x => ['active', 'expired', 'approved', 'pending_payment'].includes(x.data().status) && +x.data().amount > 0);
+    const own = subs.find(x => x.id === p.subId);
+    const targets = own && eq(+own.data().amount, amt) ? [own] : subs.length > 1 && eq(subs.reduce((a, x) => a + +x.data().amount, 0), amt) ? subs : [];
+    for (const x of targets) await renewSub(x.ref, x.data(), orderId);
+    if (targets.length) { activated = true; if (targets.length > 1) renewNote = targets.map(x => x.data().childName).join('، '); }
+    else renewNote = '⚠️ المبلغ لا يطابق رسوم الاشتراك — لم يُجدَّد تلقائياً، تحقق وجدّد يدوياً';
   }
   let tripFull = false;
   if (p.tripId) { try { tripFull = await bookTrip(orderId, p, 'upayment'); } catch (e) { console.error('trip booking', orderId, e); } }
@@ -232,9 +244,9 @@ async function finalizePayment(orderId, gw) {
   batch.update(ref, { status: 'paid', activated, gateway: gw, paymentType: gw.payment_type || gw.paymentType || null, paidAt: admin.firestore.FieldValue.serverTimestamp() });
   await batch.commit();
   try { await PortalSync.syncPhone(db, p.phone); } catch (e) { console.warn('portal sync', e.message); } // subscription + payment history
-  const extra = activated ? ' · ✅ تم التفعيل' : p.tripId ? ` · 🚌 حجز رحلة${tripFull ? ' · اكتمل العدد وأُغلق التسجيل' : ''}` : '';
+  const extra = activated ? ' · ✅ تم التجديد' + (renewNote ? ' (' + renewNote + ')' : '') : renewNote ? ' · ' + renewNote : p.tripId ? ` · 🚌 حجز رحلة${tripFull ? ' · اكتمل العدد وأُغلق التسجيل' : ''}` : '';
   await addNotif({ icon: p.tripId ? '🚌' : '💳', title: `دفعة ${(+p.amount).toFixed(3)} د.ك`, body: `${p.childName || p.phone} — ${(p.items || []).map(i => i.name).join('، ')}${extra}`, page: p.tripId ? 'trips' : 'finance' }, 'pay_' + orderId);
-  try { await tgcore.notifyAdmins(db, tg, `💳 <b>دفعة UPayment</b>\n${p.childName || p.phone} — <b>${(+p.amount).toFixed(3)} د.ك</b>\n${(p.items || []).map(i => '• ' + i.name).join('\n')}${activated ? '\n✅ تم تفعيل الاشتراك' : ''}${p.tripId ? '\n🚌 تم حجز الرحلة' + (tripFull ? ' — اكتمل العدد وأُغلق التسجيل' : '') : ''}`); } catch (_) {}
+  try { await tgcore.notifyAdmins(db, tg, `💳 <b>دفعة UPayment</b>\n${p.childName || p.phone} — <b>${(+p.amount).toFixed(3)} د.ك</b>\n${(p.items || []).map(i => '• ' + i.name).join('\n')}${activated ? '\n✅ تم تجديد الاشتراك (+30 يوم)' + (renewNote ? ': ' + renewNote : '') : renewNote ? '\n' + renewNote : ''}${p.tripId ? '\n🚌 تم حجز الرحلة' + (tripFull ? ' — اكتمل العدد وأُغلق التسجيل' : '') : ''}`); } catch (_) {}
   if (p.phone) { try { const pd = await db.collection('portal').doc(p.phone).get(); await sendTo(pd.exists ? pd.data().fcmTokens : [], '✅ تم استلام الدفع', `${(+p.amount).toFixed(3)} د.ك${activated ? ' · تم تفعيل الاشتراك' : p.tripId ? ' · تم حجز الرحلة 🚌' : ''}`, '/website/client/dashboard.html'); } catch (_) {} }
   return 'paid';
 }
