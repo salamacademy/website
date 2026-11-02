@@ -55,6 +55,8 @@
 
     <div id="pausedBanner" class="banner" style="display:none;margin:0 0 12px;background:var(--info-bg);color:var(--info)"><span>⏸️ الاشتراك متوقف اليوم <b id="pausedUntil"></b></span></div>
 
+    <div class="trip-promo" id="tripPromo" style="display:none" onclick="go('trips')"></div>
+
     <div class="alertbox" id="renewalAlert">
       <div style="font-size:1.6rem">⚠️</div>
       <div style="flex:1"><strong>اشتراكك على وشك الانتهاء!</strong><p>جدد الآن للحفاظ على مكان ابنك</p></div>
@@ -104,6 +106,12 @@
     </div>
   </section>
 
+  <!-- ===== TRIPS ===== -->
+  <section class="page" data-page="trips">
+    <div class="page-title"><h3>🚌 الرحلات</h3></div>
+    <div id="tripsList"><div class="empty">جاري التحميل...</div></div>
+  </section>
+
   <!-- ===== PAY ===== -->
   <section class="page" data-page="renew">
     <div class="page-title"><h3>💳 اختر ما تريد دفعه</h3><span id="payKid"></span></div>
@@ -118,6 +126,7 @@
 
 <nav class="tabbar"><div class="tabbar-in">
   <button class="tab on" data-page="overview" onclick="go('overview')"><i>🏠</i>الرئيسية</button>
+  <button class="tab" data-page="trips" onclick="go('trips')"><i>🚌</i>الرحلات<span class="dot"></span></button>
   <button class="tab" data-page="schedule" onclick="go('schedule')"><i>📅</i>الجدول</button>
   <div class="tab fab-slot"><button class="fab pay" onclick="go('renew')" title="الدفع">ادفع</button></div>
   <button class="tab" data-page="pause" onclick="go('pause')"><i>⏸️</i>إيقاف</button>
@@ -131,5 +140,7 @@
 <script src="../js/pwa-install.js"></script>
 <script src="../js/notifications.js"></script>
 <script src="../js/client-dashboard.js"></script>
+<script src="../js/trips-common.js"></script>
+<script src="../js/trips-client.js"></script>
 </body>
 </html>

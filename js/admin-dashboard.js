@@ -3,8 +3,8 @@
 // ============================
 const PKG_NAMES = { football: 'كرة القدم', confidence: 'بناء الثقة والكيوكشن', excellence: 'التميز', excellence_loyal: 'التميز (أسرة سلام)', premium: 'المميزة (قديم)' };
 const PKG_ICON = { football: '⚽', confidence: '🥋', excellence: '⚡', excellence_loyal: '🏅', premium: '⚡' };
-const TITLES = { dashboard: 'لوحة التحكم', review: 'طلبات المراجعة', members: 'الأعضاء', expiring: 'تنتهي قريباً', paused: 'الإيقافات المؤقتة', add: 'إضافة اشتراك', notify: 'إرسال رسالة', finance: 'المالية', telegram: 'بوت تيليجرام' };
-const SUBS = { dashboard: 'نظرة سريعة على الأكاديمية اليوم', review: 'راجع النموذج ثم وافق أو ارفض', members: 'ابحث وصفِّ جميع المشتركين', expiring: 'أرسل تذكير التجديد', paused: 'إيقافات اليوم الواحد (3 شهرياً)', add: 'تسجيل مباشر بدون نموذج', notify: 'واتساب للمشتركين', finance: 'الدخل والمصاريف والصافي', telegram: 'سجّل المصاريف من هاتفك' };
+const TITLES = { dashboard: 'لوحة التحكم', review: 'طلبات المراجعة', members: 'الأعضاء', expiring: 'تنتهي قريباً', paused: 'الإيقافات المؤقتة', add: 'إضافة اشتراك', notify: 'إرسال رسالة', finance: 'المالية', trips: 'الرحلات', telegram: 'بوت تيليجرام' };
+const SUBS = { dashboard: 'نظرة سريعة على الأكاديمية اليوم', review: 'راجع النموذج ثم وافق أو ارفض', members: 'ابحث وصفِّ جميع المشتركين', expiring: 'أرسل تذكير التجديد', paused: 'إيقافات اليوم الواحد (3 شهرياً)', add: 'تسجيل مباشر بدون نموذج', notify: 'واتساب للمشتركين', finance: 'الدخل والمصاريف والصافي', trips: 'أضف رحلة وتابع الحجوزات', telegram: 'سجّل المصاريف من هاتفك' };
 let allSubscriptions = [], allPortals = [];
 let notifReady = false;
 
@@ -43,7 +43,7 @@ function go(page) {
   document.querySelectorAll('.tab[data-page]').forEach(t => t.classList.toggle('on', t.dataset.page === page));
   document.getElementById('adminPageTitle').textContent = TITLES[page] || '';
   document.getElementById('headSub').textContent = SUBS[page] || '';
-  const fab = document.querySelector('.fab'); if (fab) { fab.textContent = page === 'finance' ? '💸' : '+'; fab.onclick = page === 'finance' ? () => openTx() : () => go('add'); }
+  const fab = document.querySelector('.fab'); if (fab) { fab.textContent = page === 'finance' ? '💸' : page === 'trips' ? '🚌' : '+'; fab.onclick = page === 'finance' ? () => openTx() : page === 'trips' ? () => openTrip() : () => go('add'); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function showAdminSection(n) { go(n === 'subscriptions' ? 'members' : n); }

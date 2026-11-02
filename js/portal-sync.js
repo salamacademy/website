@@ -26,6 +26,10 @@
       const ps = (await db.collection('payments').where('phone', '==', phone).get()).docs.map(d => d.data()).filter(p => p.status === 'paid');
       doc.payments = ps.sort((a, b) => ms(b.paidAt || b.createdAt) - ms(a.paidAt || a.createdAt)).slice(0, 5).map(p => ({ amount: +p.amount || 0, items: (p.items || []).map(i => i.name + (i.qty > 1 ? ' ×' + i.qty : '')), childName: p.childName || '', paidAt: p.paidAt || p.createdAt || null }));
     } catch (_) { if (curData && curData.payments) doc.payments = curData.payments; }
+    try { // trip bookings of the family (parent sees "booked ✅" per child)
+      const bs = (await db.collection('tripBookings').where('phone', '==', phone).get()).docs.map(d => d.data());
+      doc.trips = bs.sort((a, b) => String(b.tripDate || '').localeCompare(String(a.tripDate || ''))).slice(0, 30).map(b => ({ tripId: b.tripId, title: b.tripTitle || '', date: b.tripDate || '', subId: b.subId || '', childName: b.childName || '' }));
+    } catch (_) { if (curData && curData.trips) doc.trips = curData.trips; }
     await ref.set(doc, { merge: false });
   }
   async function syncAll(db, allSubs) { const phones = [...new Set(allSubs.map(s => norm(s.phone)).filter(p => p.length === 8))]; for (const p of phones) await syncPhone(db, p, allSubs); }

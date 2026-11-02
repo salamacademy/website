@@ -120,6 +120,7 @@ exports.createPayment = fx.https.onRequest(async (req, res) => {
   try {
     if (!UP.key) throw new Error('UPayments key not configured');
     const b = req.body || {}; const phone = norm(b.phone); if (phone.length !== 8) throw new Error('phone');
+    if (b.trip) return await createTripPayment(b, phone, res);
     const wanted = Array.isArray(b.items) ? b.items : []; if (!wanted.length) throw new Error('no items');
     // Only families whose registration the admin approved may pay (new → register + terms → admin approval → pay)
     const PAY_OK = ['approved', 'pending_payment', 'active', 'expired'];
@@ -138,22 +139,70 @@ exports.createPayment = fx.https.onRequest(async (req, res) => {
     if (!items.length) throw new Error('items unavailable');
     const amount = +items.reduce((a, i) => a + i.price * i.qty, 0).toFixed(3); if (amount <= 0) throw new Error('amount');
     const ref = db.collection('payments').doc(); const orderId = ref.id;
-    const base = String(b.returnBase || '').replace(/\/$/, '') || 'https://salamacademy.github.io/website/client';
-    const payload = {
-      products: items.map(i => ({ name: i.name, description: i.name, price: i.price, quantity: i.qty })),
-      order: { id: orderId, reference: orderId, description: 'أكاديمية سلام — ' + items.map(i => i.name).join('، ').slice(0, 480), currency: 'KWD', amount },
-      language: 'ar', reference: { id: orderId }, tokens: {},      customer: { uniqueId: phone, name: (b.parentName || 'Parent').slice(0, 50), email: (b.email || '').slice(0, 50) || undefined, mobile: '+965' + phone },
-      returnUrl: `${base}/payment-success.html?order=${orderId}`, cancelUrl: `${base}/payment-success.html?order=${orderId}&result=CANCELED`,
-      notificationUrl: `https://${REGION}-${process.env.GCLOUD_PROJECT || 'salam-5e6f2'}.cloudfunctions.net/upaymentWebhook`,
-      paymentLinkExpiryInMinutes: 60
-    };
-    const r = await fetch(UP_BASE() + '/charge', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + UP.key }, body: JSON.stringify(payload) });
-    const j = await r.json();
-    if (!j || j.status !== true || !j.data || !j.data.link) { console.error('UP charge failed', JSON.stringify(j)); throw new Error(j && j.message ? j.message : 'gateway error'); }
-    await ref.set({ status: 'pending', amount, items, phone, subId: b.subId || null, childName: b.childName || '', parentName: b.parentName || '', trackId: j.data.trackId || null, sessionId: j.data.sessionId || null, link: j.data.link, createdAt: admin.firestore.FieldValue.serverTimestamp(), sandbox: UP.sandbox });
-    res.json({ ok: true, link: j.data.link, orderId });
+    const g = await upCharge(orderId, items, amount, phone, b);
+    await ref.set({ status: 'pending', amount, items, phone, subId: b.subId || null, childName: b.childName || '', parentName: b.parentName || '', trackId: g.trackId || null, sessionId: g.sessionId || null, link: g.link, createdAt: admin.firestore.FieldValue.serverTimestamp(), sandbox: UP.sandbox });
+    res.json({ ok: true, link: g.link, orderId });
   } catch (e) { console.error(e); res.status(400).json({ ok: false, error: e.message }); }
 });
+async function upCharge(orderId, items, amount, phone, b, expiry = 60) {
+  const base = String(b.returnBase || '').replace(/\/$/, '') || 'https://salamacademy.github.io/website/client';
+  const payload = {
+    products: items.map(i => ({ name: i.name, description: i.name, price: i.price, quantity: i.qty })),
+    order: { id: orderId, reference: orderId, description: 'أكاديمية سلام — ' + items.map(i => i.name).join('، ').slice(0, 480), currency: 'KWD', amount },
+    language: 'ar', reference: { id: orderId }, tokens: {},      customer: { uniqueId: phone, name: (b.parentName || 'Parent').slice(0, 50), email: (b.email || '').slice(0, 50) || undefined, mobile: '+965' + phone },
+    returnUrl: `${base}/payment-success.html?order=${orderId}`, cancelUrl: `${base}/payment-success.html?order=${orderId}&result=CANCELED`,
+    notificationUrl: `https://${REGION}-${process.env.GCLOUD_PROJECT || 'salam-5e6f2'}.cloudfunctions.net/upaymentWebhook`,
+    paymentLinkExpiryInMinutes: expiry
+  };
+  const r = await fetch(UP_BASE() + '/charge', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + UP.key }, body: JSON.stringify(payload) });
+  const j = await r.json();
+  if (!j || j.status !== true || !j.data || !j.data.link) { console.error('UP charge failed', JSON.stringify(j)); throw new Error(j && j.message ? j.message : 'gateway error'); }
+  return j.data;
+}
+
+// Trip booking: one seat per child, price × children. Seats = capacity − paid bookings − unpaid orders of the last 20 min (hold).
+const TRIP_HOLD_MS = 20 * 60e3;
+async function tripSeats(tripId) {
+  const tr = await db.collection('trips').doc(tripId).get(); if (!tr.exists) return null;
+  const pend = (await db.collection('payments').where('tripId', '==', tripId).get()).docs.map(d => d.data())
+    .filter(p => p.status === 'pending' && p.createdAt && Date.now() - p.createdAt.toMillis() < TRIP_HOLD_MS);
+  const held = pend.reduce((a, p) => a + (p.tripKids || []).length, 0);
+  const trip = tr.data(); return { trip, left: Math.max(0, (+trip.capacity || 0) - (+trip.booked || 0) - held), pend };
+}
+async function createTripPayment(b, phone, res) {
+  const tripId = String(b.trip.id || ''); const want = Array.isArray(b.trip.kids) ? b.trip.kids.map(String) : [];
+  if (!tripId || !want.length) throw new Error('اختر المشترك');
+  const s = await tripSeats(tripId); if (!s) throw new Error('الرحلة غير موجودة');
+  const trip = s.trip;
+  if (trip.status !== 'open' || trip.hidden) return res.status(409).json({ ok: false, code: 'closed', error: 'التسجيل في هذه الرحلة مغلق' });
+  if (trip.date && trip.date < kwToday()) return res.status(409).json({ ok: false, code: 'closed', error: 'انتهى موعد هذه الرحلة' });
+  // only this family's own registered children, each booked once
+  const subs = (await db.collection('subscriptions').where('phone', '==', phone).get()).docs.filter(d => !['rejected', 'cancelled'].includes(d.data().status));
+  const booked = new Set((await db.collection('tripBookings').where('tripId', '==', tripId).get()).docs.map(d => d.data().subId));
+  const kids = [...new Set(want)].map(id => subs.find(d => d.id === id)).filter(Boolean).filter(d => !booked.has(d.id)).map(d => ({ subId: d.id, childName: d.data().childName || '' }));
+  if (!kids.length) throw new Error('المشترك محجوز مسبقاً في هذه الرحلة');
+  if (kids.length > s.left) return res.status(409).json({ ok: false, code: 'full', error: s.left ? `متبقٍ ${s.left} ${s.left === 1 ? 'مقعد' : 'مقاعد'} فقط` : 'اكتمل العدد — لا توجد مقاعد متاحة' });
+  const price = +(+trip.price).toFixed(3); if (!(price > 0)) throw new Error('سعر الرحلة غير محدد');
+  const items = kids.map(k => ({ id: 'trip_' + tripId, name: `رحلة ${trip.title} — ${k.childName.split(' ')[0]}`, icon: '🚌', price, qty: 1, packageType: null, category: 'رحلات وفعاليات' }));
+  const amount = +(price * kids.length).toFixed(3);
+  const ref = db.collection('payments').doc(); const orderId = ref.id;
+  const g = await upCharge(orderId, items, amount, phone, b, 20);
+  await ref.set({ status: 'pending', amount, items, phone, tripId, tripTitle: trip.title || '', tripKids: kids, subId: null, childName: kids.map(k => k.childName).join('، '), parentName: b.parentName || '', trackId: g.trackId || null, sessionId: g.sessionId || null, link: g.link, createdAt: admin.firestore.FieldValue.serverTimestamp(), sandbox: UP.sandbox });
+  res.json({ ok: true, link: g.link, orderId });
+}
+// Paid trip order → bookings + seat counter; closes the trip when full. Paid seats are always kept (even past capacity).
+async function bookTrip(orderId, p, method) {
+  const tripRef = db.collection('trips').doc(p.tripId); let full = false;
+  await db.runTransaction(async t => {
+    const tr = await t.get(tripRef); if (!tr.exists) return;
+    const refs = (p.tripKids || []).map((k, i) => db.collection('tripBookings').doc(`${p.tripId}_${orderId}_${i}`));
+    const ex = await Promise.all(refs.map(r => t.get(r))); const n = ex.filter(x => !x.exists).length; if (!n) return;
+    refs.forEach((r, i) => { if (!ex[i].exists) { const k = p.tripKids[i]; t.set(r, { tripId: p.tripId, tripTitle: p.tripTitle || tr.data().title || '', tripDate: tr.data().date || '', subId: k.subId, childName: k.childName, phone: p.phone, parentName: p.parentName || '', amount: +(+tr.data().price).toFixed(3), method, orderId, createdAt: admin.firestore.FieldValue.serverTimestamp() }); } });
+    const booked = (+tr.data().booked || 0) + n; full = booked >= (+tr.data().capacity || 0);
+    t.update(tripRef, { booked, ...(full ? { status: 'closed', closedReason: 'full' } : {}) });
+  });
+  return full;
+}
 
 // 2) Finalise a paid order: activate subscription (if a package item), book income, sync portal — idempotent
 async function finalizePayment(orderId, gw) {
@@ -176,14 +225,17 @@ async function finalizePayment(orderId, gw) {
       activated = true;
     }
   }
+  let tripFull = false;
+  if (p.tripId) { try { tripFull = await bookTrip(orderId, p, 'upayment'); } catch (e) { console.error('trip booking', orderId, e); } }
   const batch = db.batch(); const today = new Date(Date.now() + 3 * 3600e3).toISOString().split('T')[0];
   (p.items || []).forEach(i => batch.set(db.collection('transactions').doc(), { type: 'income', amount: +(i.price * i.qty).toFixed(3), category: i.category || 'أخرى', note: `${i.name}${i.qty > 1 ? ' ×' + i.qty : ''} — ${p.childName || p.phone} (UPayment)`, method: 'upayment', date: today, paymentId: orderId, createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'upayment' }));
   batch.update(ref, { status: 'paid', activated, gateway: gw, paymentType: gw.payment_type || gw.paymentType || null, paidAt: admin.firestore.FieldValue.serverTimestamp() });
   await batch.commit();
   try { await PortalSync.syncPhone(db, p.phone); } catch (e) { console.warn('portal sync', e.message); } // subscription + payment history
-  await addNotif({ icon: '💳', title: `دفعة ${(+p.amount).toFixed(3)} د.ك`, body: `${p.childName || p.phone} — ${(p.items || []).map(i => i.name).join('، ')}${activated ? ' · ✅ تم التفعيل' : ''}`, page: 'finance' }, 'pay_' + orderId);
-  try { await tgcore.notifyAdmins(db, tg, `💳 <b>دفعة UPayment</b>\n${p.childName || p.phone} — <b>${(+p.amount).toFixed(3)} د.ك</b>\n${(p.items || []).map(i => '• ' + i.name).join('\n')}${activated ? '\n✅ تم تفعيل الاشتراك' : ''}`); } catch (_) {}
-  if (p.phone) { try { const pd = await db.collection('portal').doc(p.phone).get(); await sendTo(pd.exists ? pd.data().fcmTokens : [], '✅ تم استلام الدفع', `${(+p.amount).toFixed(3)} د.ك${activated ? ' · تم تفعيل الاشتراك' : ''}`, '/website/client/dashboard.html'); } catch (_) {} }
+  const extra = activated ? ' · ✅ تم التفعيل' : p.tripId ? ` · 🚌 حجز رحلة${tripFull ? ' · اكتمل العدد وأُغلق التسجيل' : ''}` : '';
+  await addNotif({ icon: p.tripId ? '🚌' : '💳', title: `دفعة ${(+p.amount).toFixed(3)} د.ك`, body: `${p.childName || p.phone} — ${(p.items || []).map(i => i.name).join('، ')}${extra}`, page: p.tripId ? 'trips' : 'finance' }, 'pay_' + orderId);
+  try { await tgcore.notifyAdmins(db, tg, `💳 <b>دفعة UPayment</b>\n${p.childName || p.phone} — <b>${(+p.amount).toFixed(3)} د.ك</b>\n${(p.items || []).map(i => '• ' + i.name).join('\n')}${activated ? '\n✅ تم تفعيل الاشتراك' : ''}${p.tripId ? '\n🚌 تم حجز الرحلة' + (tripFull ? ' — اكتمل العدد وأُغلق التسجيل' : '') : ''}`); } catch (_) {}
+  if (p.phone) { try { const pd = await db.collection('portal').doc(p.phone).get(); await sendTo(pd.exists ? pd.data().fcmTokens : [], '✅ تم استلام الدفع', `${(+p.amount).toFixed(3)} د.ك${activated ? ' · تم تفعيل الاشتراك' : p.tripId ? ' · تم حجز الرحلة 🚌' : ''}`, '/website/client/dashboard.html'); } catch (_) {} }
   return 'paid';
 }
 async function fetchStatus(trackId) { const r = await fetch(UP_BASE() + '/get-payment-status/' + encodeURIComponent(trackId), { headers: { Accept: 'application/json', Authorization: 'Bearer ' + UP.key } }); return r.json(); }
@@ -210,7 +262,7 @@ exports.verifyPayment = fx.https.onRequest(async (req, res) => {
     let d = orderId ? await db.collection('payments').doc(orderId).get() : null;
     if ((!d || !d.exists) && track) { const q = await db.collection('payments').where('trackId', '==', String(track)).limit(1).get(); if (!q.empty) { d = q.docs[0]; orderId = d.id; } }
     if (!d || !d.exists) return res.json({ ok: false, error: 'order not found' });
-    const info = x => ({ ok: true, orderId, status: x.status, amount: x.amount, items: x.items || [], childName: x.childName || '', activated: !!x.activated });
+    const info = x => ({ ok: true, orderId, status: x.status, amount: x.amount, items: x.items || [], childName: x.childName || '', activated: !!x.activated, trip: x.tripTitle || '' });
     const p = d.data(); if (p.status === 'paid') return res.json(info(p));
     const tk = track || p.trackId; if (!tk || !UP.key) return res.json(info(p));
     await finalizePayment(orderId, gwFromStatus(await fetchStatus(tk)));

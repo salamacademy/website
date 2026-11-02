@@ -9,7 +9,7 @@ const SCHEDULES = {
   excellence_loyal: { name: 'باقة التميز – أسرة سلام', icon: '🏅', rows: [['📅', '4 أيام بالأسبوع'], ['⚽', 'كرة القدم: السبت · الروضة'], ['🥋', 'الكيوكشن: أحد/ثلاثاء/خميس · جنوب السرة']] },
   premium: { name: 'الباقة المميزة', icon: '⚡', rows: [['📅', '6 أيام'], ['📍', 'الروضة + السلام']] }
 };
-const TITLES = { overview: 'هذا ملخص اشتراك ابنك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: '3 أيام إيقاف كل شهر', renew: 'ادفع أو جدد اشتراكك' };
+const TITLES = { overview: 'هذا ملخص اشتراك ابنك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: '3 أيام إيقاف كل شهر', trips: 'رحلات ترفيهية وتربوية بإشراف الأكاديمية', renew: 'ادفع أو جدد اشتراكك' };
 const toD = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : null;
 const fmt = ts => { const d = toD(ts); return d ? d.toLocaleDateString('ar-KW') : '--'; };
 const $ = id => document.getElementById(id);
@@ -37,7 +37,9 @@ function loadClientData() {
     const idx = Math.max(0, kids.findIndex(k => k.id === prevId));
     const prevStatus = currentSubscription?.status;
     selectKid(idx, true);
+    if (typeof renderTripsClient === 'function') renderTripsClient();
     if (location.hash === '#pay' && !window.__wentPay) { window.__wentPay = true; setTimeout(() => go('renew'), 300); }
+    if (location.hash === '#trips' && !window.__wentTrips) { window.__wentTrips = true; setTimeout(() => go('trips'), 300); }
     const d = currentSubscription;
     if (d && prevStatus && d.status !== prevStatus) {
       if (d.status === 'approved') Notif.show('🎉 تمت الموافقة على طلبك', `${d.childName} — ${d.amount} د.ك · ادفع الآن`, 'dashboard.html');

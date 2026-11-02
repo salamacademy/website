@@ -332,3 +332,39 @@ body.app-body,body.app-body.admin{background:#EEF1EA}
 .ptr{position:fixed;top:0;left:50%;z-index:90;width:40px;height:40px;margin-left:-20px;border-radius:50%;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem;transform:translateY(-50px);opacity:0;pointer-events:none}
 .ptr.ready{color:var(--green)} .ptr.spin{animation:ptrSpin .8s linear infinite}
 @keyframes ptrSpin{to{rotate:360deg}}
+
+/* ===== TRIPS (parent + admin) ===== */
+.trip{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.trip-img{display:block;width:100%;height:auto;background:var(--green-xpale)}
+.trip-hero{background:linear-gradient(135deg,var(--green),var(--green-mid));color:#fff;padding:22px 18px 18px;text-align:center;position:relative}
+.trip-hero .k{font-size:.8rem;font-weight:800;opacity:.85}
+.trip-hero h3{font-size:1.7rem;font-weight:900;line-height:1.2;margin:2px 0 4px}
+.trip-hero .e{font-size:2.2rem;line-height:1}
+.trip-b{padding:14px 16px 16px}
+.trip-t{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.trip-t h4{font-size:1.1rem;font-weight:900;color:var(--green)}
+.trip-val{display:flex;align-items:center;gap:8px;background:var(--green-xpale);border:1.5px solid var(--green-pale);border-radius:14px;padding:8px 12px;margin-bottom:10px;font-size:.85rem;color:var(--text-mid);font-weight:700}
+.trip-val b{color:var(--green);font-size:1rem}
+.trip-info{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.trip-info div{background:#FBF7F0;border-radius:12px;padding:7px 10px;font-size:.72rem;color:var(--text-light);font-weight:800}
+.trip-info div b{display:block;font-size:.88rem;color:var(--text);font-weight:900;margin-top:1px}
+.trip-info .w{grid-column:1/-1}
+.trip-notes{white-space:pre-wrap;font-size:.8rem;line-height:1.8;color:var(--text-mid);background:var(--green-xpale);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.trip-price{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px}
+.trip-price .pr{font-size:1.6rem;font-weight:900;color:var(--accent)} .trip-price .pr small{font-size:.8rem;color:var(--text-light)}
+.seats{font-size:.78rem;font-weight:800;color:var(--text-mid);flex:1;margin-inline-start:14px}
+.seats .b{height:8px;border-radius:4px;background:var(--green-pale);overflow:hidden;margin-top:4px}
+.seats .b i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--green),var(--green-light))}
+.seats.full .b i{background:linear-gradient(90deg,#C62828,#EF5350)}
+.kidpick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.kidpick button{border:2px solid var(--green-pale);background:#fff;border-radius:20px;padding:7px 12px;font-size:.82rem;font-weight:800;color:var(--text-mid);font-family:inherit}
+.kidpick button.on{background:var(--green-mid);border-color:var(--green-mid);color:#fff}
+.kidpick button.done{background:var(--ok-bg);border-color:transparent;color:var(--ok)}
+.trip-row{display:flex;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:10px;margin-bottom:10px;box-shadow:0 3px 12px rgba(27,94,32,0.06)}
+.trip-row .th{width:58px;height:58px;border-radius:12px;object-fit:cover;background:var(--green-xpale);display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex:0 0 58px}
+.trip-row .m{flex:1;min-width:0} .trip-row .m>b{display:block;font-size:.95rem;color:var(--text)} .trip-row .m small{font-size:.72rem;color:var(--text-light);font-weight:700}
+.trip-promo{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--green),var(--green-mid));color:#fff;border-radius:var(--r);padding:14px;margin-bottom:12px;box-shadow:0 8px 22px rgba(46,125,50,0.3);cursor:pointer}
+.trip-promo .e{font-size:2rem} .trip-promo b{display:block;font-size:1rem} .trip-promo small{opacity:.9;font-weight:700;font-size:.78rem}
+.trip-promo .go{margin-inline-start:auto;background:#fff;color:var(--green);border-radius:12px;padding:8px 12px;font-weight:900;font-size:.82rem;white-space:nowrap}
+.img-pick{border:2px dashed rgba(46,125,50,0.35);border-radius:14px;padding:10px;text-align:center;background:var(--green-xpale)}
+.img-pick img{max-width:100%;max-height:240px;border-radius:10px;display:block;margin:0 auto 8px}

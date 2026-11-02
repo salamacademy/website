@@ -23,7 +23,7 @@ async function check() {
 function show(p) {
   const box = document.getElementById('box'); box.style.display = 'block';
   box.innerHTML = (p.items || []).map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${i.icon || ''} ${i.name}${i.qty > 1 ? ' ×' + i.qty : ''}</span><b>${(i.price * i.qty).toFixed(3)} د.ك</b></div>`).join('') + `<div style="display:flex;justify-content:space-between;border-top:1px dashed #ccc;margin-top:8px;padding-top:8px"><b>الإجمالي</b><b style="color:#1B5E20">${(+p.amount).toFixed(3)} د.ك</b></div>`;
-  if (p.status === 'paid') set('🎉', 'تم الدفع بنجاح!', `شكراً لك${p.childName ? ' — ' + p.childName : ''}. ${p.activated ? 'تم تفعيل الاشتراك تلقائياً ✅' : 'تم تسجيل الدفعة ✅'}`);
+  if (p.status === 'paid') set('🎉', 'تم الدفع بنجاح!', `شكراً لك${p.childName ? ' — ' + p.childName : ''}. ${p.activated ? 'تم تفعيل الاشتراك تلقائياً ✅' : p.trip ? 'تم حجز مقعد في رحلة ' + p.trip + ' 🚌✅' : 'تم تسجيل الدفعة ✅'}`);
   else if (p.status === 'failed') set('❌', 'لم تتم عملية الدفع', 'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى من حسابك.');
   else set('⏳', 'بانتظار تأكيد الدفع', 'إذا أتممت الدفع فسيتم التأكيد خلال لحظات...');
 }
