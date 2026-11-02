@@ -43,7 +43,7 @@
     <div class="ring-card" id="daysCard">
       <div class="ring">
         <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="#F3EBE3" stroke-width="10"/><circle id="daysCircle" cx="60" cy="60" r="52" fill="none" stroke="#B8541E" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="0"/></svg>
-        <div class="in"><span class="big" id="daysRemaining">--</span><span class="lbl days-label">يوم متبقي</span></div>
+        <div class="in"><span class="big" id="daysRemaining">--</span><span class="lbl days-label">حصة متبقية</span></div>
       </div>
       <div class="ring-info">
         <h3 id="daysStatusTitle">جاري التحميل...</h3>
@@ -94,7 +94,7 @@
     <div class="page-title"><h3>⏸️ إيقاف مؤقت</h3></div>
     <div class="card">
       <div id="pauseInfo">
-        <p class="note" style="margin-bottom:14px"><span id="pauseRule">يمكنك إيقاف <strong>3 أيام تدريب في الشهر</strong> — اخترها معاً أو كل يوم على حدة.</span> يتم الإيقاف فوراً ويُمدَّد الاشتراك يوماً عن كل يوم، ويمكنك إلغاء أي يوم قادم بالضغط عليه.</p>
+        <p class="note" style="margin-bottom:14px"><span id="pauseRule"></span> يتم الإيقاف فوراً وتُضاف الحصة الموقوفة في نهاية الاشتراك، ويمكنك إلغاء أي إيقاف قادم بالضغط عليه.</p>
         <div id="pauseQuota" style="display:flex;gap:6px;justify-content:center;margin-bottom:14px"></div>
         <div id="pauseCal" class="cal"></div>
         <div class="fg"><label>السبب (اختياري)</label><input type="text" id="pauseReason" placeholder="مثال: سفر، مرض..."/></div>
@@ -102,7 +102,7 @@
         <button class="btn primary" id="pauseBtn" onclick="requestPause()">⏸️ إيقاف</button>
       </div>
       <div id="pauseActive" style="display:none;text-align:center"><div style="font-size:3rem">⏸️</div><h4 style="color:var(--green);margin:8px 0">الاشتراك متوقف اليوم</h4><p style="color:var(--text-mid);line-height:1.8"><strong id="pauseFrom"></strong><br/>يستأنف التدريب غداً.</p><div id="pauseHistory" style="margin-top:10px"></div></div>
-      <div id="pauseUsed" style="display:none;text-align:center"><div style="font-size:3rem">✅</div><p style="color:var(--text-mid);line-height:1.8">تم استخدام الإيقافات الثلاثة لهذا الشهر.<br/>ستتاح مجدداً مع التجديد القادم.</p></div>
+      <div id="pauseUsed" style="display:none;text-align:center"><div style="font-size:3rem">✅</div><p style="color:var(--text-mid);line-height:1.8">تم استخدام الإيقافات المسموحة لهذا الاشتراك.<br/>ستتاح مجدداً مع التجديد القادم.</p></div>
     </div>
   </section>
 
@@ -117,6 +117,7 @@
     <div class="page-title"><h3>💳 اختر ما تريد دفعه</h3><span id="payKid"></span></div>
     <div id="payGrid" class="pay-grid"><div class="empty" style="grid-column:1/-1">جاري التحميل...</div></div>
     <div class="pay-total"><span style="font-weight:800;color:var(--text-mid)">الإجمالي</span><span><b id="payTotal">0.000</b> <small style="font-weight:800;color:var(--text-light)">د.ك</small></span></div>
+    <div class="terms-box" id="payTerms"></div>
     <button class="btn upay" id="payBtn" onclick="startPayment()" disabled style="opacity:.6"><img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span></button>
     <p class="note" style="margin-top:10px">💳 كي نت — دفع آمن عبر UPayment. يتم تفعيل الاشتراك تلقائياً بعد نجاح الدفع.</p>
     <a class="btn ghost" href="register.html" id="addKidLink" style="margin-top:10px">📝 تسجيل مشترك آخر</a>
@@ -139,6 +140,7 @@
 <script src="../js/firebase-config.js"></script>
 <script src="../js/pwa-install.js"></script>
 <script src="../js/notifications.js"></script>
+<script src="../js/classes.js"></script>
 <script src="../js/client-dashboard.js"></script>
 <script src="../js/trips-common.js"></script>
 <script src="../js/trips-client.js"></script>

@@ -109,7 +109,7 @@
       </div>
       <div class="fg2">
         <div class="fg"><label>الباقة</label>
-          <select id="newPackage" onchange="updatePackagePrice()" required>
+          <select id="newPackage" onchange="updatePackagePrice();autoEndDate('newStartDate','newEndDate')" required>
             <option value="">— اختر —</option>
             <option value="football" data-price="25" data-name="معسكر كرة القدم">⚽ كرة القدم — 25</option>
             <option value="confidence" data-price="70" data-name="معسكر بناء الثقة والكيوكشن">🥋 بناء الثقة — 70</option>
@@ -122,7 +122,7 @@
         <div class="fg"><label>بداية الاشتراك</label><input type="date" id="newStartDate" required onchange="autoEndDate('newStartDate','newEndDate')"/></div>
         <div class="fg"><label>نهاية الاشتراك</label><input type="date" id="newEndDate" required/></div>
       </div>
-      <p class="hint" style="margin:-4px 2px 10px;font-size:0.78rem;color:var(--text-light)">تُحسب النهاية تلقائياً (+30 يوماً) ويمكنك تعديلها</p>
+      <p class="hint" style="margin:-4px 2px 10px;font-size:0.78rem;color:var(--text-light)">تُحسب النهاية تلقائياً (تاريخ آخر حصة: كرة القدم 4 حصص، بناء الثقة 12، التميز 16) ويمكنك تعديلها</p>
       <div class="fg"><label>طريقة الدفع</label><select id="newPaymentMethod"><option value="cash">نقدي</option><option value="upayment">UPayment</option><option value="bank">تحويل</option></select></div>
       <div class="fg"><label>ملاحظات</label><textarea id="newNotes" rows="2"></textarea></div>
       <button type="submit" class="btn primary">💾 حفظ وتفعيل الاشتراك</button>
@@ -281,7 +281,7 @@
     <input type="hidden" id="piId"/>
     <div class="fg2"><div class="fg"><label>الأيقونة</label><input type="text" id="piIcon" placeholder="⚽" maxlength="4" style="text-align:center;font-size:1.4rem"/></div><div class="fg"><label>السعر (د.ك)</label><input type="number" id="piPrice" step="0.001" min="0" placeholder="25.000" inputmode="decimal"/></div></div>
     <div class="fg"><label>الاسم</label><input type="text" id="piName" placeholder="مثال: اشتراك كرة القدم"/></div>
-    <div class="fg"><label>يفعّل باقة؟ (اختياري)</label><select id="piPkg"><option value="">— لا، منتج عادي (تيشيرت، معدات...) —</option><option value="football">⚽ كرة القدم — يفعّل/يجدد 30 يوم</option><option value="confidence">🥋 بناء الثقة — يفعّل/يجدد 30 يوم</option><option value="excellence">⚡ التميز — يفعّل/يجدد 30 يوم</option></select></div>
+    <div class="fg"><label>يفعّل باقة؟ (اختياري)</label><select id="piPkg"><option value="">— لا، منتج عادي (تيشيرت، معدات...) —</option><option value="football">⚽ كرة القدم — يفعّل/يجدد شهر حصص</option><option value="confidence">🥋 بناء الثقة — يفعّل/يجدد شهر حصص</option><option value="excellence">⚡ التميز — يفعّل/يجدد شهر حصص</option></select></div>
     <div class="fg2"><div class="fg"><label>الترتيب</label><input type="number" id="piOrder" value="10"/></div><div class="fg"><label>فئة الدخل</label><select id="piCat"><option>اشتراكات</option><option>بيع زي</option><option>رحلات وفعاليات</option><option>بطولات</option><option>أخرى</option></select></div></div>
     <label class="chatid" style="cursor:pointer"><span>🔢 السماح باختيار الكمية (مثل التيشيرتات)</span><input type="checkbox" id="piQty" style="width:20px;height:20px;accent-color:var(--green-mid)"/></label>
     <label class="chatid" style="cursor:pointer;margin-top:6px"><span>✍️ ولي الأمر يكتب المبلغ بنفسه (دفعة بمبلغ مفتوح)</span><input type="checkbox" id="piCustom" style="width:20px;height:20px;accent-color:var(--green-mid)"/></label>
@@ -342,6 +342,7 @@
 <script src="../js/pwa-install.js"></script>
 <script src="../js/notifications.js"></script>
 <script src="../js/portal-sync.js"></script>
+<script src="../js/classes.js"></script>
 <script src="../js/admin-dashboard.js"></script>
 <script src="../js/finance.js"></script>
 <script src="../js/trips-common.js"></script>

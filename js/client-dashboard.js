@@ -9,7 +9,7 @@ const SCHEDULES = {
   excellence_loyal: { name: 'باقة التميز – أسرة سلام', icon: '🏅', rows: [['📅', '4 أيام بالأسبوع'], ['⚽', 'كرة القدم: السبت · الروضة'], ['🥋', 'الكيوكشن: أحد/ثلاثاء/خميس · جنوب السرة']] },
   premium: { name: 'الباقة المميزة', icon: '⚡', rows: [['📅', '6 أيام'], ['📍', 'الروضة + السلام']] }
 };
-const TITLES = { overview: 'هذا ملخص اشتراك ابنك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: '3 أيام إيقاف كل شهر', trips: 'رحلات ترفيهية وتربوية بإشراف الأكاديمية', renew: 'ادفع أو جدد اشتراكك' };
+const TITLES = { overview: 'هذا ملخص اشتراك ابنك في أكاديمية سلام', subscription: 'كل تفاصيل الاشتراك', schedule: 'مواعيد وأماكن التدريب', pause: 'إيقاف حصص من اشتراكك', trips: 'رحلات ترفيهية وتربوية بإشراف الأكاديمية', renew: 'ادفع أو جدد اشتراكك' };
 const toD = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : null;
 const fmt = ts => { const d = toD(ts); return d ? d.toLocaleDateString('ar-KW') : '--'; };
 const $ = id => document.getElementById(id);
@@ -68,18 +68,18 @@ function renderDashboard(sub) {
   if (sub.status !== 'active' && sub.status !== 'expired') { renderRequestState(sub); return; }
 
   const end = toD(sub.subscriptionEnd), start = toD(sub.subscriptionStart);
-  let days = 0, total = 30;
-  if (end) { days = Math.max(0, Math.ceil((end - new Date()) / 864e5)); if (start) total = Math.max(1, Math.ceil((end - start) / 864e5)); }
-  setRing(days, days / total, days <= 5 ? '#C62828' : days <= 10 ? '#E65100' : '#2E7D32');
+  // countdown in classes (football 4 · confidence 12 · excellence 16 per month), not calendar days
+  const days = end ? Classes.left(sub) : 0, total = Classes.perMonth(sub.packageType), cls = n => n === 1 ? 'حصة واحدة' : n === 2 ? 'حصتان' : n <= 10 ? n + ' حصص' : n + ' حصة';
+  setRing(days, days / total, days <= 2 ? '#C62828' : days <= 4 ? '#E65100' : '#2E7D32');
   $('startDate').textContent = fmt(start); $('endDate').textContent = fmt(end);
   const alert = $('renewalAlert'); alert.classList.remove('show');
   if (days <= 0 || sub.status === 'expired') { status('انتهى الاشتراك', 'يرجى التجديد للاستمرار في التدريب'); alertSet('انتهى الاشتراك', 'جدد الآن للعودة للتدريب', '🔄 تجديد'); }
-  else if (days <= 5) { status('⚠️ اشتراكك على وشك الانتهاء', 'جدد الآن لتجنب الانقطاع'); alertSet('اشتراكك على وشك الانتهاء!', `متبقٍ ${days} أيام فقط`, 'جدد الآن'); }
-  else if (days <= 10) { status('اشتراك نشط', 'ينتهي قريباً، فكر في التجديد المبكر'); alertSet('ينتهي قريباً', `متبقٍ ${days} يوم`, 'جدد الآن'); }
+  else if (days <= 2) { status('⚠️ اشتراكك على وشك الانتهاء', 'جدد الآن لتجنب الانقطاع'); alertSet('اشتراكك على وشك الانتهاء!', `متبقٍ ${cls(days)} فقط`, 'جدد الآن'); }
+  else if (days <= 4) { status('اشتراك نشط', 'ينتهي قريباً، فكر في التجديد المبكر'); alertSet('ينتهي قريباً', `متبقٍ ${cls(days)}`, 'جدد الآن'); }
   else status('✅ اشتراك نشط', 'استمتع بجلسات التدريب!');
   renderPause(sub);
 }
-function setRing(num, ratio, color) { $('daysRemaining').textContent = num; $('daysRemaining').style.fontSize = ''; $('daysCircle').setAttribute('stroke', color); $('daysCircle').style.strokeDashoffset = 326.7 * (1 - Math.max(0, Math.min(1, ratio))); document.querySelector('.days-label').textContent = 'يوم متبقي'; }
+function setRing(num, ratio, color) { $('daysRemaining').textContent = num; $('daysRemaining').style.fontSize = ''; $('daysCircle').setAttribute('stroke', color); $('daysCircle').style.strokeDashoffset = 326.7 * (1 - Math.max(0, Math.min(1, ratio))); document.querySelector('.days-label').textContent = 'حصة متبقية'; }
 function status(t, d) { $('daysStatusTitle').textContent = t; $('daysStatusDesc').textContent = d; }
 function alertSet(t, d, btn) { const a = $('renewalAlert'); a.classList.add('show'); a.querySelector('strong').textContent = t; a.querySelector('p').textContent = d; a.querySelector('button').textContent = btn; }
 
@@ -161,21 +161,45 @@ function purposeBox(i) {
   const opts = [...PURPOSES].sort((a, b) => (b[0] === cur) - (a[0] === cur)).map(([k, l]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${l}${k === cur ? ' (باقتك الحالية)' : ''}</option>`).join('');
   return `<div class="purpose" onclick="event.stopPropagation()"><label>لماذا تدفع؟ <b style="color:#C62828">*</b></label><select onchange="setFor('${i.id}',this.value)" class="${v ? '' : 'need'}"><option value="">— اختر —</option>${opts}</select>
     ${v === 'other' ? `<input type="text" maxlength="80" placeholder="اكتب الغرض (مثال: زي، بطولة...)" value="${(customNote[i.id] || '').replace(/"/g, '&quot;')}" oninput="customNote['${i.id}']=this.value"/>` : ''}
-    ${v && v !== 'other' ? `<small class="ok">✅ سيُجدَّد اشتراك ${(currentSubscription?.childName || '').split(' ')[0]} 30 يوماً بعد الدفع</small>` : ''}</div>`;
+    ${v && v !== 'other' ? `<small class="ok">✅ سيُجدَّد اشتراك ${(currentSubscription?.childName || '').split(' ')[0]} ${Classes.perMonth(v)} حصة بعد الدفع</small>` : ''}</div>`;
+}
+// ---------- TERMS (must be accepted before every payment) ----------
+let termsOk = false, termsShown = '';
+const DAY_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const countAr = (n, one, many) => n === 1 ? one + ' واحدة' : n === 2 ? (one === 'حصة' ? 'حصتان' : one + 'ان') : n + ' ' + (n <= 10 ? many : one);
+function cartPackages() {
+  return [...new Set(Object.keys(cart).map(id => { const i = payItems.find(x => x.id === id); return i && (i.packageType || (i.customAmount && Classes.TRAIN_DAYS[customFor[id]] && customFor[id])); }).filter(Boolean))];
+}
+function termsLines() {
+  const pk = cartPackages();
+  if (!pk.length) return ['أؤكد أن المبلغ والغرض من الدفع صحيحان.'];
+  return [...pk.map(t => { const w = Classes.TRAIN_DAYS[t].slice().sort((a, b) => ((a + 1) % 7) - ((b + 1) % 7)); return `${(SCHEDULES[t] || {}).name || t}: <b>${Classes.perMonth(t)} حصة متتالية</b> (${countAr(w.length, 'حصة', 'حصص')} أسبوعياً: ${w.map(d => DAY_AR[d]).join(' – ')})، ويحق لك إيقاف <b>${countAr(Classes.pauses(t), 'حصة', 'حصص')} فقط</b>.`; }),
+    'الحصص متتالية <b>بدون انقطاع</b>، وتبدأ من أول حصة بعد نهاية الاشتراك الحالي (أو من اليوم إذا كان الاشتراك منتهياً).',
+    'الغياب بدون إيقاف لا يُعوَّض. الإيقاف من صفحة «إيقاف» في التطبيق، وكل حصة موقوفة تُضاف في نهاية الاشتراك.'];
+}
+function renderTerms() {
+  const box = $('payTerms'); if (!box) return;
+  if (!Object.keys(cart).length || payLock(currentSubscription)) { box.style.display = 'none'; return; }
+  const lines = termsLines(), txt = lines.join('|');
+  box.style.display = 'block';
+  if (txt === termsShown) return; // keep the checkbox as it is while typing the amount
+  termsShown = txt; termsOk = false; // terms changed → accept again
+  box.innerHTML = `<b>📋 قبل الدفع — شروط الاشتراك</b><ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul><label><input type="checkbox" id="termsChk" onchange="termsOk=this.checked;updateTotal()"/> <span>قرأت الشروط وأوافق عليها</span></label>`;
 }
 function setFor(id, val) { customFor[id] = val; if (!cart[id]) cart[id] = 1; renderPayGrid(); }
 function setAmt(id, val) { customAmt[id] = val; if (!cart[id]) cart[id] = 1; updateTotal(); } // no re-render → keyboard stays open
 function setQty(id, d) { cart[id] = Math.max(0, (cart[id] || 0) + d); if (!cart[id]) delete cart[id]; renderPayGrid(); }
 function cartTotal() { return Object.entries(cart).reduce((a, [id, q]) => { const i = payItems.find(x => x.id === id); return a + (i ? itemPrice(i) * q : 0); }, 0); }
 const badCustom = () => Object.keys(cart).some(id => { const i = payItems.find(x => x.id === id); return i && i.customAmount && (!(itemPrice(i) >= 0.5 && itemPrice(i) <= 2000) || !customFor[id]); });
-function updateTotal() { const t = cartTotal(), off = t <= 0 || badCustom() || !!payLock(currentSubscription); $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = off; b.style.opacity = off ? '.6' : '1'; }
+function updateTotal() { renderTerms(); const t = cartTotal(), off = t <= 0 || badCustom() || !!payLock(currentSubscription) || !termsOk; $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = off; b.style.opacity = off ? '.6' : '1'; }
 function renewSubscription() { go('renew'); }
 async function startPayment() {
   const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => { const i = payItems.find(x => x.id === id); return i && i.customAmount ? { id, qty: 1, amount: itemPrice(i), purpose: customFor[id], note: (customNote[id] || '').trim() } : { id, qty }; }); if (!items.length || badCustom() || payLock(sub)) return;
+  if (!termsOk) return alert('يرجى قراءة الشروط والموافقة عليها قبل الدفع');
   const btn = $('payBtn'); btn.disabled = true; btn.innerHTML = '⏳ جاري تحويلك إلى UPayment...';
   try {
     if (typeof PAYMENT_API_URL === 'undefined' || !PAYMENT_API_URL || PAYMENT_API_URL.includes('YOUR_')) throw new Error('not-configured');
-    const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, subId: sub ? sub.id : null, childName: sub ? sub.childName : '', parentName: sub ? sub.parentName : (portalDoc?.parentName || ''), email: sub ? sub.email : '', items, returnBase: location.origin + location.pathname.replace(/[^/]*$/, '') }) });
+    const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, subId: sub ? sub.id : null, childName: sub ? sub.childName : '', parentName: sub ? sub.parentName : (portalDoc?.parentName || ''), email: sub ? sub.email : '', items, termsAccepted: true, termsText: termsLines().join(' | ').replace(/<[^>]+>/g, ''), returnBase: location.origin + location.pathname.replace(/[^/]*$/, '') }) });
     const j = await r.json(); if (j.code === 'not_approved') { alert(j.error); btn.disabled = false; btn.innerHTML = '<img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span>'; return; }
     if (!j.ok || !j.link) throw new Error(j.error || 'فشل إنشاء الدفع');
     location.href = j.link;
@@ -188,14 +212,14 @@ async function startPayment() {
 }
 
 // ---------- PAUSE: one-day pauses per subscription month (football 1, other packages 3) ----------
-const pauseMax = sub => sub && sub.packageType === 'football' ? 1 : 3;
+const pauseMax = sub => sub ? Classes.pauses(sub.packageType) : 3;
 const dayKey = d => (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0];
 function pausesOf(s) { return Array.isArray(s.pauses) ? s.pauses : (s.pauseStart ? [{ date: dayKey(toD(s.pauseStart)) }] : []); }
 function isPausedNow(s) { const t = dayKey(new Date()); return pausesOf(s).some(p => p.date === t); }
 function pendingPausesFor(subId) { return (portalDoc?.pauseRequests || []).filter(r => r.subId === subId && r.status === 'pending' && r.type !== 'cancel'); }
 const pendingCancels = subId => (portalDoc?.pauseRequests || []).filter(r => r.subId === subId && r.status === 'pending' && r.type === 'cancel').map(r => r.start);
 // training weekdays per package (0 = Sunday … 6 = Saturday) — only these days can be paused
-const TRAIN_DAYS = { football: [6], confidence: [0, 2, 4], excellence: [6, 0, 2, 4], excellence_loyal: [6, 0, 2, 4], premium: [6, 0, 1, 2, 3, 4] };
+const TRAIN_DAYS = Classes.TRAIN_DAYS;
 const WEEK = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة']; // Kuwait week starts Saturday
 const localToday = () => new Date().toLocaleDateString('en-CA');
 const dLabel = k => new Date(k + 'T00:00:00Z').toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
@@ -213,7 +237,7 @@ function renderPause(sub) {
     $('pauseHistory').innerHTML = `<small style="color:var(--text-light);font-weight:800">المتبقي: ${Math.max(0, left)} من ${pauseMax(sub)} هذا الشهر</small>`;
   }
   $('pauseInfo').style.display = 'block';
-  $('pauseRule').innerHTML = pauseMax(sub) === 1 ? 'يمكنك إيقاف <strong>يوم تدريب واحد في الشهر</strong> لمعسكر كرة القدم.' : 'يمكنك إيقاف <strong>3 أيام تدريب في الشهر</strong> — اخترها معاً أو كل يوم على حدة.';
+  $('pauseRule').innerHTML = `اشتراكك <strong>${Classes.perMonth(sub.packageType)} حصة متتالية</strong>، ويمكنك إيقاف <strong>${pauseMax(sub) === 1 ? 'حصة واحدة' : pauseMax(sub) + ' حصص'}</strong> فقط${pauseMax(sub) > 1 ? ' — اخترها معاً أو كل حصة على حدة' : ''}.`;
   if (calSubId !== sub.id) { calSubId = sub.id; calMonth = null; pickDays = new Set(); }
   renderPauseCal(sub);
 }
@@ -240,24 +264,24 @@ function renderPauseCal(sub) {
   }
   const prevOk = calMonth > start.slice(0, 7), nextOk = !end || calMonth < end.slice(0, 7);
   const monthName = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('ar-KW', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  $('pauseCal').innerHTML = `<div class="cal-nav"><button ${nextOk ? '' : 'disabled'} onclick="calMove(1)" aria-label="الشهر التالي">›</button><b>${monthName}</b><button ${prevOk ? '' : 'disabled'} onclick="calMove(-1)" aria-label="الشهر السابق">‹</button></div><div class="cal-grid">${cells}</div>
+  $('pauseCal').innerHTML = `<div class="cal-nav"><button ${prevOk ? '' : 'disabled'} onclick="calMove(-1)" aria-label="الشهر السابق">›</button><b>${monthName}</b><button ${nextOk ? '' : 'disabled'} onclick="calMove(1)" aria-label="الشهر التالي">‹</button></div><div class="cal-grid">${cells}</div>
     <div class="cal-legend"><span><i class="train"></i>أيام تدريب باقتك</span><span><i class="picked"></i>اخترته</span><span><i class="pending"></i>جاري التأكيد</span><span><i class="paused"></i>موقوف (اضغط للإلغاء)</span></div>`;
   const picked = [...pickDays].sort(), dayAgo = new Date(Date.now() - 864e5).toISOString();
   const refused = (portalDoc?.pauseRequests || []).filter(r => r.subId === sub.id && r.status === 'rejected' && r.auto && r.decidedAt > dayAgo);
-  $('pausePicked').innerHTML = refused.map(r => `<div style="color:#C62828;font-weight:800;margin-bottom:6px">⚠️ لم يتم ${r.type === 'cancel' ? 'إلغاء' : 'إيقاف'} ${dLabel(r.start)}: ${r.adminNote || ''}</div>`).join('') + (picked.length ? `الأيام المختارة: <strong>${picked.map(dLabel).join('، ')}</strong>${end ? `<br/>تاريخ الانتهاء الجديد بعد الموافقة: <strong>${dLabel(new Date(Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8) + picked.length)).toISOString().slice(0, 10))}</strong>` : ''}`
-    : (left > 0 ? `اضغط على أيام التدريب الملونة لاختيار حتى <strong>${left}</strong> ${left === 1 ? 'يوم' : 'أيام'}` : 'استخدمت الإيقافات الثلاثة — اضغط على يوم <b>موقوف</b> لإلغائه واختيار يوم آخر'));
+  $('pausePicked').innerHTML = refused.map(r => `<div style="color:#C62828;font-weight:800;margin-bottom:6px">⚠️ لم يتم ${r.type === 'cancel' ? 'إلغاء' : 'إيقاف'} ${dLabel(r.start)}: ${r.adminNote || ''}</div>`).join('') + (picked.length ? `الأيام المختارة: <strong>${picked.map(dLabel).join('، ')}</strong>${end ? `<br/>آخر حصة بعد الإيقاف: <strong>${dLabel(picked.reduce(k => Classes.next(k, sub.packageType), end))}</strong>` : ''}`
+    : (left > 0 ? `اضغط على أيام التدريب الملونة لاختيار حتى <strong>${left}</strong> ${left === 1 ? 'حصة' : 'حصص'}` : 'استخدمت الإيقافات المسموحة — اضغط على يوم <b>موقوف</b> لإلغائه واختيار يوم آخر'));
   const btn = $('pauseBtn'); btn.disabled = !picked.length; btn.style.opacity = picked.length ? '1' : '.6';
-  btn.textContent = picked.length ? `⏸️ إيقاف ${picked.length} ${picked.length === 1 ? 'يوم' : 'أيام'} (متبقٍ ${left})` : `⏸️ اختر الأيام من التقويم (متبقٍ ${Math.max(0, left)})`;
+  btn.textContent = picked.length ? `⏸️ إيقاف ${picked.length} ${picked.length === 1 ? 'حصة' : 'حصص'} (متبقٍ ${left})` : `⏸️ اختر الحصص من التقويم (متبقٍ ${Math.max(0, left)})`;
 }
 function togglePick(k) {
   const sub = currentSubscription; if (!sub) return;
   if (pickDays.has(k)) pickDays.delete(k);
-  else { const left = pauseMax(sub) - pausesOf(sub).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return alert(left <= 0 ? (pauseMax(sub) === 1 ? 'استخدمت الإيقاف المسموح لهذا الشهر' : 'استخدمت الإيقافات الثلاثة لهذا الشهر') : `يمكنك اختيار ${left} ${left === 1 ? 'يوم' : 'أيام'} فقط`); pickDays.add(k); }
+  else { const left = pauseMax(sub) - pausesOf(sub).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return alert(left <= 0 ? (pauseMax(sub) === 1 ? 'استخدمت الإيقاف المسموح لهذا الشهر' : 'استخدمت الإيقافات الثلاثة لهذا الشهر') : `يمكنك اختيار ${left} ${left === 1 ? 'حصة' : 'حصص'} فقط`); pickDays.add(k); }
   renderPauseCal(sub);
 }
 // pauses are approved automatically by the server (Cloud Function) within seconds — no admin step
 async function cancelPause(k) {
-  const sub = currentSubscription; if (!sub || !confirm(`إلغاء إيقاف يوم ${dLabel(k)}؟\nسيُرجَع تاريخ الانتهاء يوماً واحداً ويمكنك اختيار يوم آخر.`)) return;
+  const sub = currentSubscription; if (!sub || !confirm(`إلغاء إيقاف يوم ${dLabel(k)}؟\nستُحذف الحصة المضافة في نهاية الاشتراك ويمكنك اختيار يوم آخر.`)) return;
   try { await db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion({ subId: sub.id, childName: sub.childName, start: k, end: k, type: 'cancel', status: 'pending', requestedAt: new Date().toISOString() }) }); }
   catch (err) { alert('تعذر الإلغاء: ' + err.message); }
 }
@@ -265,7 +289,7 @@ async function requestPause() {
   const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
   const picked = [...pickDays].sort(); if (!picked.length) return alert('اختر يوم الإيقاف من التقويم');
   if (pausesOf(sub).length + pendingPausesFor(sub.id).length + picked.length > pauseMax(sub)) return alert(`تجاوزت عدد الإيقافات المسموح (${pauseMax(sub)} شهرياً)`);
-  if (!confirm(`إيقاف اشتراك ${sub.childName}:\n${picked.map(dLabel).join('\n')}\n\nسيُمدَّد الاشتراك ${picked.length} ${picked.length === 1 ? 'يوماً' : 'أيام'}.`)) return;
+  if (!confirm(`إيقاف اشتراك ${sub.childName}:\n${picked.map(dLabel).join('\n')}\n\nستُضاف ${picked.length === 1 ? 'حصة' : picked.length + ' حصص'} في نهاية الاشتراك بدلاً منها.`)) return;
   const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الإيقاف...';
   const reason = $('pauseReason').value.trim(), at = new Date().toISOString();
   try {
@@ -286,7 +310,7 @@ function setupClientNotifications() {
     b.querySelector('#notifOn').onclick = async () => { const ok = await Notif.ask(); b.remove(); if (ok) { Notif.show('تم تفعيل الإشعارات ✅', 'ستصلك تنبيهات أكاديمية سلام هنا'); Notif.registerPush(saveToken); } };
   }
   if (Notif.granted()) Notif.registerPush(saveToken);
-  kids.forEach(s => { if (s.status === 'active' && s.subscriptionEnd) { const days = Math.ceil((toD(s.subscriptionEnd) - new Date()) / 864e5), key = 'expNotif-' + s.id + '-' + new Date().toDateString(); if (days <= 3 && days >= 0 && !localStorage.getItem(key)) { localStorage.setItem(key, '1'); Notif.show('⏳ اشتراك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, 'dashboard.html'); } } });
+  kids.forEach(s => { if (s.status === 'active' && s.subscriptionEnd) { const days = Classes.left(s), key = 'expNotif-' + s.id + '-' + new Date().toDateString(); if (days <= 2 && days >= 1 && !localStorage.getItem(key)) { localStorage.setItem(key, '1'); Notif.show('⏳ اشتراك ينتهي قريباً', `${s.childName} — متبقٍ ${days === 1 ? 'حصة واحدة' : 'حصتان'} · جدد الآن`, 'dashboard.html'); } } });
 }
 
 function logout() { if (confirm('تسجيل الخروج؟')) { localStorage.removeItem('salamPhone'); location.href = 'login.html'; } }
@@ -295,7 +319,7 @@ loadClientData(); loadPayItems();
 
 
 // ---------- MULTI-KID (one parent, several children) ----------
-function kidDot(s) { if (s.status === 'active') { const d = Math.ceil((toD(s.subscriptionEnd) - new Date()) / 864e5); return d <= 5 ? 'bad' : d <= 10 ? 'warn' : 'ok'; } if (s.status === 'approved' || s.status === 'pending_payment') return 'warn'; if (s.status === 'pending_review') return 'gold'; return 'bad'; }
+function kidDot(s) { if (s.status === 'active') { const d = Classes.left(s); return d <= 2 ? 'bad' : d <= 4 ? 'warn' : 'ok'; } if (s.status === 'approved' || s.status === 'pending_payment') return 'warn'; if (s.status === 'pending_review') return 'gold'; return 'bad'; }
 function renderKidSwitch() {
   const el = $('kidSwitch'); if (!el) return;
   const p = kids[0] || {}; const addHref = 'register.html?' + new URLSearchParams({ parent: p.parentName || portalDoc?.parentName || '', phone: PHONE, email: p.email || '' }).toString();
@@ -306,7 +330,7 @@ function renderKidSwitch() {
 }
 function selectKid(i, first) {
   kidIdx = i; const s = kids[i]; if (!s) return;
-  currentSubscription = s; renderDashboard(s); renderKidSwitch(); cart = {}; customFor = {}; customNote = {}; renderPayGrid();
+  currentSubscription = s; renderDashboard(s); renderKidSwitch(); cart = {}; customFor = {}; customNote = {}; termsShown = ''; termsOk = false; renderPayGrid();
   setupClientNotifications();
   if (!first) go('overview');
 }

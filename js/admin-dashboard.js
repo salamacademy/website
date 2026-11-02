@@ -26,7 +26,10 @@ const isoDate = ts => { const d = toD(ts); return d ? d.toISOString().split('T')
 const addDaysIso = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().split('T')[0]; };
 const tsFromIso = iso => firebase.firestore.Timestamp.fromDate(new Date(iso + 'T00:00:00Z'));
 const todayIso = () => new Date().toLocaleDateString('en-CA');
-function autoEndDate(startId, endId) { const sv = document.getElementById(startId).value; if (sv) document.getElementById(endId).value = addDaysIso(sv, 30); }
+// end date = date of the last class (football 4 · confidence 12 · excellence 16 classes from the start)
+const classEnd = (startIso, pkg) => Classes.nth(startIso, Classes.perMonth(pkg), pkg);
+function autoEndDate(startId, endId) { const sv = document.getElementById(startId).value, pkg = document.getElementById(startId.replace('StartDate', 'Package'))?.value; if (sv) document.getElementById(endId).value = classEnd(sv, pkg); }
+const clsLeft = s => Classes.left(s);
 // Firestore writes can hang on a weak connection — never leave a button spinning forever
 const withTimeout = (p, ms = 15000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 const SLOW_MSG = '❌ الاتصال ضعيف ولم يتأكد الحفظ — تحقق من الإنترنت واضغط حفظ مرة أخرى';
@@ -66,8 +69,9 @@ function set(id, v) { const e = document.getElementById(id); if (e) e.textConten
 function memberCard(s, opts = {}) {
   const days = calcDaysLeft(s);
   const st = ST[s.status] || ['copper', s.status];
-  const daysChip = s.status !== 'active' || days === null ? '' : days < 0 ? `<span class="chip bad">منتهي</span>` : days <= 7 ? `<span class="chip warn">⏳ ${days} يوم</span>` : `<span class="chip ok">⏳ ${days} يوم</span>`;
-  const paused = isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (pausesOf(s).length ? `<span class="chip">⏸️ ${pausesOf(s).length}/3</span>` : '');
+  const cl = s.status === 'active' && days !== null && days >= 0 ? clsLeft(s) : 0;
+  const daysChip = s.status !== 'active' || days === null ? '' : days < 0 ? `<span class="chip bad">منتهي</span>` : `<span class="chip ${cl <= 2 ? 'bad' : cl <= 4 ? 'warn' : 'ok'}">🎯 ${cl} حصة متبقية</span>`;
+  const paused = isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (pausesOf(s).length ? `<span class="chip">⏸️ ${pausesOf(s).length}/${Classes.pauses(s.packageType)}</span>` : '');
   const actions = [];
   if (s.status === 'pending_review') actions.push(`<button class="abtn ok" onclick="openApprove('${s.id}')">✅ موافقة</button><button class="abtn bad" onclick="rejectRequest('${s.id}')">⛔ رفض</button>`);
   if (s.status === 'approved' || s.status === 'pending_payment') actions.push(`<button class="abtn ok" onclick="activateSubscription('${s.id}')">▶️ تفعيل</button>`);
@@ -132,13 +136,13 @@ async function approvePause(phone, idx) {
   const p = allPortals.find(x => x.id === phone); const r = p?.pauseRequests?.[idx]; if (!r) return;
   const s = allSubscriptions.find(x => x.id === r.subId); if (!s) return showToast('❌ الاشتراك غير موجود');
   const used = pausesOf(s); if (used.length >= 3) return showToast('❌ استنفد 3 إيقافات هذا الشهر');
-  if (!confirm(`الموافقة على إيقاف ${s.childName} يوم ${r.start}؟ سيُمدَّد الاشتراك يوماً واحداً.`)) return;
-  const ne = toD(s.subscriptionEnd); if (ne) ne.setDate(ne.getDate() + 1);
+  if (!confirm(`الموافقة على إيقاف ${s.childName} يوم ${r.start}؟ ستُضاف حصة في نهاية الاشتراك.`)) return;
+  const ne = s.subscriptionEnd ? Classes.toDate(Classes.next(Classes.key(s.subscriptionEnd), s.packageType)) : null;
   const reqs = p.pauseRequests.slice(); reqs[idx] = { ...r, status: 'approved', decidedAt: new Date().toISOString() };
   try {
     await db.collection('subscriptions').doc(s.id).update({ pauses: [...used, { date: r.start, reason: r.reason || '', approvedAt: new Date().toISOString() }], pauseUsed: used.length + 1 >= 3, ...(ne ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne) } : {}) });
     await db.collection('portal').doc(phone).update({ pauseRequests: reqs }); await PortalSync.syncPhone(db, phone);
-    window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`تمت الموافقة على إيقاف اشتراك ${s.childName} يوم ${r.start} ✅\nتم تمديد الاشتراك يوماً واحداً${ne ? ' — ينتهي الآن ' + ne.toLocaleDateString('ar-KW') : ''}.\nالمتبقي من الإيقافات هذا الشهر: ${Math.max(0, 2 - used.length)}\nأكاديمية سلام`), '_blank');
+    window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`تمت الموافقة على إيقاف اشتراك ${s.childName} يوم ${r.start} ✅\nتمت إضافة حصة في نهاية الاشتراك${ne ? ' — آخر حصة الآن ' + ne.toLocaleDateString('ar-KW') : ''}.\nالمتبقي من الإيقافات هذا الشهر: ${Math.max(0, 2 - used.length)}\nأكاديمية سلام`), '_blank');
     showToast('✅ تمت الموافقة'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
 }
@@ -153,8 +157,8 @@ async function rejectPause(phone, idx) {
 async function cancelPause(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return; const used = pausesOf(s); if (!used.length) return;
   const last = used[used.length - 1];
-  if (!confirm(`إلغاء إيقاف ${s.childName} يوم ${last.date}؟ سيُرجَع تاريخ الانتهاء يوماً واحداً.`)) return;
-  const end = toD(s.subscriptionEnd); if (end) end.setDate(end.getDate() - 1);
+  if (!confirm(`إلغاء إيقاف ${s.childName} يوم ${last.date}؟ ستُحذف الحصة المضافة في نهاية الاشتراك.`)) return;
+  const end = s.subscriptionEnd ? Classes.toDate(Classes.prev(Classes.key(s.subscriptionEnd), s.packageType)) : null;
   try { await db.collection('subscriptions').doc(id).update({ pauses: used.slice(0, -1), pauseUsed: false, pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete(), ...(end ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(end) } : {}) }); await PortalSync.syncPhone(db, s.phone); showToast('تم إلغاء الإيقاف'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
 }
 
@@ -208,7 +212,7 @@ function closeApprove() { document.getElementById('approveModal').classList.remo
 async function confirmApprove() {
   const id = document.getElementById('apId').value; const s = allSubscriptions.find(x => x.id === id); if (!s) return;
   const amount = parseFloat(document.getElementById('apAmount').value) || s.amount, note = document.getElementById('apNote').value.trim();
-  const start = new Date(document.getElementById('apStart').value); const end = new Date(start); end.setDate(end.getDate() + 30);
+  const start = new Date(document.getElementById('apStart').value); const end = Classes.toDate(classEnd(document.getElementById('apStart').value, s.packageType));
   try {
     await db.collection('subscriptions').doc(id).update({ status: 'approved', amount, adminNote: note, approvedAt: firebase.firestore.FieldValue.serverTimestamp(), plannedStart: firebase.firestore.Timestamp.fromDate(start), plannedEnd: firebase.firestore.Timestamp.fromDate(end) });
     closeApprove(); await PortalSync.syncPhone(db, s.phone);
@@ -229,8 +233,8 @@ async function rejectRequest(id) {
 }
 async function activateSubscription(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;
-  if (!confirm(`تأكيد استلام الدفع وتفعيل اشتراك ${s.childName} لمدة 30 يوماً؟`)) return;
-  const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const end = new Date(start); end.setDate(end.getDate() + 30);
+  if (!confirm(`تأكيد استلام الدفع وتفعيل اشتراك ${s.childName} (${Classes.perMonth(s.packageType)} حصة)؟`)) return;
+  const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const end = Classes.toDate(classEnd(Classes.key(start), s.packageType));
   try {
     await db.collection('subscriptions').doc(id).update({ status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauses: [], pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
     await recordIncomeForSub(s, s.amount); await PortalSync.syncPhone(db, s.phone);
@@ -309,7 +313,7 @@ async function saveSubscription(e) {
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
   try {
     const o = document.getElementById('newPackage').selectedOptions[0];
-    const sv = v('newStartDate'), ev = v('newEndDate') || (sv && addDaysIso(sv, 30));
+    const sv = v('newStartDate'), ev = v('newEndDate') || (sv && classEnd(sv, v('newPackage')));
     if (!o || !o.value) throw new Error('اختر الباقة');
     if (!sv) throw new Error('حدد تاريخ البداية');
     if (ev <= sv) throw new Error('تاريخ النهاية يجب أن يكون بعد البداية');
@@ -450,8 +454,8 @@ const SITE_BASE = location.origin + location.pathname.replace(/admin\/.*$/, '');
 function sendRenewalLink(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;
   const days = calcDaysLeft(s); const end = toD(s.subscriptionEnd), start = toD(s.subscriptionStart);
-  const newStart = s.status === 'active' && end && end > new Date() ? new Date(end) : new Date(); const newEnd = new Date(newStart); newEnd.setDate(newEnd.getDate() + 30);
+  const rn = Classes.renewal(s), newStart = Classes.toDate(rn.first), newEnd = Classes.toDate(rn.end); // next month of classes
   const link = `${SITE_BASE}client/login.html?phone=${s.phone}&go=pay`;
-  const msg = `السلام عليكم ${s.parentName} 👋\n\n${s.status === 'expired' || (days !== null && days < 0) ? `انتهى اشتراك ${s.childName} في أكاديمية سلام بتاريخ ${fmtDate(end)}.` : `اشتراك ${s.childName} في أكاديمية سلام ينتهي بعد ${days} يوم (${fmtDate(end)}).`}\n\n📦 الباقة: ${s.packageName || PKG_NAMES[s.packageType] || ''}\n💰 الرسوم: ${s.amount} د.ك / شهر\n📅 الفترة القادمة: من ${newStart.toLocaleDateString('ar-KW')} إلى ${newEnd.toLocaleDateString('ar-KW')}\n\nللتجديد عبر كي نت اضغط الرابط (يفتح حسابك مباشرة):\n${link}\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
+  const msg = `السلام عليكم ${s.parentName} 👋\n\n${s.status === 'expired' || (days !== null && days < 0) ? `انتهى اشتراك ${s.childName} في أكاديمية سلام بتاريخ ${fmtDate(end)}.` : `اشتراك ${s.childName} في أكاديمية سلام ينتهي بعد ${days} يوم (${fmtDate(end)}).`}\n\n📦 الباقة: ${s.packageName || PKG_NAMES[s.packageType] || ''}\n💰 الرسوم: ${s.amount} د.ك\n📅 الاشتراك القادم: ${Classes.perMonth(s.packageType)} حصة متتالية من ${newStart.toLocaleDateString('ar-KW')} إلى ${newEnd.toLocaleDateString('ar-KW')} (مع ${Classes.pauses(s.packageType) === 1 ? 'إيقاف حصة واحدة' : Classes.pauses(s.packageType) + ' إيقافات'})\n\nللتجديد عبر كي نت اضغط الرابط (يفتح حسابك مباشرة):\n${link}\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
   window.open('https://wa.me/965' + String(s.phone).replace(/\D/g, '') + '?text=' + encodeURIComponent(msg), '_blank');
 }
