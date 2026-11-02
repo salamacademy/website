@@ -323,7 +323,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
           else if (endKey && r.start > endKey) note = 'بعد نهاية الاشتراك';
           else if (!(TRAIN_DAYS[s.packageType] || [6, 0, 1, 2, 3, 4]).includes(dow)) note = 'ليس من أيام تدريب الباقة';
           else if (cur.pauses.some(p => p.date === r.start)) note = 'هذا اليوم موقوف مسبقاً';
-          else if (cur.pauses.length >= (s.packageType === 'football' ? 1 : 3)) note = s.packageType === 'football' ? 'كرة القدم: إيقاف واحد فقط في الشهر' : 'استُخدمت الإيقافات الثلاثة';
+          else if (cur.pauses.length >= Classes.pauses(s.packageType)) note = s.packageType === 'football' ? 'كرة القدم: إيقاف واحد فقط في الشهر' : `استُخدمت الإيقافات المسموحة (${Classes.pauses(s.packageType)})`;
           else { cur.pauses.push({ date: r.start, reason: r.reason || '', approvedAt: now, by: 'parent' }); if (cur.end) cur.end = Classes.toDate(Classes.next(Classes.key(cur.end), s.packageType)); } // +1 class at the end
         }
         if (!note) upd[r.subId] = cur;
@@ -333,7 +333,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
     }
     for (const [id, u] of Object.entries(upd)) {
       const pauses = u.pauses.sort((a, b) => a.date.localeCompare(b.date));
-      t.update(subs[id].ref, { pauses, pauseUsed: pauses.length >= 3, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(u.end), daysRemaining: Math.max(0, Math.ceil((u.end - new Date()) / 864e5)) } : {}) });
+      t.update(subs[id].ref, { pauses, pauseUsed: pauses.length >= Classes.pauses(subs[id].s.packageType), pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(u.end), daysRemaining: Math.max(0, Math.ceil((u.end - new Date()) / 864e5)) } : {}) });
     }
     const cutoff = new Date(Date.now() - 60 * 864e5).toISOString(); // keep history short
     t.update(portalRef, { pauseRequests: reqs.filter(r => r.status === 'pending' || !r.decidedAt || r.decidedAt > cutoff) });
