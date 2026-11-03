@@ -1214,6 +1214,9 @@ section { padding: 90px 0; }
   font-size: 0.8rem;
   color: rgba(255,255,255,0.3);
 }
+.footer-bottom .dev-credit { width: 100%; text-align: center; font-size: 0.75rem; }
+.dev-credit a { color: rgba(255,255,255,0.55); font-weight: 700; text-decoration: none; }
+.dev-credit a:hover { color: var(--copper-light); }
 
 /* ─── MODAL ─── */
 .modal-overlay {
