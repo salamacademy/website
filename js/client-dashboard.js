@@ -65,12 +65,15 @@ function renderDashboard(sub) {
   $('packageLabel').textContent = sch.name || sub.packageName || '--';
   $('amountDisplay').textContent = (sub.amount || '--') + ' د.ك';
   renderDetails(sub); renderSchedule(sub.packageType);
+  $('sportSplit').innerHTML = '';
   if (sub.status !== 'active' && sub.status !== 'expired') { renderRequestState(sub); return; }
 
   const end = toD(sub.subscriptionEnd), start = toD(sub.subscriptionStart);
   // countdown in classes (football 4 · confidence 12 · excellence 16 per month), not calendar days
   const days = end ? Classes.left(sub) : 0, total = Classes.perMonth(sub.packageType), cls = n => n === 1 ? 'حصة واحدة' : n === 2 ? 'حصتان' : n <= 10 ? n + ' حصص' : n + ' حصة';
   setRing(days, days / total, days <= 2 ? '#C62828' : days <= 4 ? '#E65100' : '#2E7D32');
+  const by = Classes.isSplit(sub.packageType) && end ? Classes.leftBy(sub) : null; // التميز: ⚽ football and 🥋 kyokushin counted separately
+  $('sportSplit').innerHTML = by ? Classes.sportsOf(sub.packageType).map(sp => `<span class="sp">${Classes.SPORTS[sp].icon} <b>${by[sp] || 0}</b> ${Classes.SPORTS[sp].name}</span>`).join('') : '';
   $('startDate').textContent = fmt(start); $('endDate').textContent = fmt(end);
   const alert = $('renewalAlert'); alert.classList.remove('show');
   if (days <= 0 || sub.status === 'expired') { status('انتهى الاشتراك', 'يرجى التجديد للاستمرار في التدريب'); alertSet('انتهى الاشتراك', 'جدد الآن للعودة للتدريب', '🔄 تجديد'); }
@@ -251,7 +254,7 @@ function closureNote(sub) {
 function calMove(n) { const [y, m] = calMonth.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); calMonth = d.toISOString().slice(0, 7); renderPauseCal(currentSubscription); }
 function renderPauseCal(sub) {
   const today = localToday(), start = sub.subscriptionStart ? dayKey(toD(sub.subscriptionStart)) : today, end = sub.subscriptionEnd ? dayKey(toD(sub.subscriptionEnd)) : null;
-  const train = TRAIN_DAYS[sub.packageType] || [6, 0, 1, 2, 3, 4];
+  const train = TRAIN_DAYS[sub.packageType] || [6, 0, 1, 2, 3, 4], sportEnds = Classes.ends(sub);
   const used = Classes.own(pausesOf(sub)).map(p => p.date), closed = pausesOf(sub).filter(p => p.closure).map(p => p.date), pend = pendingPausesFor(sub.id).map(r => r.start), pendCancel = pendingCancels(sub.id);
   const left = pauseMax(sub) - used.length - pend.length;
   pickDays = new Set([...pickDays].filter(k => !used.includes(k) && !pend.includes(k) && k >= today && (!end || k <= end)));
@@ -260,7 +263,7 @@ function renderPauseCal(sub) {
   let cells = WEEK.map(w => `<div class="cal-h">${w.replace('ال', '').slice(0, 3)}</div>`).join('') + '<div class="cal-d empty"></div>'.repeat(offset);
   for (let d = 1; d <= n; d++) {
     const k = `${calMonth}-${String(d).padStart(2, '0')}`, dow = new Date(k + 'T00:00:00Z').getUTCDay();
-    const inSub = k >= start && (!end || k <= end), isTrain = train.includes(dow) && inSub;
+    const spEnd = sportEnds && sportEnds[Classes.sportOf(k, sub.packageType)], inSub = k >= start && (!end || k <= (spEnd || end)), isTrain = train.includes(dow) && inSub; // التميز: each sport has its own last class
     let cls = 'off', act = '';
     if (closed.includes(k)) cls = 'closed'; // academy closure — not the parent's pause
     else if (pendCancel.includes(k) || pend.includes(k)) cls = 'pending';
@@ -276,7 +279,7 @@ function renderPauseCal(sub) {
     <div class="cal-legend"><span><i class="train"></i>أيام تدريب باقتك</span><span><i class="picked"></i>اخترته</span><span><i class="pending"></i>جاري التأكيد</span><span><i class="paused"></i>موقوف (اضغط للإلغاء)</span>${closed.length ? '<span><i class="closed"></i>إغلاق الأكاديمية</span>' : ''}</div>`;
   const picked = [...pickDays].sort(), dayAgo = new Date(Date.now() - 864e5).toISOString();
   const refused = (portalDoc?.pauseRequests || []).filter(r => r.subId === sub.id && r.status === 'rejected' && r.auto && r.decidedAt > dayAgo);
-  $('pausePicked').innerHTML = refused.map(r => `<div style="color:#C62828;font-weight:800;margin-bottom:6px">⚠️ لم يتم ${r.type === 'cancel' ? 'إلغاء' : 'إيقاف'} ${dLabel(r.start)}: ${r.adminNote || ''}</div>`).join('') + (picked.length ? `الأيام المختارة: <strong>${picked.map(dLabel).join('، ')}</strong>${end ? `<br/>آخر حصة بعد الإيقاف: <strong>${dLabel(picked.reduce(k => Classes.next(k, sub.packageType), end))}</strong>` : ''}`
+  $('pausePicked').innerHTML = refused.map(r => `<div style="color:#C62828;font-weight:800;margin-bottom:6px">⚠️ لم يتم ${r.type === 'cancel' ? 'إلغاء' : 'إيقاف'} ${dLabel(r.start)}: ${r.adminNote || ''}</div>`).join('') + (picked.length ? `الأيام المختارة: <strong>${picked.map(dLabel).join('، ')}</strong>${end ? `<br/>آخر حصة بعد الإيقاف: <strong>${dLabel(picked.reduce((st, k) => Classes.move(st, sub.packageType, Classes.sportOf(k, sub.packageType), 1), Classes.stateOf(sub)).end)}</strong>` : ''}`
     : (left > 0 ? `اضغط على أيام التدريب الملونة لاختيار حتى <strong>${left}</strong> ${left === 1 ? 'حصة' : 'حصص'}` : 'استخدمت الإيقافات المسموحة — اضغط على يوم <b>موقوف</b> لإلغائه واختيار يوم آخر'));
   const btn = $('pauseBtn'); btn.disabled = !picked.length; btn.style.opacity = picked.length ? '1' : '.6';
   btn.textContent = picked.length ? `⏸️ إيقاف ${picked.length} ${picked.length === 1 ? 'حصة' : 'حصص'} (متبقٍ ${left})` : `⏸️ اختر الحصص من التقويم (متبقٍ ${Math.max(0, left)})`;

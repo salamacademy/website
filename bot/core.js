@@ -134,7 +134,7 @@ async function handleUpdate(update, { db, tg }) {
       const ref = db.collection('subscriptions').doc(a); const d = await ref.get(); if (!d.exists) return send('الطلب غير موجود');
       const s = d.data();
       if (act === 'approve') {
-        const start = new Date(); const end = Classes.toDate(Classes.nth(Classes.today(), Classes.perMonth(s.packageType), s.packageType)); // ends on the last class
+        const start = new Date(); const end = Classes.toDate(Classes.plan(Classes.today(), s.packageType).end); // ends on the last class
         await ref.update({ status: 'approved', approvedAt: new Date(), plannedStart: start, plannedEnd: end, approvedVia: 'telegram' }); await PortalSync.syncPhone(db, s.phone);
         const wa = `https://wa.me/965${s.phone}?text=` + encodeURIComponent(`السلام عليكم ${s.parentName} 👋\n\nيسعدنا إبلاغكم بالموافقة على تسجيل ${s.childName} في أكاديمية سلام 🏆\n\nالباقة: ${s.packageName}\nالرسوم الشهرية: ${s.amount} د.ك\n\nلإتمام التسجيل يرجى سداد الرسوم، وسيتم تفعيل الاشتراك فور استلام الدفع.\n\nأكاديمية سلام 💪 93000607`);
         await tg('editMessageText', { chat_id: chat, message_id: cq.message.message_id, text: `✅ <b>تمت الموافقة</b> على ${s.childName}\n\nأرسل رسالة الموافقة للأهل:`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '💬 فتح واتساب', url: wa }]] } });

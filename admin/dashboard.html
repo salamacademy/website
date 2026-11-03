@@ -248,9 +248,10 @@
     <div class="fg2"><div class="fg"><label>الباقة</label><select id="editPackage" onchange="updatePackagePrice('editPackage','editAmount');renderEditPauses()"></select></div><div class="fg"><label>المبلغ (د.ك)</label><input type="number" id="editAmount" step="0.5"/></div></div>
     <div class="fg"><label>الحالة</label><select id="editStatus">
       <option value="active">✅ نشط</option><option value="approved">💳 موافق عليه - بانتظار الدفع</option><option value="pending_review">📝 قيد المراجعة</option><option value="expired">❌ منتهي</option><option value="rejected">⛔ مرفوض</option><option value="cancelled">🚫 ملغي</option></select></div>
-    <div class="fg2"><div class="fg"><label>البداية</label><input type="date" id="editStartDate" onchange="autoEndDate('editStartDate','editEndDate')"/></div><div class="fg"><label>النهاية</label><input type="date" id="editEndDate"/></div></div>
+    <div class="fg2"><div class="fg"><label>البداية</label><input type="date" id="editStartDate" onchange="autoEndDate('editStartDate','editEndDate')"/></div><div class="fg"><label>النهاية (آخر حصة)</label><input type="date" id="editEndDate" onchange="editEndTyped()"/></div></div>
+    <div class="fg"><label>🎯 الحصص المتبقية <small style="color:var(--text-light);font-weight:700">(+ / − لإضافة أو خصم حصة)</small></label><div id="editClasses"></div></div>
     <div class="fg"><label>⏸️ الإيقافات <span class="chip" id="editPauseCount">0/3</span></label><div id="editPauses"></div>
-      <button type="button" class="abtn" style="margin-top:6px" onclick="addEditPause()">➕ إضافة إيقاف (+1 يوم)</button></div>
+      <button type="button" class="abtn" style="margin-top:6px" onclick="addEditPause()">➕ إضافة إيقاف (+1 حصة)</button></div>
     <div class="fg"><label>ملاحظات</label><textarea id="editNotes" rows="2"></textarea></div>
     <button onclick="saveEdit(this)" class="btn primary">💾 حفظ التغييرات</button>
     <button onclick="closeEditModal()" class="btn ghost">إلغاء</button>

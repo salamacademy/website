@@ -29,8 +29,10 @@ const todayIso = () => new Date().toLocaleDateString('en-CA');
 // end date = date of the last class (football 4 · confidence 12 · excellence 16 classes from the start)
 // academy closures (js/closures-admin.js) — their days don't count as classes
 const closedFor = pkg => Classes.closedDays(typeof closuresList !== 'undefined' ? closuresList : [], pkg);
-const classEnd = (startIso, pkg) => Classes.nth(startIso, Classes.perMonth(pkg), pkg, closedFor(pkg));
-function autoEndDate(startId, endId) { const sv = document.getElementById(startId).value, pkg = document.getElementById(startId.replace('StartDate', 'Package'))?.value; if (sv) document.getElementById(endId).value = classEnd(sv, pkg); }
+const classPlan = (startIso, pkg) => Classes.plan(startIso, pkg, closedFor(pkg)); // { end, sportEnds } — التميز: football and kyokushin each get their own last class
+const classEnd = (startIso, pkg) => classPlan(startIso, pkg).end;
+const sportEndsTs = pl => pl.sportEnds ? { sportEnds: pl.sportEnds } : { sportEnds: firebase.firestore.FieldValue.delete() };
+function autoEndDate(startId, endId) { const sv = document.getElementById(startId).value, pkg = document.getElementById(startId.replace('StartDate', 'Package'))?.value; if (!sv) return; const pl = classPlan(sv, pkg); document.getElementById(endId).value = pl.end; if (endId === 'editEndDate') { editSt = pl; renderEditClasses(); } }
 const clsLeft = s => Classes.left(s);
 // Firestore writes can hang on a weak connection — never leave a button spinning forever
 const withTimeout = (p, ms = 15000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
@@ -72,7 +74,7 @@ function memberCard(s, opts = {}) {
   const days = calcDaysLeft(s);
   const st = ST[s.status] || ['copper', s.status];
   const cl = s.status === 'active' && days !== null && days >= 0 ? clsLeft(s) : 0;
-  const daysChip = s.status !== 'active' || days === null ? '' : days < 0 ? `<span class="chip bad">منتهي</span>` : `<span class="chip ${cl <= 2 ? 'bad' : cl <= 4 ? 'warn' : 'ok'}">🎯 ${cl} حصة متبقية</span>`;
+  const daysChip = s.status !== 'active' || days === null ? '' : days < 0 ? `<span class="chip bad">منتهي</span>` : `<span class="chip ${cl <= 2 ? 'bad' : cl <= 4 ? 'warn' : 'ok'}">🎯 ${cl} حصة متبقية</span>${sportChips(s)}`;
   const paused = isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (Classes.own(pausesOf(s)).length ? `<span class="chip">⏸️ ${Classes.own(pausesOf(s)).length}/${Classes.pauses(s.packageType)}</span>` : '');
   const actions = [];
   if (s.status === 'pending_review') actions.push(`<button class="abtn ok" onclick="openApprove('${s.id}')">✅ موافقة</button><button class="abtn bad" onclick="rejectRequest('${s.id}')">⛔ رفض</button>`);
@@ -139,10 +141,10 @@ async function approvePause(phone, idx) {
   const s = allSubscriptions.find(x => x.id === r.subId); if (!s) return showToast('❌ الاشتراك غير موجود');
   const used = pausesOf(s); if (Classes.own(used).length >= Classes.pauses(s.packageType)) return showToast(`❌ استنفد ${Classes.pauses(s.packageType)} إيقافات في هذا الاشتراك`);
   if (!confirm(`الموافقة على إيقاف ${s.childName} يوم ${r.start}؟ ستُضاف حصة في نهاية الاشتراك.`)) return;
-  const ne = s.subscriptionEnd ? Classes.toDate(Classes.next(Classes.key(s.subscriptionEnd), s.packageType)) : null;
+  const mv = s.subscriptionEnd ? Classes.move(Classes.stateOf(s), s.packageType, Classes.sportOf(r.start, s.packageType), 1) : null, ne = mv ? Classes.toDate(mv.end) : null; // +1 class of that day's sport
   const reqs = p.pauseRequests.slice(); reqs[idx] = { ...r, status: 'approved', decidedAt: new Date().toISOString() };
   try {
-    await db.collection('subscriptions').doc(s.id).update({ pauses: [...used, { date: r.start, reason: r.reason || '', approvedAt: new Date().toISOString() }], pauseUsed: Classes.own(used).length + 1 >= Classes.pauses(s.packageType), ...(ne ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne) } : {}) });
+    await db.collection('subscriptions').doc(s.id).update({ pauses: [...used, { date: r.start, reason: r.reason || '', approvedAt: new Date().toISOString() }], pauseUsed: Classes.own(used).length + 1 >= Classes.pauses(s.packageType), ...(ne ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne), ...(mv.sportEnds ? { sportEnds: mv.sportEnds } : {}) } : {}) });
     await db.collection('portal').doc(phone).update({ pauseRequests: reqs }); await PortalSync.syncPhone(db, phone);
     window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`تمت الموافقة على إيقاف اشتراك ${s.childName} يوم ${r.start} ✅\nتمت إضافة حصة في نهاية الاشتراك${ne ? ' — آخر حصة الآن ' + ne.toLocaleDateString('ar-KW') : ''}.\nالمتبقي من الإيقافات هذا الشهر: ${Math.max(0, Classes.pauses(s.packageType) - 1 - Classes.own(used).length)}\nأكاديمية سلام`), '_blank');
     showToast('✅ تمت الموافقة'); await loadAllData();
@@ -160,8 +162,8 @@ async function cancelPause(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return; const used = pausesOf(s); if (!used.length) return;
   const last = used[used.length - 1];
   if (!confirm(`إلغاء إيقاف ${s.childName} يوم ${last.date}؟ ستُحذف الحصة المضافة في نهاية الاشتراك.`)) return;
-  const end = s.subscriptionEnd ? Classes.toDate(Classes.prev(Classes.key(s.subscriptionEnd), s.packageType)) : null;
-  try { await db.collection('subscriptions').doc(id).update({ pauses: used.slice(0, -1), pauseUsed: false, pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete(), ...(end ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(end) } : {}) }); await PortalSync.syncPhone(db, s.phone); showToast('تم إلغاء الإيقاف'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
+  const mv = s.subscriptionEnd ? Classes.move(Classes.stateOf(s), s.packageType, Classes.sportOf(last.date, s.packageType), -1) : null, end = mv ? Classes.toDate(mv.end) : null;
+  try { await db.collection('subscriptions').doc(id).update({ ...(mv && mv.sportEnds ? { sportEnds: mv.sportEnds } : {}), pauses: used.slice(0, -1), pauseUsed: false, pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete(), ...(end ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(end) } : {}) }); await PortalSync.syncPhone(db, s.phone); showToast('تم إلغاء الإيقاف'); await loadAllData(); } catch (e) { showToast('❌ ' + e.message); }
 }
 
 // ---------- REVIEW ----------
@@ -236,9 +238,9 @@ async function rejectRequest(id) {
 async function activateSubscription(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;
   if (!confirm(`تأكيد استلام الدفع وتفعيل اشتراك ${s.childName} (${Classes.perMonth(s.packageType)} حصة)؟`)) return;
-  const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const end = Classes.toDate(classEnd(Classes.key(start), s.packageType));
+  const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const pl = classPlan(Classes.key(start), s.packageType), end = Classes.toDate(pl.end);
   try {
-    await db.collection('subscriptions').doc(id).update({ status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauses: Classes.closurePauses(closedFor(s.packageType), Classes.key(start), Classes.key(end)), pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
+    await db.collection('subscriptions').doc(id).update({ ...sportEndsTs(pl), status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauses: Classes.closurePauses(closedFor(s.packageType), Classes.key(start), Classes.key(end)), pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
     await recordIncomeForSub(s, s.amount); await PortalSync.syncPhone(db, s.phone);
     sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, end); showToast('✅ تم التفعيل'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
@@ -255,15 +257,41 @@ let editPauses = [];
 function renderEditPauses() {
   document.getElementById('editPauses').innerHTML = editPauses.length ? editPauses.map((p, i) => `<div class="pause-row"><input type="date" value="${p.date || ''}" onchange="editPauses[${i}].date=this.value"/><input type="text" value="${(p.reason || '').replace(/"/g, '&quot;')}" placeholder="السبب" onchange="editPauses[${i}].reason=this.value"/><button type="button" onclick="removeEditPause(${i})" title="حذف">🗑️</button></div>`).join('') : '<div class="hint">لا توجد إيقافات</div>';
   document.getElementById('editPauseCount').textContent = `${Classes.own(editPauses).length}/${editPauseMax()}`;
+  renderEditClasses();
+}
+// ---------- CLASSES LEFT PER SPORT (edit sheet) ----------
+// التميز: football and kyokushin each have their own last class; the admin can add / remove classes of each
+let editSt = { end: '', sportEnds: null };
+const editPkg = () => document.getElementById('editPackage').value;
+const editState = () => Classes.stateOf({ packageType: editPkg(), subscriptionEnd: editSt.end, sportEnds: editSt.sportEnds }); // normalised for the chosen package
+const editSportOf = k => (k && Classes.sportOf(k, editPkg())) || Classes.sportsOf(editPkg())[0] || null;
+function editClassMove(sp, n) {
+  const st = editState(); if (!st.end) return showToast('حدد تاريخ النهاية أولاً');
+  editSt = Classes.move(st, editPkg(), sp, n); document.getElementById('editEndDate').value = editSt.end; renderEditClasses();
+}
+function editEndTyped() { editSt = { end: document.getElementById('editEndDate').value, sportEnds: null }; renderEditClasses(); }
+function renderEditClasses() {
+  const el = document.getElementById('editClasses'); if (!el) return;
+  const st = editState(), pkg = editPkg(); if (!st.end) { el.innerHTML = '<small style="color:var(--text-light)">حدد تاريخ النهاية</small>'; return; }
+  const c = Classes.leftBy({ packageType: pkg, subscriptionEnd: st.end, sportEnds: st.sportEnds, pauses: editPauses }) || {};
+  const row = (sp, label, n, last) => `<div class="cls-row"><span class="l">${label}<small>آخر حصة ${fmtIso(last)}</small></span><button type="button" onclick="editClassMove(${sp ? `'${sp}'` : 'null'},-1)">−</button><b>${n}</b><button type="button" onclick="editClassMove(${sp ? `'${sp}'` : 'null'},1)">+</button></div>`;
+  el.innerHTML = st.sportEnds ? Object.keys(st.sportEnds).map(sp => row(sp, `${Classes.SPORTS[sp].icon} ${Classes.SPORTS[sp].name}`, c[sp] || 0, st.sportEnds[sp])).join('')
+    : row(Classes.sportsOf(pkg)[0] || null, '🎯 الحصص', c._ || 0, st.end);
+}
+const fmtIso = k => k ? new Date(k + 'T00:00:00Z').toLocaleDateString('ar-KW', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '—';
+// member card: ⚽ 4 كرة القدم · 🥋 12 الكيوكشن
+function sportChips(s) {
+  if (!Classes.isSplit(s.packageType) || !s.subscriptionEnd) return '';
+  const c = Classes.leftBy(s) || {}; return Classes.sportsOf(s.packageType).map(sp => `<span class="chip">${Classes.SPORTS[sp].icon} ${c[sp] || 0} ${Classes.SPORTS[sp].name}</span>`).join('');
 }
 function shiftEditEnd(days) { const e = document.getElementById('editEndDate'); if (e.value) e.value = addDaysIso(e.value, days); }
 const editPauseMax = () => Classes.pauses(document.getElementById('editPackage').value);
 function addEditPause() {
   if (Classes.own(editPauses).length >= editPauseMax() && !confirm(`استخدم ${Classes.own(editPauses).length} من ${editPauseMax()} إيقاف هذا الشهر. إضافة إيقاف آخر على أي حال؟`)) return;
-  editPauses.push({ date: todayIso(), reason: '', approvedAt: new Date().toISOString(), by: 'admin' }); shiftEditEnd(1); renderEditPauses();
-  showToast('➕ أُضيف إيقاف — مُدّد الاشتراك يوماً');
+  editPauses.push({ date: todayIso(), reason: '', approvedAt: new Date().toISOString(), by: 'admin' }); editClassMove(editSportOf(todayIso()), 1); renderEditPauses();
+  showToast('➕ أُضيف إيقاف — أُضيفت حصة في النهاية');
 }
-function removeEditPause(i) { editPauses.splice(i, 1); shiftEditEnd(-1); renderEditPauses(); showToast('🗑️ حُذف الإيقاف — أُرجع تاريخ النهاية يوماً'); }
+function removeEditPause(i) { const [p] = editPauses.splice(i, 1); editClassMove(editSportOf(p && p.date), -1); renderEditPauses(); showToast('🗑️ حُذف الإيقاف — أُرجعت حصة من النهاية'); }
 function openEditModal(id, toPauses) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;
   const set = (k, val) => document.getElementById(k).value = val ?? '';
@@ -272,7 +300,7 @@ function openEditModal(id, toPauses) {
   fillEditPackages(s); set('editAmount', s.amount);
   set('editStatus', s.status || 'active'); set('editNotes', s.notes);
   set('editStartDate', isoDate(s.subscriptionStart)); set('editEndDate', isoDate(s.subscriptionEnd));
-  editPauses = pausesOf(s).map(p => ({ ...p })); renderEditPauses();
+  editPauses = pausesOf(s).map(p => ({ ...p })); editSt = Classes.stateOf(s); renderEditPauses();
   document.getElementById('editModal').classList.add('open');
   const sh = document.querySelector('#editModal .sheet'); if (toPauses) setTimeout(() => document.getElementById('editPauses').scrollIntoView({ block: 'center' }), 50); else sh.scrollTop = 0;
 }
@@ -289,6 +317,7 @@ async function saveEdit(btn) {
   if (v('editChildAge')) upd.childAge = +v('editChildAge');
   if (o && o.value) { upd.packageType = o.value; upd.packageName = o.dataset.name || s.packageName || ''; }
   if (sv) upd.subscriptionStart = tsFromIso(sv);
+  const est = editState(); if (ev) Object.assign(upd, est.sportEnds && est.end === ev ? { sportEnds: est.sportEnds } : { sportEnds: firebase.firestore.FieldValue.delete() }); // per-sport last classes
   if (ev) { upd.subscriptionEnd = tsFromIso(ev); upd.daysRemaining = Math.max(0, Math.ceil((new Date(ev + 'T00:00:00Z') - new Date()) / 864e5)); }
   const pauses = editPauses.filter(p => p.date).sort((a, b) => a.date.localeCompare(b.date));
   if (JSON.stringify(pauses) !== JSON.stringify(pausesOf(s))) { upd.pauses = pauses; upd.pauseUsed = Classes.own(pauses).length >= Classes.pauses(document.getElementById('editPackage').value); upd.pauseStart = firebase.firestore.FieldValue.delete(); upd.pauseEnd = firebase.firestore.FieldValue.delete(); }
@@ -315,12 +344,12 @@ async function saveSubscription(e) {
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
   try {
     const o = document.getElementById('newPackage').selectedOptions[0];
-    const sv = v('newStartDate'), ev = v('newEndDate') || (sv && classEnd(sv, v('newPackage')));
+    const sv = v('newStartDate'), pl = sv ? classPlan(sv, v('newPackage')) : null, ev = v('newEndDate') || (pl && pl.end);
     if (!o || !o.value) throw new Error('اختر الباقة');
     if (!sv) throw new Error('حدد تاريخ البداية');
     if (ev <= sv) throw new Error('تاريخ النهاية يجب أن يكون بعد البداية');
     const end = new Date(ev + 'T00:00:00Z');
-    const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: '', packageType: o.value, packageName: o.dataset.name, amount: +v('newAmount'), paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: tsFromIso(sv), subscriptionEnd: tsFromIso(ev), daysRemaining: Math.max(0, Math.ceil((end - new Date()) / 864e5)), pauseUsed: false, pauses: Classes.closurePauses(closedFor(o.value), sv, ev), createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
+    const data = { childName: v('newChildName'), childAge: +v('newChildAge'), parentName: v('newParentName'), phone: v('newPhone').replace(/\D/g, ''), email: '', packageType: o.value, packageName: o.dataset.name, amount: +v('newAmount'), paymentMethod: v('newPaymentMethod'), notes: v('newNotes'), status: 'active', termsAccepted: true, subscriptionStart: tsFromIso(sv), subscriptionEnd: tsFromIso(ev), daysRemaining: Math.max(0, Math.ceil((end - new Date()) / 864e5)), pauseUsed: false, pauses: Classes.closurePauses(closedFor(o.value), sv, ev), ...(pl && pl.sportEnds && ev === pl.end ? { sportEnds: pl.sportEnds } : {}), createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin', source: 'admin' };
     const ref = pendingAddId ? db.collection('subscriptions').doc(pendingAddId) : db.collection('subscriptions').doc(); pendingAddId = ref.id;
     await withTimeout(ref.set(data));
     pendingAddId = null;

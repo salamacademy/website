@@ -234,7 +234,7 @@ async function renewSub(subRef, s, orderId, pkg) {
   const t = (pkg && pkg.packageType) || s.packageType, closed = Classes.closedDays(await upcomingClosures().catch(() => []), t);
   const now = new Date(), r = Classes.renewal({ ...s, ...(pkg || {}) }, 0, closed), end = Classes.toDate(r.end);
   const keep = Classes.closurePauses(closed, Classes.today(), r.end); // closure days inside the old + new period
-  await subRef.update({ status: 'active', ...(pkg || {}), subscriptionStart: admin.firestore.Timestamp.fromDate(Classes.toDate(r.start)), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: Math.ceil((end - now) / 864e5), classesPerMonth: Classes.perMonth((pkg && pkg.packageType) || s.packageType), paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId, pauses: keep });
+  await subRef.update({ status: 'active', ...(pkg || {}), subscriptionStart: admin.firestore.Timestamp.fromDate(Classes.toDate(r.start)), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: Math.ceil((end - now) / 864e5), classesPerMonth: Classes.perMonth((pkg && pkg.packageType) || s.packageType), paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId, pauses: keep, sportEnds: r.sportEnds || admin.firestore.FieldValue.delete() });
 }
 async function finalizePayment(orderId, gw) {
   const ref = db.collection('payments').doc(orderId); const d = await ref.get(); if (!d.exists) return 'no-order';
@@ -340,12 +340,12 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
       const x = subs[r.subId]; let note = '';
       if (!x) note = 'الاشتراك غير موجود';
       else {
-        const s = x.s, cur = upd[r.subId] || { pauses: Array.isArray(s.pauses) ? s.pauses.slice() : (s.pauseStart ? [{ date: isoOf(s.pauseStart) }] : []), end: s.subscriptionEnd ? s.subscriptionEnd.toDate() : null };
-        const endKey = cur.end ? Classes.key(cur.end) : '';
+        const s = x.s, cur = upd[r.subId] || { pauses: Array.isArray(s.pauses) ? s.pauses.slice() : (s.pauseStart ? [{ date: isoOf(s.pauseStart) }] : []), st: Classes.stateOf(s) };
+        const sp = Classes.sportOf(r.start || '', s.packageType), endKey = cur.st.sportEnds && sp ? cur.st.sportEnds[sp] : cur.st.end; // split packages: that sport's last class
         if (r.type === 'cancel') {
           const i = cur.pauses.findIndex(p => p.date === r.start);
           if (i < 0) note = 'لا يوجد إيقاف في هذا اليوم'; else if (cur.pauses[i].closure) note = 'هذا يوم إغلاق من الأكاديمية'; else if (r.start < today) note = 'لا يمكن إلغاء يوم مضى';
-          else { cur.pauses.splice(i, 1); if (cur.end) cur.end = Classes.toDate(Classes.prev(Classes.key(cur.end), s.packageType)); } // last class moves back
+          else { cur.pauses.splice(i, 1); cur.st = Classes.move(cur.st, s.packageType, sp, -1); } // last class (of that sport) moves back
         } else {
           const dow = new Date(r.start + 'T00:00:00Z').getUTCDay();
           if (s.status !== 'active') note = 'الاشتراك غير نشط';
@@ -354,7 +354,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
           else if (!(TRAIN_DAYS[s.packageType] || [6, 0, 1, 2, 3, 4]).includes(dow)) note = 'ليس من أيام تدريب الباقة';
           else if (cur.pauses.some(p => p.date === r.start)) note = 'هذا اليوم موقوف مسبقاً';
           else if (Classes.own(cur.pauses).length >= Classes.pauses(s.packageType)) note = s.packageType === 'football' ? 'كرة القدم: إيقاف واحد فقط في الشهر' : `استُخدمت الإيقافات المسموحة (${Classes.pauses(s.packageType)})`;
-          else { cur.pauses.push({ date: r.start, reason: r.reason || '', approvedAt: now, by: 'parent' }); if (cur.end) cur.end = Classes.toDate(Classes.next(Classes.key(cur.end), s.packageType)); } // +1 class at the end
+          else { cur.pauses.push({ date: r.start, reason: r.reason || '', approvedAt: now, by: 'parent' }); cur.st = Classes.move(cur.st, s.packageType, sp, 1); } // +1 class at the end
         }
         if (!note) upd[r.subId] = cur;
       }
@@ -363,7 +363,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
     }
     for (const [id, u] of Object.entries(upd)) {
       const pauses = u.pauses.sort((a, b) => a.date.localeCompare(b.date));
-      t.update(subs[id].ref, { pauses, pauseUsed: Classes.own(pauses).length >= Classes.pauses(subs[id].s.packageType), pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(u.end), daysRemaining: Math.max(0, Math.ceil((u.end - new Date()) / 864e5)) } : {}) });
+      t.update(subs[id].ref, { pauses, pauseUsed: Classes.own(pauses).length >= Classes.pauses(subs[id].s.packageType), pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.st.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(Classes.toDate(u.st.end)), daysRemaining: Math.max(0, Math.ceil((Classes.toDate(u.st.end) - new Date()) / 864e5)) } : {}), ...(u.st.sportEnds ? { sportEnds: u.st.sportEnds } : {}) });
     }
     const cutoff = new Date(Date.now() - 60 * 864e5).toISOString(); // keep history short
     t.update(portalRef, { pauseRequests: reqs.filter(r => r.status === 'pending' || !r.decidedAt || r.decidedAt > cutoff) });
