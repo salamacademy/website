@@ -228,6 +228,15 @@ Until step 4 is done, the ادفع button falls back to a WhatsApp message listi
 
 Collections: `payItems` (catalog), `payments/{orderId}` (status pending/paid/failed, items, gateway response).
 
+## 📸 Live Instagram numbers (landing page)
+The stats bar on `index.html` (posts / followers) reads `publicStats/instagram`, written every 6 hours by the `instagramStats` Cloud Function through the official Instagram API. Until a token exists the page shows the numbers written in the HTML.
+
+One-time setup:
+1. `salam_academy_kwt` must be a **Business** or **Creator** account (Instagram app → Settings → Account type).
+2. At https://developers.facebook.com create an app → add **Instagram** → "API setup with Instagram login" → add the account and **Generate token** (long-lived, 60 days).
+3. Put it in `functions/.env` as `IG_TOKEN=...` and deploy: `firebase deploy --only functions:instagramStats`.
+   The function refreshes the token itself every ~30 days and keeps the new one in `settings/instagram`.
+
 ## 📊 Firestore Data Structure
 
 ### `subscriptions` collection:

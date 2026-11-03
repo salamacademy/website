@@ -56,6 +56,21 @@ exports.onSubscriptionUpdate = fx.firestore.document('subscriptions/{id}').onUpd
 });
 
 // 3) Daily 9:00 Kuwait — expiry reminders (3 days & 1 day) + expire overdue
+// Instagram followers / posts for the landing page (official Instagram API — token from Meta, see SETUP.md)
+// Token: settings/instagram.token (refreshed here every ~30 days) or IG_TOKEN in functions/.env for the first run.
+exports.instagramStats = fx.pubsub.schedule('every 6 hours').timeZone('Asia/Kuwait').onRun(async () => {
+  const ref = db.collection('settings').doc('instagram'), cfg = (await ref.get()).data() || {};
+  const token = cfg.token || process.env.IG_TOKEN; if (!token) return console.log('instagramStats: no token yet');
+  const r = await (await fetch(`https://graph.instagram.com/v21.0/me?fields=username,followers_count,media_count&access_token=${encodeURIComponent(token)}`)).json();
+  if (r.error || !r.followers_count) return console.error('instagramStats', JSON.stringify(r.error || r));
+  await db.collection('publicStats').doc('instagram').set({ username: r.username || '', followers: r.followers_count, posts: r.media_count, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+  const age = cfg.refreshedAt ? Date.now() - cfg.refreshedAt.toMillis() : Infinity;
+  if (age > 30 * 864e5) { // long-lived tokens last 60 days → refresh halfway
+    const n = await (await fetch(`https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(token)}`)).json();
+    if (n.access_token) await ref.set({ token: n.access_token, refreshedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); else console.error('ig refresh', JSON.stringify(n));
+  }
+});
+
 exports.dailyReminders = fx.pubsub.schedule('0 9 * * *').timeZone('Asia/Kuwait').onRun(async () => {
   const now = new Date();
   const snap = await db.collection('subscriptions').where('status', '==', 'active').get();

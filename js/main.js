@@ -106,6 +106,17 @@ const statsObserver = new IntersectionObserver((entries) => {
 const statsBar = document.querySelector('.hero-stats-bar');
 if (statsBar) statsObserver.observe(statsBar);
 
+// Live Instagram numbers (written every few hours by the instagramStats Cloud Function); the numbers in the HTML are the fallback
+try {
+  db.collection('publicStats').doc('instagram').get().then(d => {
+    const s = d.exists ? d.data() : null; if (!s) return;
+    document.querySelectorAll('[data-ig]').forEach(el => {
+      const v = +s[el.dataset.ig]; if (!v) return;
+      el.dataset.count = v; if (countStarted) el.textContent = v.toLocaleString('ar');
+    });
+  }).catch(() => {});
+} catch (_) {}
+
 function showToast(msg) {
   const t = document.createElement('div');
   t.style.cssText = `
