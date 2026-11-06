@@ -96,8 +96,9 @@ async function postRecurring(db, admin, month) {
   const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
   const done = new Set(rec.filter(t => (t.date || '').startsWith(month)).map(t => (t.category || '') + '|' + (t.note || '')));
   const todo = Object.values(seen).filter(t => !done.has((t.category || '') + '|' + (t.note || ''))); if (!todo.length) return 0;
-  const heads = (await db.collection('subscriptions').where('status', '==', 'active').get()).size, b = db.batch();
-  todo.forEach((t, i) => b.set(db.collection('transactions').doc(`rec_${month}_auto${i + 1}`), { type: 'expense', amount: t.perHead ? +(t.perHead * heads).toFixed(3) : +t.amount, category: t.category, note: t.note || '', method: t.method || 'cash', date: month + '-01', recurring: true, ...(t.perHead ? { perHead: t.perHead, heads } : {}), createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'auto' }));
+  const act = (await db.collection('subscriptions').where('status', '==', 'active').get()).docs.map(d => d.data()), b = db.batch();
+  const headsOf = t => act.filter(s => !t.perHeadPkgs || t.perHeadPkgs.includes(s.packageType)).length; // e.g. الكبتن: kyokushin package only
+  todo.forEach((t, i) => b.set(db.collection('transactions').doc(`rec_${month}_auto${i + 1}`), { type: 'expense', amount: t.perHead ? +(t.perHead * headsOf(t)).toFixed(3) : +t.amount, category: t.category, note: t.note || '', method: t.method || 'cash', date: month + '-01', recurring: true, ...(t.perHead ? { perHead: t.perHead, heads: headsOf(t), ...(t.perHeadPkgs ? { perHeadPkgs: t.perHeadPkgs } : {}) } : {}), createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'auto' }));
   await b.commit(); return todo.length;
 }
 

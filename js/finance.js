@@ -19,9 +19,9 @@ async function loadFinance() {
     renderFinance(); if (typeof renderStats === 'function') renderStats();
   } catch (e) { console.error(e); }
 }
-// recurring expense paid per subscriber (الكبتن 15 د.ك × active subscribers)
-const activeCount = () => (typeof allSubscriptions !== 'undefined' ? allSubscriptions : []).filter(s => s.status === 'active').length;
-const recAmount = t => t.perHead ? +(t.perHead * activeCount()).toFixed(3) : +t.amount;
+// recurring expense paid per subscriber (الكبتن 15 د.ك × active subscribers of perHeadPkgs, e.g. the kyokushin package only)
+const activeCount = t => (typeof allSubscriptions !== 'undefined' ? allSubscriptions : []).filter(s => s.status === 'active' && (!(t && t.perHeadPkgs) || t.perHeadPkgs.includes(s.packageType))).length;
+const recAmount = t => t.perHead ? +(t.perHead * activeCount(t)).toFixed(3) : +t.amount;
 function monthTx() { const k = monthKey(finCur); return allTx.filter(t => (t.date || '').startsWith(k)); }
 function finNetNow() { const k = monthKey(new Date()); let n = 0; allTx.forEach(t => { if ((t.date || '').startsWith(k)) n += t.type === 'income' ? +t.amount : -t.amount; }); return n.toFixed(0); }
 function finMonth(d) { finCur.setMonth(finCur.getMonth() + d); renderFinance(); }
@@ -61,7 +61,7 @@ function renderRecurring() {
   const rec = allTx.filter(t => t.recurring && t.type === 'expense');
   const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
   const list = Object.values(seen);
-  document.getElementById('recurringList').innerHTML = list.length ? list.map(t => { const posted = monthTx().some(x => x.category === t.category && x.note === t.note && x.type === 'expense'); return `<div class="chatid" style="${posted ? 'opacity:.6' : ''}"><span>${CAT_ICON[t.category] || '📦'} ${t.note || t.category} — <b>${t.perHead ? `${KD(t.perHead)} × ${activeCount()} = ${KD(recAmount(t))}` : KD(t.amount)}</b> د.ك ${posted ? '<span class="chip ok" style="margin-right:6px">✓ مسجّل</span>' : ''}</span></div>`; }).join('') : '<div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div>';
+  document.getElementById('recurringList').innerHTML = list.length ? list.map(t => { const posted = monthTx().some(x => x.category === t.category && x.note === t.note && x.type === 'expense'); return `<div class="chatid" style="${posted ? 'opacity:.6' : ''}"><span>${CAT_ICON[t.category] || '📦'} ${t.note || t.category} — <b>${t.perHead ? `${KD(t.perHead)} × ${activeCount(t)} = ${KD(recAmount(t))}` : KD(t.amount)}</b> د.ك ${posted ? '<span class="chip ok" style="margin-right:6px">✓ مسجّل</span>' : ''}</span></div>`; }).join('') : '<div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div>';
 }
 async function postRecurring() {
   const rec = allTx.filter(t => t.recurring && t.type === 'expense'); const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
@@ -69,7 +69,7 @@ async function postRecurring() {
   if (!todo.length) return showToast('كل المصاريف الثابتة مسجّلة لهذا الشهر');
   if (!confirm(`تسجيل ${todo.length} مصروف ثابت لشهر ${AR_MONTHS[finCur.getMonth()]}؟`)) return;
   const date = monthKey(finCur) + '-01'; const batch = db.batch();
-  todo.forEach(t => batch.set(db.collection('transactions').doc(), { type: 'expense', amount: recAmount(t), ...(t.perHead ? { perHead: +t.perHead, heads: activeCount() } : {}), category: t.category, note: t.note || '', method: t.method || 'cash', date, recurring: true, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
+  todo.forEach(t => batch.set(db.collection('transactions').doc(), { type: 'expense', amount: recAmount(t), ...(t.perHead ? { perHead: +t.perHead, heads: activeCount(t), ...(t.perHeadPkgs ? { perHeadPkgs: t.perHeadPkgs } : {}) } : {}), category: t.category, note: t.note || '', method: t.method || 'cash', date, recurring: true, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
   await batch.commit(); showToast('✅ تم التسجيل'); loadFinance();
 }
 
