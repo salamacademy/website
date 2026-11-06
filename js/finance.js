@@ -1,11 +1,15 @@
 // ============================
 // FINANCE (accounting) MODULE
 // ============================
-const CATS = {
+const DEF_CATS = {
   expense: ['إيجار', 'رواتب', 'خدمات', 'رسوم الدفع', 'أكل وشرب', 'معدات', 'زي وملابس', 'مواصلات', 'تسويق', 'صيانة', 'رحلات وفعاليات', 'أخرى'],
   income: ['اشتراكات', 'رحلات وفعاليات', 'بيع زي', 'بطولات', 'رعاية', 'أخرى']
 };
 const CAT_ICON = { 'إيجار': '🏟️', 'رواتب': '👨‍🏫', 'خدمات': '🧹', 'رسوم الدفع': '🏦', 'أكل وشرب': '🍔', 'معدات': '⚽', 'زي وملابس': '👕', 'مواصلات': '🚌', 'تسويق': '📣', 'صيانة': '🔧', 'رحلات وفعاليات': '🎳', 'أخرى': '📦', 'اشتراكات': '💳', 'بيع زي': '👕', 'بطولات': '🏆', 'رعاية': '🤝' };
+// settings/finance (admin-controlled): fixedExpenses, categories (custom), hiddenCats, upaymentFees
+let finSet = { fixedExpenses: null, categories: { expense: [], income: [] }, hiddenCats: { expense: [], income: [] } };
+const catsOf = type => [...DEF_CATS[type].filter(c => !(finSet.hiddenCats[type] || []).includes(c)), ...(finSet.categories[type] || []).map(c => c.name)];
+const iconOf = c => CAT_ICON[c] || ([...(finSet.categories.expense || []), ...(finSet.categories.income || [])].find(x => x.name === c) || {}).icon || '📦';
 let allTx = [], finCur = new Date(), finType = 'expense', finFilterV = 'all', txType = 'expense', txCat = null;
 const KD = n => (+n || 0).toLocaleString('en-KW', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const monthKey = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -15,13 +19,12 @@ async function loadFinance() {
   try {
     const snap = await db.collection('transactions').orderBy('date', 'desc').limit(1000).get();
     allTx = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (!upFeesLoaded) loadUpFees();
+    if (!upFeesLoaded) await loadUpFees();
     renderFinance(); if (typeof renderStats === 'function') renderStats();
   } catch (e) { console.error(e); }
 }
 // recurring expense paid per subscriber (الكبتن 15 د.ك × active subscribers of perHeadPkgs, e.g. the kyokushin package only)
 const activeCount = t => (typeof allSubscriptions !== 'undefined' ? allSubscriptions : []).filter(s => s.status === 'active' && (!(t && t.perHeadPkgs) || t.perHeadPkgs.includes(s.packageType))).length;
-const recAmount = t => t.perHead ? +(t.perHead * activeCount(t)).toFixed(3) : +t.amount;
 function monthTx() { const k = monthKey(finCur); return allTx.filter(t => (t.date || '').startsWith(k)); }
 function finNetNow() { const k = monthKey(new Date()); let n = 0; allTx.forEach(t => { if ((t.date || '').startsWith(k)) n += t.type === 'income' ? +t.amount : -t.amount; }); return n.toFixed(0); }
 function finMonth(d) { finCur.setMonth(finCur.getMonth() + d); renderFinance(); }
@@ -45,37 +48,99 @@ function renderBars(id, list, total, isIn) {
   const el = document.getElementById(id);
   if (!list.length) { el.innerHTML = `<div class="empty" style="padding:14px">${isIn ? 'لا يوجد دخل' : 'لا توجد مصاريف'} هذا الشهر</div>`; return; }
   const by = {}; list.forEach(t => by[t.category || 'أخرى'] = (by[t.category || 'أخرى'] || 0) + (+t.amount || 0));
-  el.innerHTML = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([c, v]) => { const p = total ? Math.round(v / total * 100) : 0; return `<div class="bar ${isIn ? 'in' : ''}"><div class="t"><span>${CAT_ICON[c] || '📦'} ${c}</span><span>${KD(v)} <small>د.ك · ${p}%</small></span></div><div class="b"><i style="width:${p}%"></i></div></div>`; }).join('');
+  el.innerHTML = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([c, v]) => { const p = total ? Math.round(v / total * 100) : 0; return `<div class="bar ${isIn ? 'in' : ''}" style="cursor:pointer" onclick="filterCat(${JSON.stringify(c).replace(/"/g, '&quot;')})"><div class="t"><span>${iconOf(c)} ${c}</span><span>${KD(v)} <small>د.ك · ${p}%</small></span></div><div class="b"><i style="width:${p}%"></i></div></div>`; }).join('');
 }
+// transactions list: type segments + category + search (note / category / amount)
+let finCatV = '';
+function filterCat(c) { finCatV = finCatV === c ? '' : c; renderTxList(); document.getElementById('txList').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 function renderTxList() {
   let tx = monthTx(); if (finFilterV !== 'all') tx = tx.filter(t => t.type === finFilterV);
+  const q = (document.getElementById('txSearch')?.value || '').trim();
+  if (finCatV) tx = tx.filter(t => (t.category || 'أخرى') === finCatV);
+  if (q) tx = tx.filter(t => `${t.note || ''} ${t.category || ''} ${t.amount}`.includes(q));
+  const sel = document.getElementById('txCatSel');
+  if (sel) sel.innerHTML = `<option value="">كل الفئات</option>` + [...new Set([...monthTx().map(t => t.category || 'أخرى'), ...(finCatV ? [finCatV] : [])])].map(c => `<option ${c === finCatV ? 'selected' : ''}>${c}</option>`).join('');
+  const sum = tx.reduce((a, t) => a + (t.type === 'income' ? 1 : -1) * (+t.amount || 0), 0), info = document.getElementById('txFilterInfo');
+  if (info) info.textContent = finCatV || q ? `${tx.length} عملية · ${sum < 0 ? '−' : ''}${KD(Math.abs(sum))} د.ك` : '';
   const el = document.getElementById('txList');
   if (!tx.length) { el.innerHTML = '<div class="empty"><b>🧾</b>لا توجد عمليات</div>'; return; }
   const byDay = {}; tx.forEach(t => (byDay[t.date] = byDay[t.date] || []).push(t));
   el.innerHTML = Object.keys(byDay).sort().reverse().map(day => {
     const d = new Date(day); const lbl = isNaN(d) ? day : d.toLocaleDateString('ar-KW', { weekday: 'long', day: 'numeric', month: 'long' });
-    return `<div style="font-size:0.75rem;font-weight:800;color:var(--text-light);margin:10px 4px 6px">${lbl}</div>` + byDay[day].map(t => `<div class="tx ${t.type === 'income' ? 'in' : ''}" onclick="openTx('${t.id}')"><div class="ic">${CAT_ICON[t.category] || '📦'}</div><div class="m"><b>${t.note || t.category || '--'}</b><small>${t.category || ''}${t.createdBy === 'telegram' ? ' · 🤖' : ''}${t.recurring ? ' · 🔁' : ''}${t.method === 'knet' ? ' · كي نت' : t.method === 'upayment' ? ' · UPayment' : ''}</small></div><div class="a">${KD(t.amount)}</div><button class="more">›</button></div>`).join('');
+    return `<div style="font-size:0.75rem;font-weight:800;color:var(--text-light);margin:10px 4px 6px">${lbl}</div>` + byDay[day].map(t => `<div class="tx ${t.type === 'income' ? 'in' : ''}" onclick="openTx('${t.id}')"><div class="ic">${iconOf(t.category)}</div><div class="m"><b>${t.note || t.category || '--'}</b><small>${t.category || ''}${t.createdBy === 'telegram' ? ' · 🤖' : ''}${t.recurring ? ' · 🔁' : ''}${t.method === 'knet' ? ' · كي نت' : t.method === 'upayment' ? ' · UPayment' : ''}</small></div><div class="a">${KD(t.amount)}</div><button class="more">›</button></div>`).join('');
   }).join('');
 }
+// ---------- FIXED MONTHLY EXPENSES (settings/finance.fixedExpenses — editable; posted each month, automatically on the 1st) ----------
+// item: { id, name, category, amount } or per subscriber { perHead, perHeadPkgs: ['confidence'] }; active: false = paused
+const FX_PKGS = { confidence: '🥋 بناء الثقة', football: '⚽ كرة القدم', excellence: '⚡ التميز', excellence_loyal: '🏅 أسرة سلام' };
+function legacyFixed() { // before the list existed: latest recurring transaction per category + note
+  const seen = {}; allTx.filter(t => t.recurring && t.type === 'expense').forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
+  return Object.values(seen).map((t, i) => ({ id: 'fx' + (i + 1), name: t.note || t.category, category: t.category, amount: +t.amount, ...(t.perHead ? { perHead: +t.perHead, perHeadPkgs: t.perHeadPkgs || null } : {}), active: true }));
+}
+const fixedList = () => finSet.fixedExpenses || legacyFixed();
+const fxAmount = f => f.perHead ? +(f.perHead * activeCount(f)).toFixed(3) : +f.amount || 0;
+const fxPosted = f => monthTx().find(x => x.type === 'expense' && (x.fixedId === f.id || (!x.fixedId && x.recurring && x.category === f.category && x.note === f.name)));
 function renderRecurring() {
-  const rec = allTx.filter(t => t.recurring && t.type === 'expense');
-  const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
-  const list = Object.values(seen);
-  document.getElementById('recurringList').innerHTML = list.length ? list.map(t => { const posted = monthTx().some(x => x.category === t.category && x.note === t.note && x.type === 'expense'); return `<div class="chatid" style="${posted ? 'opacity:.6' : ''}"><span>${CAT_ICON[t.category] || '📦'} ${t.note || t.category} — <b>${t.perHead ? `${KD(t.perHead)} × ${activeCount(t)} = ${KD(recAmount(t))}` : KD(t.amount)}</b> د.ك ${posted ? '<span class="chip ok" style="margin-right:6px">✓ مسجّل</span>' : ''}</span></div>`; }).join('') : '<div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div>';
+  const list = fixedList(), el = document.getElementById('recurringList'); if (!el) return;
+  const total = list.filter(f => f.active !== false).reduce((a, f) => a + fxAmount(f), 0);
+  el.innerHTML = (list.length ? list.map(f => { const p = fxPosted(f), off = f.active === false;
+    return `<div class="tx" style="${off ? 'opacity:.5' : ''}" onclick="openFixed('${f.id}')"><div class="ic">${iconOf(f.category)}</div><div class="m"><b>${f.name}</b><small>${f.category}${f.perHead ? ` · ${KD(f.perHead)} × ${activeCount(f)} مشترك${f.perHeadPkgs ? ' (' + f.perHeadPkgs.map(k => FX_PKGS[k] || k).join('، ') + ')' : ''}` : ''}${off ? ' · ⏸️ متوقف' : p ? ' · ✓ مسجّل هذا الشهر' : ''}</small></div><div class="a">${KD(fxAmount(f))}</div><button class="more">›</button></div>`; }).join('')
+    + `<div style="display:flex;justify-content:space-between;font-weight:900;padding:8px 6px 0"><span>الإجمالي الشهري</span><span>${KD(total)} د.ك</span></div>`
+    : '<div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — أضف أول مصروف</div>');
+}
+async function saveFixedList(list) { await db.collection('settings').doc('finance').set({ fixedExpenses: list }, { merge: true }); finSet.fixedExpenses = list; renderRecurring(); }
+function openFixed(id) {
+  const f = id ? fixedList().find(x => x.id === id) : null;
+  document.getElementById('fxId').value = id || ''; document.getElementById('fxTitle').textContent = f ? '✏️ مصروف ثابت' : '➕ مصروف ثابت جديد';
+  document.getElementById('fxName').value = f ? f.name : ''; document.getElementById('fxCat').innerHTML = catsOf('expense').map(c => `<option ${f && f.category === c ? 'selected' : ''}>${c}</option>`).join('');
+  document.getElementById('fxAmount').value = f && !f.perHead ? f.amount : ''; document.getElementById('fxPerHead').value = f && f.perHead ? f.perHead : '';
+  document.getElementById('fxPkgs').innerHTML = Object.entries(FX_PKGS).map(([k, n]) => `<label class="chatid" style="cursor:pointer;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>${n}</span><input type="checkbox" value="${k}" ${!f || !f.perHeadPkgs || f.perHeadPkgs.includes(k) ? 'checked' : ''} onchange="fxPreview()" style="flex:0 0 20px;width:20px;height:20px;margin:0;accent-color:var(--green-mid)"/></label>`).join('');
+  document.getElementById('fxActive').checked = !f || f.active !== false; setFxMode(f && f.perHead ? 'head' : 'fixed');
+  const p = f && fxPosted(f), pn = document.getElementById('fxPostedNote'); pn.style.display = p ? '' : 'none'; pn.innerHTML = p ? `✓ مسجّل لشهر ${AR_MONTHS[finCur.getMonth()]} (${KD(p.amount)} د.ك) — <button class="link" type="button" onclick="closeFixed();openTx('${p.id}')">تعديل عملية هذا الشهر</button>` : '';
+  document.getElementById('fxDel').style.display = f ? 'flex' : 'none'; document.getElementById('fixedModal').classList.add('open');
+}
+function closeFixed() { document.getElementById('fixedModal').classList.remove('open'); }
+let fxMode = 'fixed';
+function setFxMode(m) { fxMode = m; document.getElementById('fxModeFixed').classList.toggle('on', m === 'fixed'); document.getElementById('fxModeHead').classList.toggle('on', m === 'head'); document.getElementById('fxFixedBox').style.display = m === 'fixed' ? '' : 'none'; document.getElementById('fxHeadBox').style.display = m === 'head' ? '' : 'none'; fxPreview(); }
+function fxForm() {
+  const pk = [...document.querySelectorAll('#fxPkgs input:checked')].map(i => i.value);
+  return { name: document.getElementById('fxName').value.trim(), category: document.getElementById('fxCat').value, active: document.getElementById('fxActive').checked,
+    ...(fxMode === 'head' ? { perHead: +document.getElementById('fxPerHead').value || 0, perHeadPkgs: pk.length === Object.keys(FX_PKGS).length ? null : pk, amount: 0 } : { amount: +document.getElementById('fxAmount').value || 0 }) };
+}
+function fxPreview() { const el = document.getElementById('fxHeadPreview'); if (!el) return; const f = fxForm(); el.textContent = fxMode === 'head' ? `${KD(f.perHead)} × ${activeCount(f)} مشترك نشط = ${KD(fxAmount(f))} د.ك هذا الشهر` : ''; }
+async function saveFixed(btn) {
+  const id = document.getElementById('fxId').value, f = fxForm();
+  if (!f.name) return showToast('❌ اكتب اسم المصروف'); if (fxMode === 'fixed' ? !f.amount : !f.perHead) return showToast('❌ أدخل المبلغ');
+  if (fxMode === 'head' && f.perHeadPkgs && !f.perHeadPkgs.length) return showToast('❌ اختر باقة واحدة على الأقل');
+  const list = fixedList().map(x => ({ ...x })), i = list.findIndex(x => x.id === id);
+  if (i >= 0) { list[i] = { ...list[i], ...f }; if (fxMode === 'fixed') { delete list[i].perHead; delete list[i].perHeadPkgs; } } else list.push({ id: 'fx' + Date.now().toString(36), ...f });
+  btn.disabled = true;
+  try { await saveFixedList(list); closeFixed(); showToast('✅ حُفظ — يُطبّق من التسجيل القادم'); } catch (e) { showToast('❌ ' + e.message); } finally { btn.disabled = false; }
+}
+async function deleteFixed() {
+  const id = document.getElementById('fxId').value; if (!id || !confirm('حذف هذا المصروف الثابت؟ (العمليات المسجّلة سابقاً تبقى كما هي)')) return;
+  try { await saveFixedList(fixedList().filter(x => x.id !== id)); closeFixed(); showToast('🗑️ حُذف'); } catch (e) { showToast('❌ ' + e.message); }
 }
 async function postRecurring() {
-  const rec = allTx.filter(t => t.recurring && t.type === 'expense'); const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
-  const todo = Object.values(seen).filter(t => !monthTx().some(x => x.category === t.category && x.note === t.note && x.type === 'expense'));
+  const todo = fixedList().filter(f => f.active !== false && !fxPosted(f));
   if (!todo.length) return showToast('كل المصاريف الثابتة مسجّلة لهذا الشهر');
-  if (!confirm(`تسجيل ${todo.length} مصروف ثابت لشهر ${AR_MONTHS[finCur.getMonth()]}؟`)) return;
-  const date = monthKey(finCur) + '-01'; const batch = db.batch();
-  todo.forEach(t => batch.set(db.collection('transactions').doc(), { type: 'expense', amount: recAmount(t), ...(t.perHead ? { perHead: +t.perHead, heads: activeCount(t), ...(t.perHeadPkgs ? { perHeadPkgs: t.perHeadPkgs } : {}) } : {}), category: t.category, note: t.note || '', method: t.method || 'cash', date, recurring: true, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
-  await batch.commit(); showToast('✅ تم التسجيل'); loadFinance();
+  const total = todo.reduce((a, f) => a + fxAmount(f), 0);
+  if (!confirm(`تسجيل ${todo.length} مصروف ثابت لشهر ${AR_MONTHS[finCur.getMonth()]}؟
+الإجمالي: ${KD(total)} د.ك`)) return;
+  const month = monthKey(finCur), batch = db.batch();
+  todo.forEach(f => batch.set(db.collection('transactions').doc(`rec_${month}_${f.id}`), { type: 'expense', amount: fxAmount(f), category: f.category, note: f.name, method: 'cash', date: month + '-01', recurring: true, fixedId: f.id, ...(f.perHead ? { perHead: +f.perHead, heads: activeCount(f), ...(f.perHeadPkgs ? { perHeadPkgs: f.perHeadPkgs } : {}) } : {}), createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
+  try { await batch.commit(); showToast('✅ تم التسجيل'); loadFinance(); } catch (e) { showToast('❌ ' + e.message); }
 }
 
 // ---------- UPAYMENT FEES (settings/finance.upaymentFees — the Cloud Function records one per payment) ----------
 let upFees = null, upFeesLoaded = false;
-async function loadUpFees() { upFeesLoaded = true; try { upFees = ((await db.collection('settings').doc('finance').get()).data() || {}).upaymentFees || null; } catch (e) { console.warn('fees', e); } renderUpFees(); }
+async function loadUpFees() { // the whole settings/finance doc: fees, fixed expenses, categories
+  upFeesLoaded = true;
+  try { const d = (await db.collection('settings').doc('finance').get()).data() || {}; upFees = d.upaymentFees || null;
+    finSet = { fixedExpenses: d.fixedExpenses || null, categories: { expense: [], income: [], ...(d.categories || {}) }, hiddenCats: { expense: [], income: [], ...(d.hiddenCats || {}) } };
+  } catch (e) { console.warn('finance settings', e); }
+  renderUpFees();
+}
 function renderUpFees() {
   [['knet', 'fixed'], ['knet', 'pct'], ['card', 'fixed'], ['card', 'pct']].forEach(([a, b]) => { const el = document.getElementById(`fee_${a}_${b}`); if (el) el.value = upFees && upFees[a] && upFees[a][b] ? upFees[a][b] : ''; });
   const st = document.getElementById('feeState'); if (st) { st.textContent = upFees ? '✓ مفعّلة' : 'غير محددة'; st.className = 'chip ' + (upFees ? 'ok' : 'gold'); }
@@ -120,9 +185,37 @@ async function openMonthReport(btn, send) {
   } catch (e) { showToast('❌ ' + e.message); } finally { btn.disabled = false; btn.textContent = label; }
 }
 
+// ---------- CATEGORIES (settings/finance.categories = custom, hiddenCats = defaults hidden from the picker) ----------
+let catTab = 'expense';
+function openCats() { document.getElementById('catModal').classList.add('open'); renderCatManager(); }
+function closeCats() { document.getElementById('catModal').classList.remove('open'); if (document.getElementById('txModal').classList.contains('open')) renderCats(); }
+function setCatTab(t) { catTab = t; renderCatManager(); }
+function renderCatManager() {
+  document.getElementById('catTabOut').classList.toggle('on', catTab === 'expense'); document.getElementById('catTabIn').classList.toggle('on', catTab === 'income');
+  const hid = finSet.hiddenCats[catTab] || [], custom = finSet.categories[catTab] || [];
+  document.getElementById('catList').innerHTML = DEF_CATS[catTab].map(c => `<label class="chatid" style="cursor:pointer;margin-bottom:6px;${hid.includes(c) ? 'opacity:.5' : ''}"><span>${iconOf(c)} ${c}</span><input type="checkbox" ${hid.includes(c) ? '' : 'checked'} data-c="${c}" onchange="toggleCat(this.dataset.c,this.checked)" style="width:20px;height:20px;accent-color:var(--green-mid)"/></label>`).join('')
+    + custom.map(c => `<div class="chatid" style="margin-bottom:6px"><span>${c.icon || '📦'} ${c.name} <small style="color:var(--text-light)">(مضافة)</small></span><button class="abtn bad" style="flex:0 0 auto;padding:6px 10px" data-c="${c.name.replace(/"/g, '&quot;')}" onclick="removeCat(this.dataset.c)">🗑️</button></div>`).join('');
+}
+async function saveCatSettings() { await db.collection('settings').doc('finance').set({ categories: finSet.categories, hiddenCats: finSet.hiddenCats }, { merge: true }); }
+async function toggleCat(c, on) { const h = new Set(finSet.hiddenCats[catTab] || []); on ? h.delete(c) : h.add(c); finSet.hiddenCats[catTab] = [...h]; renderCatManager(); try { await saveCatSettings(); } catch (e) { showToast('❌ ' + e.message); } }
+async function addCat() {
+  const name = document.getElementById('catName').value.trim(), icon = document.getElementById('catIcon').value.trim() || '📦'; if (!name) return showToast('❌ اكتب اسم الفئة');
+  if (catsOf(catTab).includes(name) || DEF_CATS[catTab].includes(name)) return showToast('هذه الفئة موجودة');
+  finSet.categories[catTab] = [...(finSet.categories[catTab] || []), { name, icon }]; document.getElementById('catName').value = ''; document.getElementById('catIcon').value = '';
+  renderCatManager(); try { await saveCatSettings(); showToast('✅ أُضيفت الفئة'); } catch (e) { showToast('❌ ' + e.message); }
+}
+async function removeCat(name) {
+  if (!confirm(`حذف فئة "${name}"؟ العمليات المسجّلة بها تبقى كما هي.`)) return;
+  finSet.categories[catTab] = (finSet.categories[catTab] || []).filter(c => c.name !== name); renderCatManager(); try { await saveCatSettings(); } catch (e) { showToast('❌ ' + e.message); }
+}
+
 // ---------- ADD / EDIT ----------
 function setTxType(t) { txType = t; document.getElementById('tgOut').classList.toggle('on', t === 'expense'); document.getElementById('tgIn').classList.toggle('on', t === 'income'); txCat = null; renderCats(); }
-function renderCats() { document.getElementById('txCats').innerHTML = CATS[txType].map(c => `<button type="button" class="cat ${txCat === c ? 'on' : ''}" onclick="txCat='${c}';renderCats()">${CAT_ICON[c] || ''} ${c}</button>`).join(''); }
+function renderCats() {
+  const list = catsOf(txType); if (txCat && !list.includes(txCat)) list.push(txCat); // keep an old / hidden category when editing
+  document.getElementById('txCats').innerHTML = list.map(c => `<button type="button" class="cat ${txCat === c ? 'on' : ''}" data-c="${c.replace(/"/g, '&quot;')}" onclick="txCat=this.dataset.c;renderCats()">${iconOf(c)} ${c}</button>`).join('')
+    + `<button type="button" class="cat" onclick="openCats()">⚙️ الفئات</button>`;
+}
 function openTx(id) {
   const t = id ? allTx.find(x => x.id === id) : null;
   document.getElementById('txId').value = id || ''; document.getElementById('txTitle').textContent = t ? '✏️ تعديل العملية' : '➕ عملية جديدة';
@@ -141,6 +234,8 @@ async function saveTx() {
   try {
     if (id) await db.collection('transactions').doc(id).update(data);
     else await db.collection('transactions').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' });
+    const fxName = data.note || data.category; // 🔁 → becomes a fixed monthly expense (if not already in the list)
+    if (data.recurring && !fixedList().some(f => f.name === fxName && f.category === data.category)) await saveFixedList([...fixedList(), { id: 'fx' + Date.now().toString(36), name: fxName, category: data.category, amount, active: true }]);
     closeTx(); showToast('✅ تم الحفظ'); loadFinance();
   } catch (e) { showToast('❌ ' + e.message); }
 }

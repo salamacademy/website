@@ -90,15 +90,21 @@ ${families.map(f => `<tr class="fam"><td colspan="3">${esc(f.parent || 'بدون
   return { month, html, text, summary };
 }
 
-// recurring monthly expenses (templates = latest expense per category+note with recurring: true) → posted once for `month`
+// fixed monthly expenses: settings/finance.fixedExpenses (managed by the admin in المالية) → posted once for `month`
+// fallback when that list doesn't exist yet: latest recurring expense per category+note
 async function postRecurring(db, admin, month) {
   const rec = (await db.collection('transactions').where('recurring', '==', true).get()).docs.map(d => d.data()).filter(t => t.type === 'expense');
-  const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
-  const done = new Set(rec.filter(t => (t.date || '').startsWith(month)).map(t => (t.category || '') + '|' + (t.note || '')));
-  const todo = Object.values(seen).filter(t => !done.has((t.category || '') + '|' + (t.note || ''))); if (!todo.length) return 0;
+  let list = ((await db.collection('settings').doc('finance').get()).data() || {}).fixedExpenses;
+  if (!Array.isArray(list)) {
+    const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
+    list = Object.values(seen).map((t, i) => ({ id: 'auto' + (i + 1), name: t.note || t.category, category: t.category, amount: +t.amount, ...(t.perHead ? { perHead: +t.perHead, perHeadPkgs: t.perHeadPkgs || null } : {}), active: true }));
+  }
+  const cur = rec.filter(t => (t.date || '').startsWith(month));
+  const todo = list.filter(f => f.active !== false && !cur.some(x => x.fixedId === f.id || (!x.fixedId && x.category === f.category && x.note === f.name)));
+  if (!todo.length) return 0;
   const act = (await db.collection('subscriptions').where('status', '==', 'active').get()).docs.map(d => d.data()), b = db.batch();
-  const headsOf = t => act.filter(s => !t.perHeadPkgs || t.perHeadPkgs.includes(s.packageType)).length; // e.g. الكبتن: kyokushin package only
-  todo.forEach((t, i) => b.set(db.collection('transactions').doc(`rec_${month}_auto${i + 1}`), { type: 'expense', amount: t.perHead ? +(t.perHead * headsOf(t)).toFixed(3) : +t.amount, category: t.category, note: t.note || '', method: t.method || 'cash', date: month + '-01', recurring: true, ...(t.perHead ? { perHead: t.perHead, heads: headsOf(t), ...(t.perHeadPkgs ? { perHeadPkgs: t.perHeadPkgs } : {}) } : {}), createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'auto' }));
+  const headsOf = f => act.filter(s => !f.perHeadPkgs || f.perHeadPkgs.includes(s.packageType)).length; // e.g. الكبتن: kyokushin package only
+  todo.forEach(f => b.set(db.collection('transactions').doc(`rec_${month}_${f.id}`), { type: 'expense', amount: f.perHead ? +(f.perHead * headsOf(f)).toFixed(3) : +f.amount || 0, category: f.category, note: f.name || '', method: 'cash', date: month + '-01', recurring: true, fixedId: f.id, ...(f.perHead ? { perHead: +f.perHead, heads: headsOf(f), ...(f.perHeadPkgs ? { perHeadPkgs: f.perHeadPkgs } : {}) } : {}), createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'auto' }));
   await b.commit(); return todo.length;
 }
 

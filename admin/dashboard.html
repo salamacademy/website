@@ -149,8 +149,10 @@
       <div class="bars" id="finInBars"><div class="empty">لا يوجد دخل هذا الشهر</div></div>
     </div>
     <div class="card">
-      <div class="card-h"><h4>🔁 مصاريف شهرية ثابتة</h4><button class="link" onclick="postRecurring()">تسجيلها لهذا الشهر</button></div>
-      <div id="recurringList"><div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div></div>
+      <div class="card-h"><h4>🔁 مصاريف شهرية ثابتة</h4><button class="link" onclick="openFixed()">➕ إضافة</button></div>
+      <p class="sub" style="margin:0 0 8px">تُسجّل تلقائياً يوم 1 من كل شهر — اضغط على أي مصروف لتعديل مبلغه أو إيقافه أو حذفه</p>
+      <div id="recurringList"><div class="empty" style="padding:14px">جاري التحميل...</div></div>
+      <button class="btn ghost" style="margin-top:8px" onclick="postRecurring()">📌 تسجيل غير المسجّل لهذا الشهر الآن</button>
     </div>
     <div class="card">
       <div class="card-h"><h4>📊 التقرير الشهري</h4></div>
@@ -173,6 +175,8 @@
       <div id="paymentsList"><div class="empty" style="padding:14px">لا توجد مدفوعات بعد</div></div>
     </div>
     <div class="page-title" style="margin-top:4px"><h3>📋 العمليات</h3><button class="link" onclick="exportCSV()">⬇️ CSV</button></div>
+    <div class="fg2" style="margin-bottom:8px"><div class="fg" style="margin:0"><input type="search" id="txSearch" placeholder="🔎 بحث بالاسم أو المبلغ" oninput="renderTxList()"/></div><div class="fg" style="margin:0"><select id="txCatSel" onchange="finCatV=this.value;renderTxList()"><option value="">كل الفئات</option></select></div></div>
+    <div id="txFilterInfo" style="font-size:.78rem;font-weight:800;color:var(--text-mid);margin:0 4px 6px"></div>
     <div class="segs" id="finSegs">
       <button class="seg on" data-v="all" onclick="finFilter('all')">الكل</button>
       <button class="seg" data-v="expense" onclick="finFilter('expense')">مصاريف</button>
@@ -352,9 +356,41 @@
   </div>
 </div>
 
+<!-- FIXED EXPENSE SHEET -->
+<div class="sheet-bg" id="fixedModal" onclick="if(event.target===this)closeFixed()">
+  <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeFixed()" aria-label="إغلاق">✕</button>
+    <h3 id="fxTitle">➕ مصروف ثابت</h3><p class="sub">يُسجّل كل شهر تلقائياً يوم 1</p>
+    <input type="hidden" id="fxId"/>
+    <div class="fg"><label>الاسم</label><input type="text" id="fxName" placeholder="مثال: إيجار الصالة"/></div>
+    <div class="fg"><label>الفئة</label><select id="fxCat"></select></div>
+    <div class="type-toggle"><button type="button" class="out on" id="fxModeFixed" onclick="setFxMode('fixed')">💵 مبلغ ثابت</button><button type="button" class="in" id="fxModeHead" onclick="setFxMode('head')">👥 لكل مشترك</button></div>
+    <div id="fxFixedBox" class="fg"><label>المبلغ الشهري (د.ك)</label><input type="number" id="fxAmount" step="0.001" min="0" inputmode="decimal"/></div>
+    <div id="fxHeadBox" style="display:none">
+      <div class="fg"><label>المبلغ عن كل مشترك نشط (د.ك)</label><input type="number" id="fxPerHead" step="0.001" min="0" inputmode="decimal" oninput="fxPreview()"/></div>
+      <div class="fg"><label>يُحسب على مشتركي الباقات:</label><div id="fxPkgs"></div></div>
+      <div class="note" id="fxHeadPreview"></div>
+    </div>
+    <label class="chatid" style="cursor:pointer;margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>🟢 مفعّل (يُسجّل كل شهر)</span><input type="checkbox" id="fxActive" checked style="flex:0 0 20px;width:20px;height:20px;margin:0;accent-color:var(--green-mid)"/></label>
+    <div class="note" id="fxPostedNote" style="margin-top:8px"></div>
+    <button onclick="saveFixed(this)" class="btn primary" style="margin-top:12px">💾 حفظ</button>
+    <button onclick="deleteFixed()" class="btn bad" id="fxDel" style="display:none">🗑️ حذف المصروف الثابت</button>
+  </div>
+</div>
+
+<!-- CATEGORIES SHEET -->
+<div class="sheet-bg" id="catModal" onclick="if(event.target===this)closeCats()">
+  <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeCats()" aria-label="إغلاق">✕</button>
+    <h3>⚙️ فئات الدخل والمصاريف</h3><p class="sub">أضف فئة جديدة، أو أخفِ فئة لا تستخدمها</p>
+    <div class="type-toggle"><button type="button" class="out on" id="catTabOut" onclick="setCatTab('expense')">💸 المصاريف</button><button type="button" class="in" id="catTabIn" onclick="setCatTab('income')">💰 الدخل</button></div>
+    <div id="catList"></div>
+    <div class="fg2" style="margin-top:10px"><div class="fg" style="flex:0 0 70px"><input type="text" id="catIcon" placeholder="📦" maxlength="4" style="text-align:center;font-size:1.3rem"/></div><div class="fg"><input type="text" id="catName" placeholder="اسم الفئة الجديدة"/></div></div>
+    <button class="btn primary" onclick="addCat()">➕ إضافة فئة</button>
+  </div>
+</div>
+
 <!-- TRANSACTION SHEET -->
 <div class="sheet-bg" id="txModal" onclick="if(event.target===this)closeTx()">
-  <div class="sheet"><div class="sheet-grip"></div>
+  <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeTx()" aria-label="إغلاق">✕</button>
     <h3 id="txTitle">➕ عملية جديدة</h3><p class="sub">تُحفظ فوراً وتظهر في بوت تيليجرام أيضاً</p>
     <input type="hidden" id="txId"/>
     <div class="type-toggle"><button type="button" class="out on" id="tgOut" onclick="setTxType('expense')">💸 مصروف</button><button type="button" class="in" id="tgIn" onclick="setTxType('income')">💰 دخل</button></div>
