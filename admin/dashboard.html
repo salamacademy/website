@@ -112,10 +112,10 @@
         <div class="fg"><label>الباقة</label>
           <select id="newPackage" onchange="updatePackagePrice();autoEndDate('newStartDate','newEndDate')" required>
             <option value="">— اختر —</option>
-            <option value="football" data-price="25" data-name="معسكر كرة القدم">⚽ كرة القدم — 25</option>
-            <option value="confidence" data-price="70" data-name="معسكر بناء الثقة والكيوكشن">🥋 بناء الثقة — 70</option>
-            <option value="excellence" data-price="85" data-name="باقة التميز">⚡ التميز — 85</option>
-            <option value="excellence_loyal" data-price="100" data-name="باقة التميز - أسرة سلام">🏅 أسرة سلام — 100</option>
+            <option value="football" data-price="25" data-name="كرة القدم">⚽ كرة القدم — 25</option>
+            <option value="confidence" data-price="70" data-name="بناء الثقة والكيوكشن">🥋 بناء الثقة — 70</option>
+            <option value="excellence" data-price="80" data-name="باقة التميز (كرة القدم + الكيوكشن)">⚡ التميز (قدم + كيوكشن) — 80</option>
+            <option value="excellence_loyal" data-price="" data-name="باقة التميز - أسرة سلام">🏅 أسرة سلام — خاص (حدد المبلغ)</option>
           </select></div>
         <div class="fg"><label>المبلغ (د.ك)</label><input type="number" id="newAmount" required step="0.5"/></div>
       </div>
@@ -151,6 +151,18 @@
     <div class="card">
       <div class="card-h"><h4>🔁 مصاريف شهرية ثابتة</h4><button class="link" onclick="postRecurring()">تسجيلها لهذا الشهر</button></div>
       <div id="recurringList"><div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>📊 التقرير الشهري</h4></div>
+      <p class="sub" style="margin:0 0 8px">يصلك تلقائياً يوم 1 من كل شهر على تيليجرام: الدخل، المصاريف، الصافي، وما دفعه كل عميل</p>
+      <div class="fg2"><button class="btn primary" onclick="openMonthReport(this,false)">👁️ عرض تقرير الشهر</button><button class="btn ghost" onclick="openMonthReport(this,true)">📲 إرسال لتيليجرام</button></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>🏦 رسوم UPayment <span class="chip" id="feeState">—</span></h4><button class="link" onclick="backfillUpFees(this)">تطبيقها على دفعات هذا الشهر</button></div>
+      <p class="sub" style="margin:0 0 8px">حسب عقدكم مع UPayment — تُسجّل تلقائياً كمصروف "رسوم الدفع" مع كل دفعة</p>
+      <div class="fg2"><div class="fg"><label>كي نت — مبلغ ثابت (د.ك)</label><input type="number" id="fee_knet_fixed" step="0.001" min="0" inputmode="decimal" placeholder="0.000"/></div><div class="fg"><label>كي نت — نسبة %</label><input type="number" id="fee_knet_pct" step="0.01" min="0" inputmode="decimal" placeholder="0"/></div></div>
+      <div class="fg2"><div class="fg"><label>بطاقة — مبلغ ثابت (د.ك)</label><input type="number" id="fee_card_fixed" step="0.001" min="0" inputmode="decimal" placeholder="0.000"/></div><div class="fg"><label>بطاقة — نسبة %</label><input type="number" id="fee_card_pct" step="0.01" min="0" inputmode="decimal" placeholder="0"/></div></div>
+      <button class="btn primary" onclick="saveUpFees(this)">💾 حفظ الرسوم</button>
     </div>
     <div class="card">
       <div class="card-h"><h4>🛒 منتجات الدفع (تظهر للأهل عند الضغط على ادفع)</h4><button class="link" onclick="openPayItem()">➕ إضافة</button></div>
@@ -331,6 +343,13 @@
 <!-- TRIP DETAIL SHEET -->
 <div class="sheet-bg" id="tripDetailModal" onclick="if(event.target===this)closeTripDetail()">
   <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeTripDetail()" aria-label="إغلاق">✕</button><div id="tripDetailBody"></div></div>
+</div>
+
+<!-- MONTHLY REPORT SHEET -->
+<div class="sheet-bg" id="reportModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="sheet" style="height:92vh;display:flex;flex-direction:column;padding-bottom:10px"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="document.getElementById('reportModal').classList.remove('open')" aria-label="إغلاق">✕</button>
+    <iframe id="reportFrame" title="التقرير الشهري" style="flex:1;width:100%;border:0;border-radius:14px;background:#FBF7F0"></iframe>
+  </div>
 </div>
 
 <!-- TRANSACTION SHEET -->

@@ -2,10 +2,10 @@
 // FINANCE (accounting) MODULE
 // ============================
 const CATS = {
-  expense: ['إيجار', 'رواتب', 'أكل وشرب', 'معدات', 'زي وملابس', 'مواصلات', 'تسويق', 'صيانة', 'رحلات وفعاليات', 'أخرى'],
+  expense: ['إيجار', 'رواتب', 'خدمات', 'رسوم الدفع', 'أكل وشرب', 'معدات', 'زي وملابس', 'مواصلات', 'تسويق', 'صيانة', 'رحلات وفعاليات', 'أخرى'],
   income: ['اشتراكات', 'رحلات وفعاليات', 'بيع زي', 'بطولات', 'رعاية', 'أخرى']
 };
-const CAT_ICON = { 'إيجار': '🏟️', 'رواتب': '👨‍🏫', 'أكل وشرب': '🍔', 'معدات': '⚽', 'زي وملابس': '👕', 'مواصلات': '🚌', 'تسويق': '📣', 'صيانة': '🔧', 'رحلات وفعاليات': '🎳', 'أخرى': '📦', 'اشتراكات': '💳', 'بيع زي': '👕', 'بطولات': '🏆', 'رعاية': '🤝' };
+const CAT_ICON = { 'إيجار': '🏟️', 'رواتب': '👨‍🏫', 'خدمات': '🧹', 'رسوم الدفع': '🏦', 'أكل وشرب': '🍔', 'معدات': '⚽', 'زي وملابس': '👕', 'مواصلات': '🚌', 'تسويق': '📣', 'صيانة': '🔧', 'رحلات وفعاليات': '🎳', 'أخرى': '📦', 'اشتراكات': '💳', 'بيع زي': '👕', 'بطولات': '🏆', 'رعاية': '🤝' };
 let allTx = [], finCur = new Date(), finType = 'expense', finFilterV = 'all', txType = 'expense', txCat = null;
 const KD = n => (+n || 0).toLocaleString('en-KW', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const monthKey = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -15,9 +15,13 @@ async function loadFinance() {
   try {
     const snap = await db.collection('transactions').orderBy('date', 'desc').limit(1000).get();
     allTx = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!upFeesLoaded) loadUpFees();
     renderFinance(); if (typeof renderStats === 'function') renderStats();
   } catch (e) { console.error(e); }
 }
+// recurring expense paid per subscriber (الكبتن 15 د.ك × active subscribers)
+const activeCount = () => (typeof allSubscriptions !== 'undefined' ? allSubscriptions : []).filter(s => s.status === 'active').length;
+const recAmount = t => t.perHead ? +(t.perHead * activeCount()).toFixed(3) : +t.amount;
 function monthTx() { const k = monthKey(finCur); return allTx.filter(t => (t.date || '').startsWith(k)); }
 function finNetNow() { const k = monthKey(new Date()); let n = 0; allTx.forEach(t => { if ((t.date || '').startsWith(k)) n += t.type === 'income' ? +t.amount : -t.amount; }); return n.toFixed(0); }
 function finMonth(d) { finCur.setMonth(finCur.getMonth() + d); renderFinance(); }
@@ -57,7 +61,7 @@ function renderRecurring() {
   const rec = allTx.filter(t => t.recurring && t.type === 'expense');
   const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
   const list = Object.values(seen);
-  document.getElementById('recurringList').innerHTML = list.length ? list.map(t => { const posted = monthTx().some(x => x.category === t.category && x.note === t.note && x.type === 'expense'); return `<div class="chatid" style="${posted ? 'opacity:.6' : ''}"><span>${CAT_ICON[t.category] || '📦'} ${t.note || t.category} — <b>${KD(t.amount)}</b> د.ك ${posted ? '<span class="chip ok" style="margin-right:6px">✓ مسجّل</span>' : ''}</span></div>`; }).join('') : '<div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div>';
+  document.getElementById('recurringList').innerHTML = list.length ? list.map(t => { const posted = monthTx().some(x => x.category === t.category && x.note === t.note && x.type === 'expense'); return `<div class="chatid" style="${posted ? 'opacity:.6' : ''}"><span>${CAT_ICON[t.category] || '📦'} ${t.note || t.category} — <b>${t.perHead ? `${KD(t.perHead)} × ${activeCount()} = ${KD(recAmount(t))}` : KD(t.amount)}</b> د.ك ${posted ? '<span class="chip ok" style="margin-right:6px">✓ مسجّل</span>' : ''}</span></div>`; }).join('') : '<div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — فعّل "تكرار شهري" عند إضافة مصروف</div>';
 }
 async function postRecurring() {
   const rec = allTx.filter(t => t.recurring && t.type === 'expense'); const seen = {}; rec.forEach(t => { const k = (t.category || '') + '|' + (t.note || ''); if (!seen[k] || t.date > seen[k].date) seen[k] = t; });
@@ -65,8 +69,55 @@ async function postRecurring() {
   if (!todo.length) return showToast('كل المصاريف الثابتة مسجّلة لهذا الشهر');
   if (!confirm(`تسجيل ${todo.length} مصروف ثابت لشهر ${AR_MONTHS[finCur.getMonth()]}؟`)) return;
   const date = monthKey(finCur) + '-01'; const batch = db.batch();
-  todo.forEach(t => batch.set(db.collection('transactions').doc(), { type: 'expense', amount: +t.amount, category: t.category, note: t.note || '', method: t.method || 'cash', date, recurring: true, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
+  todo.forEach(t => batch.set(db.collection('transactions').doc(), { type: 'expense', amount: recAmount(t), ...(t.perHead ? { perHead: +t.perHead, heads: activeCount() } : {}), category: t.category, note: t.note || '', method: t.method || 'cash', date, recurring: true, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
   await batch.commit(); showToast('✅ تم التسجيل'); loadFinance();
+}
+
+// ---------- UPAYMENT FEES (settings/finance.upaymentFees — the Cloud Function records one per payment) ----------
+let upFees = null, upFeesLoaded = false;
+async function loadUpFees() { upFeesLoaded = true; try { upFees = ((await db.collection('settings').doc('finance').get()).data() || {}).upaymentFees || null; } catch (e) { console.warn('fees', e); } renderUpFees(); }
+function renderUpFees() {
+  [['knet', 'fixed'], ['knet', 'pct'], ['card', 'fixed'], ['card', 'pct']].forEach(([a, b]) => { const el = document.getElementById(`fee_${a}_${b}`); if (el) el.value = upFees && upFees[a] && upFees[a][b] ? upFees[a][b] : ''; });
+  const st = document.getElementById('feeState'); if (st) { st.textContent = upFees ? '✓ مفعّلة' : 'غير محددة'; st.className = 'chip ' + (upFees ? 'ok' : 'gold'); }
+}
+async function saveUpFees(btn) {
+  const g = id => +document.getElementById(id).value || 0;
+  const f = { knet: { fixed: g('fee_knet_fixed'), pct: g('fee_knet_pct') }, card: { fixed: g('fee_card_fixed'), pct: g('fee_card_pct') } };
+  btn.disabled = true;
+  try { await db.collection('settings').doc('finance').set({ upaymentFees: f }, { merge: true }); upFees = f; renderUpFees(); showToast('✅ حُفظت رسوم UPayment'); }
+  catch (e) { showToast('❌ ' + e.message); } finally { btn.disabled = false; }
+}
+// same rule as the Cloud Function: KNET / Apple Pay (KNET) vs card
+function upFeeFor(p) {
+  if (!upFees) return null; const gw = p.gateway || {}, t = (gw.raw && gw.raw.data && gw.raw.data.transaction) || {};
+  const card = t.is_paid_from_cc === true || (!/knet/i.test(gw.payment_type || t.payment_type || '') && t.is_paid_from_knet !== true);
+  const r = upFees[card ? 'card' : 'knet'] || {}, fee = +((+r.fixed || 0) + (+p.amount || 0) * (+r.pct || 0) / 100).toFixed(3);
+  return fee > 0 ? { amount: fee, label: card ? 'بطاقة' : 'كي نت' } : null;
+}
+async function backfillUpFees(btn) {
+  if (!upFees) return showToast('حدد الرسوم واحفظها أولاً');
+  const k = monthKey(finCur), pays = (await db.collection('payments').where('status', '==', 'paid').get()).docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(p => p.paidAt && p.paidAt.toDate && new Date(p.paidAt.toDate().getTime() + 3 * 3600e3).toISOString().startsWith(k) && !allTx.some(t => t.id === 'fee_' + p.id));
+  const rows = pays.map(p => ({ p, f: upFeeFor(p) })).filter(x => x.f);
+  if (!rows.length) return showToast('لا توجد دفعات بدون رسوم في هذا الشهر');
+  const total = rows.reduce((a, x) => a + x.f.amount, 0);
+  if (!confirm(`تسجيل رسوم UPayment لـ ${rows.length} دفعة في ${AR_MONTHS[finCur.getMonth()]}؟\nالإجمالي: ${KD(total)} د.ك`)) return;
+  btn.disabled = true; const b = db.batch();
+  rows.forEach(({ p, f }) => b.set(db.collection('transactions').doc('fee_' + p.id), { type: 'expense', amount: f.amount, category: 'رسوم الدفع', note: `رسوم UPayment (${f.label}) — ${p.childName || p.phone}`, method: 'upayment', date: new Date(p.paidAt.toDate().getTime() + 3 * 3600e3).toISOString().slice(0, 10), paymentId: p.id, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
+  try { await b.commit(); showToast(`✅ سُجّلت ${rows.length} رسوم`); loadFinance(); } catch (e) { showToast('❌ ' + e.message); } finally { btn.disabled = false; }
+}
+
+// ---------- MONTHLY REPORT (built by the monthlyReportNow Cloud Function for the month shown) ----------
+async function openMonthReport(btn, send) {
+  const month = monthKey(finCur);
+  if (send && !confirm(`إرسال تقرير ${AR_MONTHS[finCur.getMonth()]} إلى تيليجرام؟`)) return;
+  const label = btn.textContent; btn.disabled = true; btn.textContent = '⏳ جاري التجهيز...';
+  try {
+    const r = await fetch(PAYMENT_API_URL + '/monthlyReportNow', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await auth.currentUser.getIdToken() }, body: JSON.stringify({ month, send }) });
+    const j = await r.json(); if (!j.ok) throw new Error(j.error || 'تعذر إنشاء التقرير');
+    document.getElementById('reportFrame').srcdoc = j.html; document.getElementById('reportModal').classList.add('open');
+    if (send) showToast('✅ أُرسل التقرير إلى تيليجرام');
+  } catch (e) { showToast('❌ ' + e.message); } finally { btn.disabled = false; btn.textContent = label; }
 }
 
 // ---------- ADD / EDIT ----------
@@ -124,7 +175,7 @@ let payItemsAdmin = [];
 const DEFAULT_ITEMS = [
   { icon: '⚽', name: 'اشتراك كرة القدم (شهر)', price: 25, packageType: 'football', category: 'اشتراكات', order: 1, active: true },
   { icon: '🥋', name: 'اشتراك بناء الثقة والكيوكشن (شهر)', price: 70, packageType: 'confidence', category: 'اشتراكات', order: 2, active: true },
-  { icon: '⚡', name: 'باقة التميز — كرة القدم + الكيوكشن (4 أيام)', price: 85, packageType: 'excellence', category: 'اشتراكات', order: 3, active: true },
+  { icon: '⚡', name: 'باقة التميز — كرة القدم + الكيوكشن (4 أيام)', price: 80, packageType: 'excellence', category: 'اشتراكات', order: 3, active: true },
   { icon: '👕', name: 'تيشيرت الأكاديمية', price: 5, category: 'بيع زي', order: 10, active: true, allowQty: true },
   { icon: '🥊', name: 'معدات تدريب — واقي + قفازات', price: 30, category: 'بيع زي', order: 11, active: true }
 ];

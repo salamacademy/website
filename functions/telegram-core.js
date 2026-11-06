@@ -77,9 +77,10 @@ async function lastTx(db) {
 const daysLeft = s => { const e = toD(s.subscriptionEnd); return e ? Math.ceil((e - new Date()) / 864e5) : null; };
 const pausedNow = s => { const a = toD(s.pauseStart), b = toD(s.pauseEnd); if (!a || !b) return false; const n = new Date(); return n >= a && n <= b; };
 
+const PKG_LABEL = { confidence: '🥋 بناء الثقة والكيوكشن', football: '⚽ كرة القدم', excellence: '⚡ باقة التميز (قدم + كيوكشن)', excellence_loyal: '🏅 أسرة سلام' };
 async function subscribers(db) {
   const snap = await db.collection('subscriptions').get(); const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  const act = all.filter(s => s.status === 'active'); const by = {}; act.forEach(s => by[s.packageName || s.packageType] = (by[s.packageName || s.packageType] || 0) + 1);
+  const act = all.filter(s => s.status === 'active'); const by = {}; act.forEach(s => { const k = PKG_LABEL[s.packageType] || s.packageName || s.packageType; by[k] = (by[k] || 0) + 1; }); // the 4 packages
   return `👥 <b>المشتركين</b>\n\n✅ نشط: <b>${act.length}</b>\n📝 بانتظار المراجعة: <b>${all.filter(s => s.status === 'pending_review').length}</b>\n💳 بانتظار الدفع: <b>${all.filter(s => s.status === 'approved').length}</b>\n⚠️ تنتهي خلال 7 أيام: <b>${act.filter(s => { const d = daysLeft(s); return d !== null && d >= 0 && d <= 7; }).length}</b>\n⏸️ متوقف مؤقتاً: <b>${all.filter(pausedNow).length}</b>\n❌ منتهي: <b>${all.filter(s => s.status === 'expired').length}</b>\n\n<b>حسب الباقة:</b>\n` + Object.entries(by).map(([k, v]) => `• ${k}: ${v}`).join('\n');
 }
 async function expiring(db) {

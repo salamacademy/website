@@ -9,6 +9,7 @@ const db = admin.firestore();
 const tgcore = require('./telegram-core');
 const PortalSync = require('./portal-sync');
 const Classes = require('./classes');
+const Report = require('./report');
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const tg = async (method, body) => { const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r.json(); };
 
@@ -69,6 +70,41 @@ exports.instagramStats = fx.pubsub.schedule('every 6 hours').timeZone('Asia/Kuwa
     const n = await (await fetch(`https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(token)}`)).json();
     if (n.access_token) await ref.set({ token: n.access_token, refreshedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); else console.error('ig refresh', JSON.stringify(n));
   }
+});
+
+// ---------- MONTHLY REPORT (1st of each month, 8:00 Kuwait) ----------
+// Report for last month → reports/{YYYY-MM}, Telegram (summary + full HTML file) and the admin 🔔; then this month's fixed expenses are posted.
+async function tgSendReport(r) {
+  const d = await db.collection('settings').doc('telegram').get(), ids = d.exists ? d.data().chatIds || [] : [];
+  for (const c of ids) {
+    try {
+      await tg('sendMessage', { chat_id: c.id, text: r.text, parse_mode: 'HTML' });
+      const fd = new FormData(); fd.append('chat_id', String(c.id)); fd.append('caption', `📎 تقرير ${Report.monthName(r.month)} — افتحه للتفاصيل الكاملة`);
+      fd.append('document', new Blob([r.html], { type: 'text/html' }), `salam-report-${r.month}.html`);
+      await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendDocument`, { method: 'POST', body: fd });
+    } catch (e) { console.warn('report tg', c.id, e.message); }
+  }
+}
+async function runReport(month, send) {
+  const r = await Report.buildReport(db, month);
+  await db.collection('reports').doc(month).set({ ...r.summary, html: r.html, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  if (send) { if (TG_TOKEN) await tgSendReport(r); await addNotif({ icon: '📊', title: `تقرير ${Report.monthName(month)}`, body: `الدخل ${r.summary.income} · المصاريف ${r.summary.expense} · الصافي ${r.summary.net} د.ك`, page: 'finance' }, 'report_' + month); }
+  return r;
+}
+exports.monthlyReport = fx.pubsub.schedule('0 8 1 * *').timeZone('Asia/Kuwait').onRun(async () => {
+  await runReport(Report.prevMonth(), true);
+  const posted = await Report.postRecurring(db, admin, kwToday().slice(0, 7)); console.log('recurring posted', posted);
+});
+// On demand from المالية: POST { month: 'YYYY-MM', send } with the admin's ID token → { ok, html, summary }
+exports.monthlyReportNow = fx.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*'); res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization'); res.set('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  try {
+    const tok = String(req.headers.authorization || '').replace(/^Bearer /, ''); const u = await admin.auth().verifyIdToken(tok);
+    if (!(await db.collection('admins').doc(u.uid).get()).exists) return res.status(403).json({ ok: false, error: 'admins only' });
+    const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}), month = /^\d{4}-\d\d$/.test(b.month || '') ? b.month : Report.prevMonth();
+    const r = await runReport(month, !!b.send); res.json({ ok: true, html: r.html, summary: r.summary });
+  } catch (e) { console.error('report', e); res.status(e.code && String(e.code).startsWith('auth/') ? 401 : 500).json({ ok: false, error: e.message }); }
 });
 
 exports.dailyReminders = fx.pubsub.schedule('0 9 * * *').timeZone('Asia/Kuwait').onRun(async () => {
@@ -225,7 +261,8 @@ async function bookTrip(orderId, p, method) {
 }
 
 // 2) Finalise a paid order: activate subscription (if a package item), book income, sync portal — idempotent
-const PKG_NAME = { football: 'معسكر كرة القدم', confidence: 'معسكر بناء الثقة والكيوكشن', excellence: 'باقة التميز', excellence_loyal: 'باقة التميز - أسرة سلام' };
+// the 4 packages (admin: بناء الثقة 70 · كرة القدم 25 · التميز 80 · أسرة سلام خاص ومحدد)
+const PKG_NAME = { football: 'كرة القدم', confidence: 'بناء الثقة والكيوكشن', excellence: 'باقة التميز (كرة القدم + الكيوكشن)', excellence_loyal: 'باقة التميز - أسرة سلام' };
 // One month of classes (football 4 · confidence 12 · excellence 16): an active subscription continues after its last class,
 // an expired / new one starts today. The end date is the date of the last class.
 // academy-wide closures still to come (holidays / emergencies) — their days don't count as classes
@@ -235,6 +272,14 @@ async function renewSub(subRef, s, orderId, pkg) {
   const now = new Date(), r = Classes.renewal({ ...s, ...(pkg || {}) }, 0, closed), end = Classes.toDate(r.end);
   const keep = Classes.closurePauses(closed, Classes.today(), r.end); // closure days inside the old + new period
   await subRef.update({ status: 'active', ...(pkg || {}), subscriptionStart: admin.firestore.Timestamp.fromDate(Classes.toDate(r.start)), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: Math.ceil((end - now) / 864e5), classesPerMonth: Classes.perMonth((pkg && pkg.packageType) || s.packageType), paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId, pauses: keep, sportEnds: r.sportEnds || admin.firestore.FieldValue.delete() });
+}
+// UPayment does not send its fee, so it is computed from the contract rates in settings/finance.upaymentFees
+// { knet: { fixed, pct }, card: { fixed, pct } } — KNET / Apple Pay (KNET) vs credit cards / Apple Pay (card)
+async function upaymentFee(gw, amount) {
+  const f = ((await db.collection('settings').doc('finance').get()).data() || {}).upaymentFees; if (!f) return null;
+  const t = (gw.raw && gw.raw.data && gw.raw.data.transaction) || {}, card = t.is_paid_from_cc === true || (!/knet/i.test(gw.payment_type || t.payment_type || '') && t.is_paid_from_knet !== true);
+  const r = f[card ? 'card' : 'knet'] || {}, fee = +((+r.fixed || 0) + (+amount || 0) * (+r.pct || 0) / 100).toFixed(3);
+  return fee > 0 ? { amount: fee, label: card ? 'بطاقة' : 'كي نت' } : null;
 }
 async function finalizePayment(orderId, gw) {
   const ref = db.collection('payments').doc(orderId); const d = await ref.get(); if (!d.exists) return 'no-order';
@@ -268,6 +313,8 @@ async function finalizePayment(orderId, gw) {
   if (p.tripId) { try { tripFull = await bookTrip(orderId, p, 'upayment'); } catch (e) { console.error('trip booking', orderId, e); } }
   const batch = db.batch(); const today = new Date(Date.now() + 3 * 3600e3).toISOString().split('T')[0];
   (p.items || []).forEach(i => batch.set(db.collection('transactions').doc(), { type: 'income', amount: +(i.price * i.qty).toFixed(3), category: i.category || 'أخرى', note: `${i.name}${i.qty > 1 ? ' ×' + i.qty : ''} — ${p.childName || p.phone} (UPayment)`, method: 'upayment', date: today, paymentId: orderId, createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'upayment' }));
+  const upFee = await upaymentFee(gw, p.amount); // UPayment's cut → expense (rates set by the admin in المالية)
+  if (upFee) batch.set(db.collection('transactions').doc('fee_' + orderId), { type: 'expense', amount: upFee.amount, category: 'رسوم الدفع', note: `رسوم UPayment (${upFee.label}) — ${p.childName || p.phone}`, method: 'upayment', date: today, paymentId: orderId, createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'upayment' });
   batch.update(ref, { status: 'paid', activated, gateway: gw, paymentType: gw.payment_type || gw.paymentType || null, paidAt: admin.firestore.FieldValue.serverTimestamp() });
   await batch.commit();
   try { await PortalSync.syncPhone(db, p.phone); } catch (e) { console.warn('portal sync', e.message); } // subscription + payment history
