@@ -24,7 +24,16 @@ async function loadFinance() {
   } catch (e) { console.error(e); }
 }
 // recurring expense paid per subscriber (الكبتن 15 د.ك × active subscribers of perHeadPkgs, e.g. the kyokushin package only)
-const activeCount = t => (typeof allSubscriptions !== 'undefined' ? allSubscriptions : []).filter(s => s.status === 'active' && (!(t && t.perHeadPkgs) || t.perHeadPkgs.includes(s.packageType))).length;
+// who counts = active subscribers of perHeadPkgs, minus skipIds, plus addIds — the admin edits this list by name
+const allSubsF = () => typeof allSubscriptions !== 'undefined' ? allSubscriptions : [];
+const isAutoHead = (t, s) => s.status === 'active' && (!(t && t.perHeadPkgs) || t.perHeadPkgs.includes(s.packageType));
+function headList(t) {
+  const subs = allSubsF(), skip = (t && t.skipIds) || [], add = (t && t.addIds) || [];
+  const auto = subs.filter(s => isAutoHead(t, s) && !skip.includes(s.id));
+  return [...auto, ...subs.filter(s => add.includes(s.id) && !auto.includes(s))].sort((a, b) => (a.childName || '').localeCompare(b.childName || '', 'ar'));
+}
+const activeCount = t => headList(t).length;
+const escF = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function monthTx() { const k = monthKey(finCur); return allTx.filter(t => (t.date || '').startsWith(k)); }
 function finNetNow() { const k = monthKey(new Date()); let n = 0; allTx.forEach(t => { if ((t.date || '').startsWith(k)) n += t.type === 'income' ? +t.amount : -t.amount; }); return n.toFixed(0); }
 function finMonth(d) { finCur.setMonth(finCur.getMonth() + d); renderFinance(); }
@@ -84,7 +93,7 @@ function renderRecurring() {
   const list = fixedList(), el = document.getElementById('recurringList'); if (!el) return;
   const total = list.filter(f => f.active !== false).reduce((a, f) => a + fxAmount(f), 0);
   el.innerHTML = (list.length ? list.map(f => { const p = fxPosted(f), off = f.active === false;
-    return `<div class="tx" style="${off ? 'opacity:.5' : ''}" onclick="openFixed('${f.id}')"><div class="ic">${iconOf(f.category)}</div><div class="m"><b>${f.name}</b><small>${f.category}${f.perHead ? ` · ${KD(f.perHead)} × ${activeCount(f)} مشترك${f.perHeadPkgs ? ' (' + f.perHeadPkgs.map(k => FX_PKGS[k] || k).join('، ') + ')' : ''}` : ''}${off ? ' · ⏸️ متوقف' : p ? ' · ✓ مسجّل هذا الشهر' : ''}</small></div><div class="a">${KD(fxAmount(f))}</div><button class="more">›</button></div>`; }).join('')
+    return `<div class="tx" style="${off ? 'opacity:.5' : ''}" onclick="openFixed('${f.id}')"><div class="ic">${iconOf(f.category)}</div><div class="m"><b>${f.name}</b><small>${f.category}${f.perHead ? ` · ${KD(f.perHead)} × ${activeCount(f)} مشترك${f.perHeadPkgs ? ' (' + f.perHeadPkgs.map(k => FX_PKGS[k] || k).join('، ') + ')' : ''} · 👥 اضغط لعرض الأسماء` : ''}${off ? ' · ⏸️ متوقف' : p ? ' · ✓ مسجّل هذا الشهر' : ''}</small></div><div class="a">${KD(fxAmount(f))}</div><button class="more">›</button></div>`; }).join('')
     + `<div style="display:flex;justify-content:space-between;font-weight:900;padding:8px 6px 0"><span>الإجمالي الشهري</span><span>${KD(total)} د.ك</span></div>`
     : '<div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — أضف أول مصروف</div>');
 }
@@ -95,32 +104,57 @@ function openFixed(id) {
   document.getElementById('fxName').value = f ? f.name : ''; document.getElementById('fxCat').innerHTML = catsOf('expense').map(c => `<option ${f && f.category === c ? 'selected' : ''}>${c}</option>`).join('');
   document.getElementById('fxAmount').value = f && !f.perHead ? f.amount : ''; document.getElementById('fxPerHead').value = f && f.perHead ? f.perHead : '';
   document.getElementById('fxPkgs').innerHTML = Object.entries(FX_PKGS).map(([k, n]) => `<label class="chatid" style="cursor:pointer;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>${n}</span><input type="checkbox" value="${k}" ${!f || !f.perHeadPkgs || f.perHeadPkgs.includes(k) ? 'checked' : ''} onchange="fxPreview()" style="flex:0 0 20px;width:20px;height:20px;margin:0;accent-color:var(--green-mid)"/></label>`).join('');
+  fxEd = { addIds: [...((f && f.addIds) || [])], skipIds: [...((f && f.skipIds) || [])] };
   document.getElementById('fxActive').checked = !f || f.active !== false; setFxMode(f && f.perHead ? 'head' : 'fixed');
   const p = f && fxPosted(f), pn = document.getElementById('fxPostedNote'); pn.style.display = p ? '' : 'none'; pn.innerHTML = p ? `✓ مسجّل لشهر ${AR_MONTHS[finCur.getMonth()]} (${KD(p.amount)} د.ك) — <button class="link" type="button" onclick="closeFixed();openTx('${p.id}')">تعديل عملية هذا الشهر</button>` : '';
   document.getElementById('fxDel').style.display = f ? 'flex' : 'none'; document.getElementById('fixedModal').classList.add('open');
 }
 function closeFixed() { document.getElementById('fixedModal').classList.remove('open'); }
-let fxMode = 'fixed';
+let fxMode = 'fixed', fxEd = { addIds: [], skipIds: [] };
 function setFxMode(m) { fxMode = m; document.getElementById('fxModeFixed').classList.toggle('on', m === 'fixed'); document.getElementById('fxModeHead').classList.toggle('on', m === 'head'); document.getElementById('fxFixedBox').style.display = m === 'fixed' ? '' : 'none'; document.getElementById('fxHeadBox').style.display = m === 'head' ? '' : 'none'; fxPreview(); }
 function fxForm() {
   const pk = [...document.querySelectorAll('#fxPkgs input:checked')].map(i => i.value);
   return { name: document.getElementById('fxName').value.trim(), category: document.getElementById('fxCat').value, active: document.getElementById('fxActive').checked,
-    ...(fxMode === 'head' ? { perHead: +document.getElementById('fxPerHead').value || 0, perHeadPkgs: pk.length === Object.keys(FX_PKGS).length ? null : pk, amount: 0 } : { amount: +document.getElementById('fxAmount').value || 0 }) };
+    ...(fxMode === 'head' ? { perHead: +document.getElementById('fxPerHead').value || 0, perHeadPkgs: pk.length === Object.keys(FX_PKGS).length ? null : pk, addIds: [...fxEd.addIds], skipIds: [...fxEd.skipIds], amount: 0 } : { amount: +document.getElementById('fxAmount').value || 0 }) };
 }
-function fxPreview() { const el = document.getElementById('fxHeadPreview'); if (!el) return; const f = fxForm(); el.textContent = fxMode === 'head' ? `${KD(f.perHead)} × ${activeCount(f)} مشترك نشط = ${KD(fxAmount(f))} د.ك هذا الشهر` : ''; }
+function fxPreview() { const el = document.getElementById('fxHeadPreview'); if (!el) return; const f = fxForm(); el.textContent = fxMode === 'head' ? `${KD(f.perHead)} × ${activeCount(f)} مشترك = ${KD(fxAmount(f))} د.ك هذا الشهر` : ''; fxRenderHeads(f); }
+// editable list of the subscribers this expense is paid for (e.g. the captain's 15 KD each)
+function fxRenderHeads(f) {
+  const el = document.getElementById('fxHeads'); if (!el) return; if (fxMode !== 'head') { el.innerHTML = ''; return; }
+  const list = headList(f), PK = s => FX_PKGS[s.packageType] || s.packageName || '', ST = { pending_review: 'قيد المراجعة', approved: 'مقبول', expired: 'منتهي', paused: 'موقوف' };
+  const row = (s, btn) => `<div class="tx" style="padding:8px 10px;cursor:default"><div class="m"><b>${escF(s.childName || '—')}</b><small>${PK(s)}${fxEd.addIds.includes(s.id) ? ' · ➕ مضاف يدوياً' : ''}${s.status !== 'active' ? ' · ' + (ST[s.status] || s.status) : ''}</small></div>${btn}</div>`;
+  const skipped = allSubsF().filter(s => fxEd.skipIds.includes(s.id) && isAutoHead(f, s));
+  const others = allSubsF().filter(s => !list.includes(s) && !skipped.includes(s) && !['rejected', 'cancelled'].includes(s.status)).sort((a, b) => (a.childName || '').localeCompare(b.childName || '', 'ar'));
+  el.innerHTML = `<div style="font-weight:900;margin:12px 4px 6px">👥 المشتركون المحسوب عليهم (${list.length})</div>`
+    + (list.length ? list.map(s => row(s, `<button type="button" class="more" style="color:#C62828;font-size:1rem" onclick="fxHead('${s.id}',false)" aria-label="إزالة">✕</button>`)).join('') : '<div class="empty" style="padding:10px">لا يوجد أحد</div>')
+    + (skipped.length ? `<div style="font-size:.78rem;font-weight:800;color:var(--text-light);margin:10px 4px 6px">🚫 مستبعدون (${skipped.length})</div>` + skipped.map(s => `<div style="opacity:.6">${row(s, `<button type="button" class="link" onclick="fxHead('${s.id}',true)">↩️ إرجاع</button>`)}</div>`).join('') : '')
+    + `<div style="display:flex;gap:8px;margin-top:10px;align-items:stretch"><div class="fg" style="flex:1;min-width:0;margin:0"><select id="fxAddSel"><option value="">➕ أضف مشتركاً للقائمة...</option>${others.map(s => `<option value="${s.id}">${escF(s.childName || '—')} — ${PK(s)}</option>`).join('')}</select></div><button type="button" class="btn ghost" style="width:auto;flex:0 0 auto;margin:0;padding:0 16px" onclick="fxHead(document.getElementById('fxAddSel').value,true)">إضافة</button></div>`;
+}
+function fxHead(id, on) {
+  if (!id) return showToast('اختر مشتركاً'); const s = allSubsF().find(x => x.id === id), auto = s && isAutoHead(fxForm(), s);
+  fxEd.addIds = fxEd.addIds.filter(x => x !== id); fxEd.skipIds = fxEd.skipIds.filter(x => x !== id);
+  if (on && !auto) fxEd.addIds.push(id); if (!on && auto) fxEd.skipIds.push(id); fxPreview();
+}
 async function saveFixed(btn) {
   const id = document.getElementById('fxId').value, f = fxForm();
   if (!f.name) return showToast('❌ اكتب اسم المصروف'); if (fxMode === 'fixed' ? !f.amount : !f.perHead) return showToast('❌ أدخل المبلغ');
   if (fxMode === 'head' && f.perHeadPkgs && !f.perHeadPkgs.length) return showToast('❌ اختر باقة واحدة على الأقل');
   const list = fixedList().map(x => ({ ...x })), i = list.findIndex(x => x.id === id);
-  if (i >= 0) { list[i] = { ...list[i], ...f }; if (fxMode === 'fixed') { delete list[i].perHead; delete list[i].perHeadPkgs; } } else list.push({ id: 'fx' + Date.now().toString(36), ...f });
+  if (i >= 0) { list[i] = { ...list[i], ...f }; if (fxMode === 'fixed') ['perHead', 'perHeadPkgs', 'addIds', 'skipIds'].forEach(k => delete list[i][k]); } else list.push({ id: 'fx' + Date.now().toString(36), ...f });
+  const saved = i >= 0 ? list[i] : list[list.length - 1], p = fxPosted(saved), amt = fxAmount(saved);
   btn.disabled = true;
-  try { await saveFixedList(list); closeFixed(); showToast('✅ حُفظ — يُطبّق من التسجيل القادم'); } catch (e) { showToast('❌ ' + e.message); } finally { btn.disabled = false; }
+  try {
+    await saveFixedList(list); closeFixed();
+    if (p && Math.abs((+p.amount || 0) - amt) > 0.0005 && confirm(`هذا المصروف مسجّل لشهر ${AR_MONTHS[finCur.getMonth()]} بمبلغ ${KD(p.amount)} د.ك.\nتحديثه إلى ${KD(amt)} د.ك؟`)) {
+      await db.collection('transactions').doc(p.id).update({ amount: amt, note: saved.name, category: saved.category, ...(saved.perHead ? fxHeadFields(saved) : {}) }); showToast('✅ حُفظ وتم تحديث هذا الشهر'); loadFinance();
+    } else showToast('✅ حُفظ — يُطبّق من التسجيل القادم');
+  } catch (e) { showToast('❌ ' + e.message); } finally { btn.disabled = false; }
 }
 async function deleteFixed() {
   const id = document.getElementById('fxId').value; if (!id || !confirm('حذف هذا المصروف الثابت؟ (العمليات المسجّلة سابقاً تبقى كما هي)')) return;
   try { await saveFixedList(fixedList().filter(x => x.id !== id)); closeFixed(); showToast('🗑️ حُذف'); } catch (e) { showToast('❌ ' + e.message); }
 }
+const fxHeadFields = f => { const h = headList(f); return { perHead: +f.perHead, heads: h.length, headIds: h.map(s => s.id), headNames: h.map(s => s.childName || ''), ...(f.perHeadPkgs ? { perHeadPkgs: f.perHeadPkgs } : {}) }; };
 async function postRecurring() {
   const todo = fixedList().filter(f => f.active !== false && !fxPosted(f));
   if (!todo.length) return showToast('كل المصاريف الثابتة مسجّلة لهذا الشهر');
@@ -128,7 +162,7 @@ async function postRecurring() {
   if (!confirm(`تسجيل ${todo.length} مصروف ثابت لشهر ${AR_MONTHS[finCur.getMonth()]}؟
 الإجمالي: ${KD(total)} د.ك`)) return;
   const month = monthKey(finCur), batch = db.batch();
-  todo.forEach(f => batch.set(db.collection('transactions').doc(`rec_${month}_${f.id}`), { type: 'expense', amount: fxAmount(f), category: f.category, note: f.name, method: 'cash', date: month + '-01', recurring: true, fixedId: f.id, ...(f.perHead ? { perHead: +f.perHead, heads: activeCount(f), ...(f.perHeadPkgs ? { perHeadPkgs: f.perHeadPkgs } : {}) } : {}), createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
+  todo.forEach(f => batch.set(db.collection('transactions').doc(`rec_${month}_${f.id}`), { type: 'expense', amount: fxAmount(f), category: f.category, note: f.name, method: 'cash', date: month + '-01', recurring: true, fixedId: f.id, ...(f.perHead ? fxHeadFields(f) : {}), createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: 'admin' }));
   try { await batch.commit(); showToast('✅ تم التسجيل'); loadFinance(); } catch (e) { showToast('❌ ' + e.message); }
 }
 

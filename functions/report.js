@@ -102,9 +102,13 @@ async function postRecurring(db, admin, month) {
   const cur = rec.filter(t => (t.date || '').startsWith(month));
   const todo = list.filter(f => f.active !== false && !cur.some(x => x.fixedId === f.id || (!x.fixedId && x.category === f.category && x.note === f.name)));
   if (!todo.length) return 0;
-  const act = (await db.collection('subscriptions').where('status', '==', 'active').get()).docs.map(d => d.data()), b = db.batch();
-  const headsOf = f => act.filter(s => !f.perHeadPkgs || f.perHeadPkgs.includes(s.packageType)).length; // e.g. الكبتن: kyokushin package only
-  todo.forEach(f => b.set(db.collection('transactions').doc(`rec_${month}_${f.id}`), { type: 'expense', amount: f.perHead ? +(f.perHead * headsOf(f)).toFixed(3) : +f.amount || 0, category: f.category, note: f.name || '', method: 'cash', date: month + '-01', recurring: true, fixedId: f.id, ...(f.perHead ? { perHead: +f.perHead, heads: headsOf(f), ...(f.perHeadPkgs ? { perHeadPkgs: f.perHeadPkgs } : {}) } : {}), createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'auto' }));
+  const subs = (await db.collection('subscriptions').get()).docs.map(d => ({ id: d.id, ...d.data() })), b = db.batch();
+  // who counts: active subscribers of perHeadPkgs (e.g. الكبتن: kyokushin package only), minus skipIds, plus addIds — edited by the admin in المالية
+  const headsOf = f => { const skip = f.skipIds || [], add = f.addIds || [];
+    const auto = subs.filter(s => s.status === 'active' && (!f.perHeadPkgs || f.perHeadPkgs.includes(s.packageType)) && !skip.includes(s.id));
+    return [...auto, ...subs.filter(s => add.includes(s.id) && !auto.includes(s))]; };
+  todo.forEach(f => { const h = f.perHead ? headsOf(f) : [];
+    b.set(db.collection('transactions').doc(`rec_${month}_${f.id}`), { type: 'expense', amount: f.perHead ? +(f.perHead * h.length).toFixed(3) : +f.amount || 0, category: f.category, note: f.name || '', method: 'cash', date: month + '-01', recurring: true, fixedId: f.id, ...(f.perHead ? { perHead: +f.perHead, heads: h.length, headIds: h.map(s => s.id), headNames: h.map(s => s.childName || ''), ...(f.perHeadPkgs ? { perHeadPkgs: f.perHeadPkgs } : {}) } : {}), createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'auto' }); });
   await b.commit(); return todo.length;
 }
 
