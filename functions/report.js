@@ -105,7 +105,8 @@ async function postRecurring(db, admin, month) {
   const subs = (await db.collection('subscriptions').get()).docs.map(d => ({ id: d.id, ...d.data() })), b = db.batch();
   // who counts: active subscribers of perHeadPkgs (e.g. الكبتن: kyokushin package only), minus skipIds, plus addIds — edited by the admin in المالية
   const headsOf = f => { const skip = f.skipIds || [], add = f.addIds || [];
-    const auto = subs.filter(s => s.status === 'active' && (!f.perHeadPkgs || f.perHeadPkgs.includes(s.packageType)) && !skip.includes(s.id));
+    const startKey = s => { const d = s.subscriptionStart && s.subscriptionStart.toDate ? s.subscriptionStart.toDate() : null; return d ? new Date(d.getTime() + 3 * 3600e3).toISOString().slice(0, 10) : ''; };
+    const auto = subs.filter(s => s.status === 'active' && (!f.perHeadPkgs || f.perHeadPkgs.includes(s.packageType)) && (!f.fromDate || startKey(s) >= f.fromDate) && !skip.includes(s.id));
     return [...auto, ...subs.filter(s => add.includes(s.id) && !auto.includes(s))]; };
   todo.forEach(f => { const h = f.perHead ? headsOf(f) : [];
     b.set(db.collection('transactions').doc(`rec_${month}_${f.id}`), { type: 'expense', amount: f.perHead ? +(f.perHead * h.length).toFixed(3) : +f.amount || 0, category: f.category, note: f.name || '', method: 'cash', date: month + '-01', recurring: true, fixedId: f.id, ...(f.perHead ? { perHead: +f.perHead, heads: h.length, headIds: h.map(s => s.id), headNames: h.map(s => s.childName || ''), ...(f.perHeadPkgs ? { perHeadPkgs: f.perHeadPkgs } : {}) } : {}), createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: 'auto' }); });

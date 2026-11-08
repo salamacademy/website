@@ -26,7 +26,9 @@ async function loadFinance() {
 // recurring expense paid per subscriber (الكبتن 15 د.ك × active subscribers of perHeadPkgs, e.g. the kyokushin package only)
 // who counts = active subscribers of perHeadPkgs, minus skipIds, plus addIds — the admin edits this list by name
 const allSubsF = () => typeof allSubscriptions !== 'undefined' ? allSubscriptions : [];
-const isAutoHead = (t, s) => s.status === 'active' && (!(t && t.perHeadPkgs) || t.perHeadPkgs.includes(s.packageType));
+// fromDate: only subscriptions that started on/after this day count (e.g. the captain: from 2026-11-01)
+const subStartKey = s => { const v = s.subscriptionStart, d = v && v.toDate ? v.toDate() : v ? new Date(v) : null; return d && !isNaN(d) ? new Date(d.getTime() + 3 * 3600e3).toISOString().slice(0, 10) : ''; };
+const isAutoHead = (t, s) => s.status === 'active' && (!(t && t.perHeadPkgs) || t.perHeadPkgs.includes(s.packageType)) && (!(t && t.fromDate) || subStartKey(s) >= t.fromDate);
 function headList(t) {
   const subs = allSubsF(), skip = (t && t.skipIds) || [], add = (t && t.addIds) || [];
   const auto = subs.filter(s => isAutoHead(t, s) && !skip.includes(s.id));
@@ -93,7 +95,7 @@ function renderRecurring() {
   const list = fixedList(), el = document.getElementById('recurringList'); if (!el) return;
   const total = list.filter(f => f.active !== false).reduce((a, f) => a + fxAmount(f), 0);
   el.innerHTML = (list.length ? list.map(f => { const p = fxPosted(f), off = f.active === false;
-    return `<div class="tx" style="${off ? 'opacity:.5' : ''}" onclick="openFixed('${f.id}')"><div class="ic">${iconOf(f.category)}</div><div class="m"><b>${f.name}</b><small>${f.category}${f.perHead ? ` · ${KD(f.perHead)} × ${activeCount(f)} مشترك${f.perHeadPkgs ? ' (' + f.perHeadPkgs.map(k => FX_PKGS[k] || k).join('، ') + ')' : ''} · 👥 اضغط لعرض الأسماء` : ''}${off ? ' · ⏸️ متوقف' : p ? ' · ✓ مسجّل هذا الشهر' : ''}</small></div><div class="a">${KD(fxAmount(f))}</div><button class="more">›</button></div>`; }).join('')
+    return `<div class="tx" style="${off ? 'opacity:.5' : ''}" onclick="openFixed('${f.id}')"><div class="ic">${iconOf(f.category)}</div><div class="m"><b>${f.name}</b><small>${f.category}${f.perHead ? ` · ${KD(f.perHead)} × ${activeCount(f)} مشترك${f.perHeadPkgs ? ' (' + f.perHeadPkgs.map(k => FX_PKGS[k] || k).join('، ') + ')' : ''}${f.fromDate ? ' · من ' + f.fromDate : ''} · 👥 اضغط لعرض الأسماء` : ''}${off ? ' · ⏸️ متوقف' : p ? ' · ✓ مسجّل هذا الشهر' : ''}</small></div><div class="a">${KD(fxAmount(f))}</div><button class="more">›</button></div>`; }).join('')
     + `<div style="display:flex;justify-content:space-between;font-weight:900;padding:8px 6px 0"><span>الإجمالي الشهري</span><span>${KD(total)} د.ك</span></div>`
     : '<div class="empty" style="padding:14px">لا توجد مصاريف ثابتة — أضف أول مصروف</div>');
 }
@@ -104,7 +106,7 @@ function openFixed(id) {
   document.getElementById('fxName').value = f ? f.name : ''; document.getElementById('fxCat').innerHTML = catsOf('expense').map(c => `<option ${f && f.category === c ? 'selected' : ''}>${c}</option>`).join('');
   document.getElementById('fxAmount').value = f && !f.perHead ? f.amount : ''; document.getElementById('fxPerHead').value = f && f.perHead ? f.perHead : '';
   document.getElementById('fxPkgs').innerHTML = Object.entries(FX_PKGS).map(([k, n]) => `<label class="chatid" style="cursor:pointer;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span>${n}</span><input type="checkbox" value="${k}" ${!f || !f.perHeadPkgs || f.perHeadPkgs.includes(k) ? 'checked' : ''} onchange="fxPreview()" style="flex:0 0 20px;width:20px;height:20px;margin:0;accent-color:var(--green-mid)"/></label>`).join('');
-  fxEd = { addIds: [...((f && f.addIds) || [])], skipIds: [...((f && f.skipIds) || [])] };
+  fxEd = { addIds: [...((f && f.addIds) || [])], skipIds: [...((f && f.skipIds) || [])] }; document.getElementById('fxFrom').value = (f && f.fromDate) || '';
   document.getElementById('fxActive').checked = !f || f.active !== false; setFxMode(f && f.perHead ? 'head' : 'fixed');
   const p = f && fxPosted(f), pn = document.getElementById('fxPostedNote'); pn.style.display = p ? '' : 'none'; pn.innerHTML = p ? `✓ مسجّل لشهر ${AR_MONTHS[finCur.getMonth()]} (${KD(p.amount)} د.ك) — <button class="link" type="button" onclick="closeFixed();openTx('${p.id}')">تعديل عملية هذا الشهر</button>` : '';
   document.getElementById('fxDel').style.display = f ? 'flex' : 'none'; document.getElementById('fixedModal').classList.add('open');
@@ -115,7 +117,7 @@ function setFxMode(m) { fxMode = m; document.getElementById('fxModeFixed').class
 function fxForm() {
   const pk = [...document.querySelectorAll('#fxPkgs input:checked')].map(i => i.value);
   return { name: document.getElementById('fxName').value.trim(), category: document.getElementById('fxCat').value, active: document.getElementById('fxActive').checked,
-    ...(fxMode === 'head' ? { perHead: +document.getElementById('fxPerHead').value || 0, perHeadPkgs: pk.length === Object.keys(FX_PKGS).length ? null : pk, addIds: [...fxEd.addIds], skipIds: [...fxEd.skipIds], amount: 0 } : { amount: +document.getElementById('fxAmount').value || 0 }) };
+    ...(fxMode === 'head' ? { perHead: +document.getElementById('fxPerHead').value || 0, perHeadPkgs: pk.length === Object.keys(FX_PKGS).length ? null : pk, addIds: [...fxEd.addIds], skipIds: [...fxEd.skipIds], fromDate: document.getElementById('fxFrom').value || null, amount: 0 } : { amount: +document.getElementById('fxAmount').value || 0 }) };
 }
 function fxPreview() { const el = document.getElementById('fxHeadPreview'); if (!el) return; const f = fxForm(); el.textContent = fxMode === 'head' ? `${KD(f.perHead)} × ${activeCount(f)} مشترك = ${KD(fxAmount(f))} د.ك هذا الشهر` : ''; fxRenderHeads(f); }
 // editable list of the subscribers this expense is paid for (e.g. the captain's 15 KD each)
@@ -140,7 +142,7 @@ async function saveFixed(btn) {
   if (!f.name) return showToast('❌ اكتب اسم المصروف'); if (fxMode === 'fixed' ? !f.amount : !f.perHead) return showToast('❌ أدخل المبلغ');
   if (fxMode === 'head' && f.perHeadPkgs && !f.perHeadPkgs.length) return showToast('❌ اختر باقة واحدة على الأقل');
   const list = fixedList().map(x => ({ ...x })), i = list.findIndex(x => x.id === id);
-  if (i >= 0) { list[i] = { ...list[i], ...f }; if (fxMode === 'fixed') ['perHead', 'perHeadPkgs', 'addIds', 'skipIds'].forEach(k => delete list[i][k]); } else list.push({ id: 'fx' + Date.now().toString(36), ...f });
+  if (i >= 0) { list[i] = { ...list[i], ...f }; if (fxMode === 'fixed') ['perHead', 'perHeadPkgs', 'addIds', 'skipIds', 'fromDate'].forEach(k => delete list[i][k]); } else list.push({ id: 'fx' + Date.now().toString(36), ...f });
   const saved = i >= 0 ? list[i] : list[list.length - 1], p = fxPosted(saved), amt = fxAmount(saved);
   btn.disabled = true;
   try {

@@ -368,6 +368,7 @@
     <div id="fxHeadBox" style="display:none">
       <div class="fg"><label>المبلغ عن كل مشترك نشط (د.ك)</label><input type="number" id="fxPerHead" step="0.001" min="0" inputmode="decimal" oninput="fxPreview()"/></div>
       <div class="fg"><label>يُحسب على مشتركي الباقات:</label><div id="fxPkgs"></div></div>
+      <div class="fg"><label>يُحسب فقط لمن بدأ اشتراكه من تاريخ (اتركه فارغاً للجميع)</label><input type="date" id="fxFrom" onchange="fxPreview()"/></div>
       <div class="note" id="fxHeadPreview"></div>
       <div id="fxHeads"></div>
     </div>
