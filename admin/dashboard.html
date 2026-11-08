@@ -258,6 +258,10 @@
   <div class="sheet"><div class="sheet-grip"></div><button type="button" class="sheet-close" onclick="closeEditModal()" aria-label="إغلاق">✕</button>
     <h3>✏️ تعديل الاشتراك</h3><p class="sub" id="editName"></p>
     <input type="hidden" id="editSubId"/>
+    <div class="photo-row"><div class="sub-photo" id="editPhoto">👦</div><div style="flex:1;min-width:0">
+      <label class="btn ghost" style="margin:0 0 6px;cursor:pointer">📷 رفع / تغيير الصورة<input type="file" accept="image/*" hidden onchange="pickEditPhoto(this)"/></label>
+      <button type="button" class="btn bad" id="editPhotoDel" style="display:none;margin:0" onclick="deleteEditPhoto()">🗑️ حذف الصورة</button>
+      <small style="display:block;color:var(--text-light);font-weight:700;margin-top:4px">تظهر لولي الأمر في بطاقة العضوية</small></div></div>
     <div class="fg2"><div class="fg"><label>اسم المشترك</label><input type="text" id="editChildName"/></div><div class="fg"><label>العمر</label><input type="number" id="editChildAge" min="3" max="18"/></div></div>
     <div class="fg2"><div class="fg"><label>ولي الأمر</label><input type="text" id="editParentName"/></div><div class="fg"><label>الهاتف</label><input type="tel" id="editPhone" maxlength="8" inputmode="numeric"/></div></div>
     <div class="fg"><label>البريد</label><input type="email" id="editEmail"/></div>

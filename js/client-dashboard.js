@@ -101,10 +101,19 @@ function renderRequestState(sub) {
 }
 function ringIcon(ch, color, ratio) { $('daysRemaining').textContent = ch; $('daysRemaining').style.fontSize = '1.8rem'; $('daysCircle').setAttribute('stroke', color); $('daysCircle').style.strokeDashoffset = 326.7 * (1 - ratio); document.querySelector('.days-label').textContent = ''; }
 
+// 🪪 membership card: photo (uploaded by the admin), name, package, member no., validity
+function idCard(sub, ST) {
+  const esc = x => String(x || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sch = SCHEDULES[sub.packageType] || {}, end = sub.status === 'active' && sub.subscriptionEnd ? fmt(sub.subscriptionEnd) : '';
+  const photo = /^data:image\/(jpeg|png|webp);base64,/.test(sub.photo || '') ? `<img src="${sub.photo}" alt="${esc(sub.childName)}">` : '<span>👦</span>';
+  return `<div class="idcard"><div class="idc-top"><img src="../images/logo-ar.png" alt="أكاديمية سلام"/><span>بطاقة عضوية</span></div>
+    <div class="idc-body"><div class="idc-photo">${photo}</div><div class="idc-info"><b>${esc(sub.childName || '--')}</b><span>${esc(sch.name || sub.packageName || '')}</span>
+    <span>رقم العضوية: <b dir="ltr">${String(sub.id || '').slice(0, 6).toUpperCase()}</b></span>${end ? `<span>صالحة حتى: <b>${end}</b></span>` : ''}<span class="chip ${ST[0]}">${ST[1]}</span>${sub.loyaltyMember ? ' <span class="chip gold">🏅 أسرة سلام</span>' : ''}</div></div></div>`;
+}
 function renderDetails(sub) {
   const ST = { active: ['ok', '✅ نشط'], pending_review: ['gold', '📝 قيد المراجعة'], approved: ['info', '💳 بانتظار الدفع'], pending_payment: ['info', '💳 بانتظار الدفع'], rejected: ['bad', '⛔ مرفوض'], expired: ['bad', '❌ منتهي'] }[sub.status] || ['copper', sub.status];
   const row = (k, v) => `<div class="sched"><span style="width:auto;color:var(--text-light);font-size:0.8rem;min-width:90px">${k}</span><b>${v || '--'}</b></div>`;
-  $('subscriptionDetails').innerHTML = row('اسم المشترك', sub.childName) + row('ولي الأمر', sub.parentName) + row('الهاتف', `<span dir="ltr">${sub.phone || ''}</span>`) + row('الباقة', sub.packageName) + row('الرسوم الشهرية', (sub.amount || '--') + ' د.ك') + row('الحالة', `<span class="chip ${ST[0]}">${ST[1]}</span>`) + (sub.subscriptionStart ? row('بداية الاشتراك', fmt(sub.subscriptionStart)) + row('نهاية الاشتراك', fmt(sub.subscriptionEnd)) : '') + (sub.loyaltyMember ? row('العضوية', '<span class="chip gold">🏅 أسرة سلام</span>') : '');
+  $('subscriptionDetails').innerHTML = idCard(sub, ST) + row('اسم المشترك', sub.childName) + row('ولي الأمر', sub.parentName) + row('الهاتف', `<span dir="ltr">${sub.phone || ''}</span>`) + row('الباقة', sub.packageName) + row('الرسوم الشهرية', (sub.amount || '--') + ' د.ك') + row('الحالة', `<span class="chip ${ST[0]}">${ST[1]}</span>`) + (sub.subscriptionStart ? row('بداية الاشتراك', fmt(sub.subscriptionStart)) + row('نهاية الاشتراك', fmt(sub.subscriptionEnd)) : '') + (sub.loyaltyMember ? row('العضوية', '<span class="chip gold">🏅 أسرة سلام</span>') : '');
 }
 function renderPayments() { // last 5 online payments of the family (kept in portal/{phone}.payments by the server)
   const esc = x => String(x || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -337,7 +346,7 @@ function renderKidSwitch() {
   const link = $('addKidLink'); if (link) link.href = addHref;
   if (kids.length < 2) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
-  el.innerHTML = kids.map((s, i) => `<button class="kid ${i === kidIdx ? 'on' : ''}" onclick="selectKid(${i})"><span class="av">👦</span>${(s.childName || '').split(' ')[0]}<span class="st ${kidDot(s)}"></span></button>`).join('') + `<a class="kid add" href="${addHref}"><span class="av">➕</span>مشترك آخر</a>`;
+  el.innerHTML = kids.map((s, i) => `<button class="kid ${i === kidIdx ? 'on' : ''}" onclick="selectKid(${i})"><span class="av">${/^data:image\//.test(s.photo || '') ? `<img src="${s.photo}" alt="">` : '👦'}</span>${(s.childName || '').split(' ')[0]}<span class="st ${kidDot(s)}"></span></button>`).join('') + `<a class="kid add" href="${addHref}"><span class="av">➕</span>مشترك آخر</a>`;
 }
 function selectKid(i, first) {
   kidIdx = i; const s = kids[i]; if (!s) return;

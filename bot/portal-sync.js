@@ -22,6 +22,11 @@
     const doc = buildDoc(subs);
     const cur = await ref.get(); const curData = cur.exists ? cur.data() : null;
     if (curData) { doc.pauseRequests = curData.pauseRequests || []; doc.fcmTokens = curData.fcmTokens || []; }
+    await Promise.all(doc.kids.map(async k => { // child photo (admin uploads it; photos/{subId} is admin-only)
+      const s = subs.find(x => x.id === k.subId); if (!s || !s.photoAt) return;
+      try { const p = await db.collection('photos').doc(s.id).get(), d = p.exists ? p.data() : null; if (d && d.data) k.photo = d.data; }
+      catch (_) { const old = curData && (curData.kids || []).find(x => x.subId === k.subId); if (old && old.photo) k.photo = old.photo; }
+    }));
     try { // last 5 paid online payments of the family (shown to the parent)
       const ps = (await db.collection('payments').where('phone', '==', phone).get()).docs.map(d => d.data()).filter(p => p.status === 'paid');
       doc.payments = ps.sort((a, b) => ms(b.paidAt || b.createdAt) - ms(a.paidAt || a.createdAt)).slice(0, 5).map(p => ({ amount: +p.amount || 0, items: (p.items || []).map(i => i.name + (i.qty > 1 ? ' ×' + i.qty : '')), childName: p.childName || '', paidAt: p.paidAt || p.createdAt || null }));

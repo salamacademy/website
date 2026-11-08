@@ -300,11 +300,46 @@ function openEditModal(id, toPauses) {
   fillEditPackages(s); set('editAmount', s.amount);
   set('editStatus', s.status || 'active'); set('editNotes', s.notes);
   set('editStartDate', isoDate(s.subscriptionStart)); set('editEndDate', isoDate(s.subscriptionEnd));
-  editPauses = pausesOf(s).map(p => ({ ...p })); editSt = Classes.stateOf(s); renderEditPauses();
+  editPauses = pausesOf(s).map(p => ({ ...p })); editSt = Classes.stateOf(s); renderEditPauses(); loadEditPhoto(s);
   document.getElementById('editModal').classList.add('open');
   const sh = document.querySelector('#editModal .sheet'); if (toPauses) setTimeout(() => document.getElementById('editPauses').scrollIntoView({ block: 'center' }), 50); else sh.scrollTop = 0;
 }
 function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
+// ---------- SUBSCRIBER PHOTO: photos/{subId}.data = small JPEG (360×450); subscriptions.photoAt marks it; PortalSync copies it to the parent as kids[].photo ----------
+function photoResize(file) {
+  return new Promise((res, rej) => { const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => { const W = 360, H = 450, c = document.createElement('canvas'), x = c.getContext('2d'); c.width = W; c.height = H;
+      const r = Math.max(W / img.naturalWidth, H / img.naturalHeight), w = img.naturalWidth * r, h = img.naturalHeight * r;
+      x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(img, (W - w) / 2, (H - h) * 0.35, w, h); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.82)); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('تعذر قراءة الصورة — جرّب صورة JPG أو PNG')); }; img.src = url; });
+}
+async function loadEditPhoto(s) {
+  const el = document.getElementById('editPhoto'); el.innerHTML = '👦'; el.dataset.id = s.id;
+  document.getElementById('editPhotoDel').style.display = s.photoAt ? '' : 'none'; if (!s.photoAt) return;
+  el.innerHTML = '⏳';
+  try { const d = (await db.collection('photos').doc(s.id).get()).data(); if (el.dataset.id === s.id) el.innerHTML = d && d.data ? `<img src="${d.data}" alt="">` : '👦'; } catch (e) { el.innerHTML = '👦'; console.warn('photo', e); }
+}
+async function pickEditPhoto(inp) {
+  const f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
+  const id = v('editSubId'), s = allSubscriptions.find(x => x.id === id), el = document.getElementById('editPhoto'); if (!s) return;
+  el.innerHTML = '⏳';
+  try {
+    const data = await photoResize(f), at = Date.now();
+    await withTimeout(db.collection('photos').doc(id).set({ data, updatedAt: at }));
+    await withTimeout(db.collection('subscriptions').doc(id).update({ photoAt: at })); s.photoAt = at;
+    if (el.dataset.id === id) el.innerHTML = `<img src="${data}" alt="">`; document.getElementById('editPhotoDel').style.display = '';
+    showToast('✅ حُفظت الصورة — تظهر لولي الأمر'); withTimeout(PortalSync.syncPhone(db, s.phone)).catch(e => console.warn('sync', e));
+  } catch (e) { el.innerHTML = '👦'; showToast(e.message === 'timeout' ? SLOW_MSG : '❌ ' + e.message); }
+}
+async function deleteEditPhoto() {
+  const id = v('editSubId'), s = allSubscriptions.find(x => x.id === id); if (!s || !confirm(`حذف صورة ${s.childName}؟`)) return;
+  try {
+    await withTimeout(db.collection('subscriptions').doc(id).update({ photoAt: firebase.firestore.FieldValue.delete() })); delete s.photoAt;
+    await db.collection('photos').doc(id).delete();
+    document.getElementById('editPhoto').innerHTML = '👦'; document.getElementById('editPhotoDel').style.display = 'none';
+    showToast('🗑️ حُذفت الصورة'); withTimeout(PortalSync.syncPhone(db, s.phone)).catch(e => console.warn('sync', e));
+  } catch (e) { showToast('❌ ' + e.message); }
+}
 async function saveEdit(btn) {
   const id = v('editSubId'); const s = allSubscriptions.find(x => x.id === id); if (!s) return;
   const phone = v('editPhone').replace(/\D/g, '');
@@ -333,7 +368,7 @@ async function saveEdit(btn) {
 async function deleteSubscription(id) {
   if (!confirm('حذف هذا الاشتراك نهائياً؟')) return;
   const sdel = allSubscriptions.find(x => x.id === id);
-  try { await db.collection('subscriptions').doc(id).delete(); if (sdel) await PortalSync.syncPhone(db, sdel.phone); showToast('تم الحذف'); await loadAllData(); } catch (e) { showToast('❌ خطأ'); }
+  try { await db.collection('subscriptions').doc(id).delete(); if (sdel && sdel.photoAt) db.collection('photos').doc(id).delete().catch(() => {}); if (sdel) await PortalSync.syncPhone(db, sdel.phone); showToast('تم الحذف'); await loadAllData(); } catch (e) { showToast('❌ خطأ'); }
 }
 
 // ---------- ADD ----------
