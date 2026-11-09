@@ -51,6 +51,7 @@ function go(page) {
   document.getElementById('adminPageTitle').textContent = TITLES[page] || '';
   document.getElementById('headSub').textContent = SUBS[page] || '';
   const fab = document.querySelector('.fab'); if (fab) { fab.textContent = page === 'finance' ? '💸' : page === 'trips' ? '🚌' : '+'; fab.onclick = page === 'finance' ? () => openTx() : page === 'trips' ? () => openTrip() : () => go('add'); }
+  if (page === 'notify') annRender();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function showAdminSection(n) { go(n === 'subscriptions' ? 'members' : n); }
@@ -185,7 +186,7 @@ function renderReview() {
   set('reviewCount', list.length ? list.length + ' طلب' : '');
   document.getElementById('reviewList').innerHTML = heardSummary() + (list.length ? list.map(s => `<div class="mcard s-pending">
     <div class="mcard-top"><div><div class="mcard-name">${s.childName}<small>${s.childAge ? s.childAge + ' سنة' : ''}</small></div><div class="mcard-sub">👤 ${s.parentName} · ${fmtDate(s.createdAt)}</div></div><span class="chip gold">📝 جديد</span></div>
-    <div class="mcard-meta"><span class="chip copper">${PKG_ICON[s.packageType] || ''} ${s.packageName || ''} · ${s.amount} د.ك</span>${s.loyaltyMember ? '<span class="chip gold">🏅 أسرة سلام</span>' : ''}</div>
+    <div class="mcard-meta"><span class="chip copper">${PKG_ICON[s.packageType] || ''} ${s.packageName || ''} · ${s.amount} د.ك</span>${s.loyaltyMember ? '<span class="chip gold">🏅 أسرة سلام</span>' : ''}${s.photoAt ? `<span class="chip info" style="cursor:pointer" onclick="openEditModal('${s.id}')">📷 أرفق صورة</span>` : ''}</div>
     ${surveyBody(s)}
     <div class="mcard-actions"><button class="abtn ok" style="flex:2" onclick="openApprove('${s.id}')">✅ موافقة</button><button class="abtn bad" onclick="rejectRequest('${s.id}')">⛔ رفض</button><button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}?text=${encodeURIComponent('مرحباً ' + s.parentName + '، بخصوص طلب تسجيل ' + s.childName + ' في أكاديمية سلام')}','_blank')">💬</button></div>
   </div>`).join('') : emptyBox('🎉', 'لا توجد طلبات بانتظار المراجعة'));
@@ -412,6 +413,42 @@ function sendBulkWhatsApp() {
   if (!list.length) return showToast('لا توجد اشتراكات تنتهي قريباً');
   if (!confirm(`سيتم فتح ${list.length} نافذة واتساب. اسمح بالنوافذ المنبثقة.`)) return;
   list.forEach((s, i) => setTimeout(() => sendWhatsAppReminder(s.phone, s.childName, calcDaysLeft(s)), i * 1500));
+}
+// ---------- 📢 ANNOUNCEMENT: one WhatsApp chat per tap (no API / no cost). Progress is remembered on this device per message ----------
+const ANN_KEY = 'salamAnnSent', annEsc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let annQ = [], annSent = new Set();
+function annRecipients() {
+  const st = { active: ['active'], current: ['active', 'approved', 'pending_review'], expired: ['expired'], all: ['active', 'approved', 'pending_review', 'expired'] }[v('annWho')] || ['active'];
+  const pkg = v('annPkg'), both = document.getElementById('annPhone2').checked, m = new Map();
+  allSubscriptions.filter(s => st.includes(s.status) && (!pkg || s.packageType === pkg)).forEach(s => [s.phone, both ? s.phone2 : ''].forEach(p => {
+    p = String(p || '').replace(/\D/g, '').slice(-8); if (p.length !== 8) return;
+    const r = m.get(p) || { phone: p, parent: s.parentName || '', kids: [] }; if (s.childName && !r.kids.includes(s.childName)) r.kids.push(s.childName); m.set(p, r);
+  }));
+  return [...m.values()].sort((a, b) => a.parent.localeCompare(b.parent, 'ar'));
+}
+const annText = r => v('annMsg').replace(/\{ولي الأمر\}/g, (r.parent || '').split(' ')[0]).replace(/\{المشترك\}/g, r.kids.map(k => k.split(' ')[0]).join(' و'));
+function annLoad() { try { const d = JSON.parse(localStorage.getItem(ANN_KEY) || '{}'); return d.msg === v('annMsg') ? new Set(d.sent || []) : new Set(); } catch (_) { return new Set(); } }
+function annSave() { try { localStorage.setItem(ANN_KEY, JSON.stringify({ msg: v('annMsg'), sent: [...annSent] })); } catch (_) {} }
+function annRender() {
+  const box = document.getElementById('annBox'); if (!box) return;
+  annQ = annRecipients(); annSent = annLoad();
+  const done = annQ.filter(r => annSent.has(r.phone)).length, next = annQ.find(r => !annSent.has(r.phone));
+  box.innerHTML = `<div class="note" style="margin-bottom:10px">👥 <b>${annQ.length}</b> ولي أمر · ✅ أُرسل <b>${done}</b>${annQ.length ? ` · متبقٍ <b>${annQ.length - done}</b>` : ''}<br>اضغط «إرسال التالي» — يفتح واتساب بالرسالة جاهزة، اضغط إرسال ثم ارجع هنا للتالي.</div>`
+    + (next ? `<button class="btn wa" onclick="annSend('${next.phone}')">▶️ إرسال التالي — ${annEsc(next.parent || next.phone)}</button>` : annQ.length ? '<div class="empty" style="padding:10px">🎉 تم الإرسال للجميع</div>' : '')
+    + `<div style="display:flex;gap:8px;margin:8px 0"><button class="btn ghost" style="margin:0" onclick="annCopy()">📋 نسخ الأرقام</button>${done ? '<button class="btn ghost" style="margin:0" onclick="annReset()">↺ البدء من جديد</button>' : ''}</div>`
+    + annQ.map(r => `<div class="tx" style="padding:8px 10px;cursor:default${annSent.has(r.phone) ? ';opacity:.55' : ''}"><div class="m"><b>${annEsc(r.parent || '—')}</b><small>${annEsc(r.kids.join('، '))} · <span dir="ltr">${r.phone}</span></small></div><button type="button" class="abtn wa" style="flex:0 0 auto" onclick="annSend('${r.phone}')">${annSent.has(r.phone) ? '✅' : '💬'}</button></div>`).join('');
+}
+function annIns(t) { const el = document.getElementById('annMsg'), a = el.selectionStart ?? el.value.length; el.value = el.value.slice(0, a) + t + el.value.slice(el.selectionEnd ?? a); el.focus(); annRender(); }
+function annSend(phone) {
+  if (!v('annMsg')) { document.getElementById('annMsg').focus(); return showToast('اكتب الرسالة أولاً'); }
+  const r = annQ.find(x => x.phone === phone); if (!r) return;
+  window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(annText(r)), '_blank');
+  annSent.add(phone); annSave(); annRender();
+}
+function annReset() { if (!confirm('مسح علامات الإرسال والبدء من جديد؟')) return; annSent = new Set(); annSave(); annRender(); }
+function annCopy() {
+  const t = annQ.map(r => '+965' + r.phone).join('\n'); if (!t) return showToast('لا توجد أرقام');
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => showToast(`📋 نُسخ ${annQ.length} رقم`), () => prompt('انسخ الأرقام:', t.replace(/\n/g, ', ')));
 }
 function sendCustomWhatsApp() {
   const p = v('customPhone'), m = v('customMsg'); if (!p || !m) return showToast('أدخل الهاتف والرسالة');

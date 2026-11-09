@@ -50,6 +50,7 @@
       <div class="tile c-copper" onclick="go('finance')"><div class="t-ico">💰</div><div class="t-num" id="statRevenue">–</div><div class="t-lbl">صافي الشهر (د.ك)</div></div>
     </div>
 
+    <button class="btn wa" style="margin-bottom:12px" onclick="go('notify');setTimeout(()=>document.getElementById('annMsg').focus(),200)">📢 إرسال إعلان لجميع الأهالي</button>
     <div class="card">
       <div class="card-h"><h4>آخر الاشتراكات</h4><button class="link" onclick="go('members')">عرض الكل</button></div>
       <div id="recentList"><div class="empty">جاري التحميل...</div></div>
@@ -219,6 +220,17 @@
   <!-- ===== NOTIFY ===== -->
   <section class="page" data-page="notify">
     <div class="page-title"><h3>📨 إرسال رسالة</h3><div style="display:flex;gap:6px"><button class="link" onclick="syncPortalsIfNeeded(true).then(()=>showToast('✅ تمت مزامنة بوابة الأهالي'))">🔄 مزامنة البوابة</button><button class="link" onclick="go('telegram')">🤖 تيليجرام</button></div></div>
+    <div class="card" id="annCard">
+      <div class="card-h"><h4>📢 إعلان لجميع الأهالي (واتساب)</h4></div>
+      <div class="fg"><label>الرسالة</label><textarea id="annMsg" rows="5" placeholder="السلام عليكم {ولي الأمر}، نود إبلاغكم..." oninput="annRender()"></textarea>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button type="button" class="link" onclick="annIns('{ولي الأمر}')">+ اسم ولي الأمر</button><button type="button" class="link" onclick="annIns('{المشترك}')">+ اسم المشترك</button></div></div>
+      <div style="display:flex;gap:8px">
+        <div class="fg" style="flex:1;min-width:0"><label>إلى</label><select id="annWho" onchange="annRender()"><option value="active">المشتركون النشطون</option><option value="current">النشطون + الطلبات الجديدة</option><option value="expired">المنتهية اشتراكاتهم</option><option value="all">الجميع</option></select></div>
+        <div class="fg" style="flex:1;min-width:0"><label>الباقة</label><select id="annPkg" onchange="annRender()"><option value="">كل الباقات</option><option value="football">⚽ كرة القدم</option><option value="confidence">🥋 الثقة والكيوكشن</option><option value="excellence">🏆 باقة التميز</option></select></div>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:800;font-size:.85rem;margin:0 2px 10px"><input type="checkbox" id="annPhone2" onchange="annRender()"/> أرسل للرقم الثاني أيضاً</label>
+      <div id="annBox"></div>
+    </div>
     <div class="card">
       <div class="card-h"><h4>⚠️ تذكير انتهاء الاشتراك</h4></div>
       <p class="note" style="margin-bottom:12px">يفتح واتساب لكل مشترك ينتهي اشتراكه خلال 7 أيام برسالة تذكير جاهزة.</p>

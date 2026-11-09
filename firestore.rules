@@ -30,7 +30,16 @@ service cloud.firestore {
     // Trips: public read (shown to parents), admin write. Bookings: admin only (paid bookings are written by Cloud Functions)
     match /trips/{id}        { allow read: if true; allow write: if isAdmin(); }
     match /tripBookings/{id} { allow read, write: if isAdmin(); }
-    match /photos/{id}       { allow read, write: if isAdmin(); } // subscriber photos (parents get theirs via portal/{phone})
+    match /photos/{id} { // subscriber photos (parents get theirs via portal/{phone})
+      allow read, write: if isAdmin();
+      // new registration (no login): one small JPEG for its own just-created pending request
+      allow create: if exists(/databases/$(database)/documents/subscriptions/$(id))
+                    && get(/databases/$(database)/documents/subscriptions/$(id)).data.status == 'pending_review'
+                    && request.resource.data.keys().hasOnly(['data', 'updatedAt'])
+                    && request.resource.data.data is string
+                    && request.resource.data.data.size() < 400000
+                    && request.resource.data.data.matches('data:image/jpeg;base64,.*');
+    }
     match /closures/{id}     { allow read, write: if isAdmin(); } // academy-wide closures (admin only; parents see them as pauses in portal)
     // Payments: created/updated only by Cloud Functions; parent can fetch their own order by id; admin lists
     match /payments/{id}     { allow get: if true; allow list: if isAdmin(); allow write: if false; }

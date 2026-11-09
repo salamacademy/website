@@ -41,6 +41,27 @@ function updateDob() {
   out.textContent = '🎂 العمر: ' + age + ' سنة';
 }
 
+// Child photo (optional): cropped to a 4:5 portrait and shrunk to a small JPEG, saved to photos/{subId} after the request is created
+let regPhotoData = '';
+function photoResize(file) {
+  return new Promise((res, rej) => { const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => { const W = 360, H = 450, c = document.createElement('canvas'), x = c.getContext('2d'); c.width = W; c.height = H;
+      const r = Math.max(W / img.naturalWidth, H / img.naturalHeight), w = img.naturalWidth * r, h = img.naturalHeight * r;
+      x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(img, (W - w) / 2, (H - h) * 0.35, w, h); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.82)); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad image')); }; img.src = url; });
+}
+function setRegPhoto(data) {
+  regPhotoData = data || '';
+  const box = document.getElementById('regPhotoBox'); box.innerHTML = data ? `<img src="${data}" alt="">` : '👦';
+  document.getElementById('regPhotoX').hidden = !data;
+}
+document.getElementById('regPhoto').addEventListener('change', async function () {
+  const f = this.files && this.files[0]; this.value = ''; if (!f) return;
+  document.getElementById('regPhotoBox').innerHTML = '⏳';
+  try { setRegPhoto(await photoResize(f)); } catch (_) { setRegPhoto(''); showError('تعذر قراءة الصورة — جرّب صورة أخرى (JPG أو PNG)'); }
+});
+document.getElementById('regPhotoX').addEventListener('click', () => setRegPhoto(''));
+
 function validateStep(n) {
   const sec = document.querySelector(`.reg-step[data-step="${n}"]`);
   const fields = sec.querySelectorAll('input[required], textarea[required], select[required]');
@@ -105,9 +126,12 @@ document.getElementById('regForm').addEventListener('submit', async function (e)
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     subscriptionStart: null, subscriptionEnd: null, daysRemaining: 0
   };
+  if (regPhotoData) data.photoAt = Date.now();
 
   try {
-    const ref = await db.collection('subscriptions').add(data);
+    const ref = db.collection('subscriptions').doc();
+    await ref.set(data);
+    if (regPhotoData) await db.collection('photos').doc(ref.id).set({ data: regPhotoData, updatedAt: data.photoAt }).catch(e => console.warn('photo', e)); // the request still goes through if the photo fails
     document.getElementById('regForm').hidden = true;
     document.querySelector('.reg-steps').style.display = 'none';
     document.getElementById('succPhone').textContent = '+965 ' + data.phone;

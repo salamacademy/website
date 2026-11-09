@@ -57,3 +57,12 @@
 /* How did you hear about us: 2 × 2 pills */
 .radio-row.heard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .radio-row.heard .radio-pill span { padding: 10px 6px; font-size: .9rem; }
+
+/* optional child photo */
+.reg-photo { display: flex; gap: 14px; align-items: center; }
+.reg-photo-box { flex: 0 0 84px; width: 84px; height: 105px; border-radius: 14px; background: var(--copper-xpale); border: 2px dashed rgba(184,84,30,0.35); display: flex; align-items: center; justify-content: center; font-size: 2.4rem; overflow: hidden; }
+.reg-photo-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.reg-photo-act { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.reg-photo-act small { color: var(--text-light, #777); font-size: 0.78rem; }
+.form-group .reg-photo-btn { display: inline-block; margin: 0; padding: 10px 16px; border-radius: 12px; background: var(--copper); color: #fff; font-weight: 800; cursor: pointer; text-align: center; }
+.reg-photo-x { align-self: flex-start; background: none; border: 0; color: #c62828; font-family: inherit; font-weight: 800; font-size: 0.85rem; cursor: pointer; padding: 2px 0; }
