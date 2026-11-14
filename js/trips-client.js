@@ -45,10 +45,10 @@ async function payTrip(tid) {
   if (!confirm(`حجز رحلة ${t.title}\n${Trips.date(t.date)}\nالمشترك: ${names}\nالإجمالي: ${(pick.length * t.price).toFixed(3)} د.ك`)) return;
   const btn = $('tripPay_' + tid); btn.disabled = true; btn.innerHTML = '⏳ جاري تحويلك إلى UPayment...';
   try {
-    const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, parentName: portalDoc?.parentName || kids[0]?.parentName || '', trip: { id: tid, kids: pick }, returnBase: location.origin + location.pathname.replace(/[^/]*$/, '') }) });
+    const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, parentName: portalDoc?.parentName || kids[0]?.parentName || '', trip: { id: tid, kids: pick }, returnBase: payReturnBase() }) });
     const j = await r.json();
     if (!j.ok || !j.link) throw new Error(j.error || 'فشل إنشاء الدفع');
-    location.href = j.link;
+    openPayLink(j.link);
   } catch (e) { alert('تعذر الحجز: ' + e.message); tripPick[tid] = []; renderTripsClient(); }
 }
 listenTripsClient();

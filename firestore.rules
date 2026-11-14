@@ -24,7 +24,8 @@ service cloud.firestore {
     match /reports/{id}      { allow read: if isAdmin(); allow write: if false; } // monthly reports, written by Cloud Functions
     match /publicStats/{id}  { allow read: if true; allow write: if false; } // landing-page numbers, written by Cloud Functions
     match /botState/{id}     { allow read, write: if false; }
-    match /adminNotifs/{id}  { allow read, write: if isAdmin(); } // 🔔 feed, written by Cloud Functions
+    match /adminNotifs/{id}  { allow read, write: if isAdmin(); }
+    match /deletionRequests/{id} { allow read, write: if isAdmin(); } // account deletion requests, written by Cloud Functions // 🔔 feed, written by Cloud Functions
     // Pay catalog: public read (prices are public), admin write
     match /payItems/{id}     { allow read: if true; allow write: if isAdmin(); }
     // Trips: public read (shown to parents), admin write. Bookings: admin only (paid bookings are written by Cloud Functions)

@@ -205,16 +205,20 @@ function cartTotal() { return Object.entries(cart).reduce((a, [id, q]) => { cons
 const badCustom = () => Object.keys(cart).some(id => { const i = payItems.find(x => x.id === id); return i && i.customAmount && (!(itemPrice(i) >= 0.5 && itemPrice(i) <= 2000) || !customFor[id]); });
 function updateTotal() { renderTerms(); const t = cartTotal(), off = t <= 0 || badCustom() || !!payLock(currentSubscription) || !termsOk; $('payTotal').textContent = t.toFixed(3); const b = $('payBtn'); b.disabled = off; b.style.opacity = off ? '.6' : '1'; }
 function renewSubscription() { go('renew'); }
+// Store app (Capacitor): pages live on capacitor://localhost, so UPayment returns to the website's payment page,
+// and the checkout opens in an in-app browser sheet (closing it reloads the dashboard). The PWA keeps the old behaviour.
+function payReturnBase() { return window.SalamNative ? SalamNative.webBase + 'client/' : location.origin + location.pathname.replace(/[^/]*$/, ''); }
+function openPayLink(link) { if (window.SalamNative) SalamNative.openPay(link); else location.href = link; }
 async function startPayment() {
   const sub = currentSubscription; const items = Object.entries(cart).map(([id, qty]) => { const i = payItems.find(x => x.id === id); return i && i.customAmount ? { id, qty: 1, amount: itemPrice(i), purpose: customFor[id], note: (customNote[id] || '').trim() } : { id, qty }; }); if (!items.length || badCustom() || payLock(sub)) return;
   if (!termsOk) return alert('يرجى قراءة الشروط والموافقة عليها قبل الدفع');
   const btn = $('payBtn'); btn.disabled = true; btn.innerHTML = '⏳ جاري تحويلك إلى UPayment...';
   try {
     if (typeof PAYMENT_API_URL === 'undefined' || !PAYMENT_API_URL || PAYMENT_API_URL.includes('YOUR_')) throw new Error('not-configured');
-    const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, subId: sub ? sub.id : null, childName: sub ? sub.childName : '', parentName: sub ? sub.parentName : (portalDoc?.parentName || ''), email: sub ? sub.email : '', items, termsAccepted: true, termsText: termsLines().join(' | ').replace(/<[^>]+>/g, ''), returnBase: location.origin + location.pathname.replace(/[^/]*$/, '') }) });
+    const r = await fetch(PAYMENT_API_URL + '/createPayment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, subId: sub ? sub.id : null, childName: sub ? sub.childName : '', parentName: sub ? sub.parentName : (portalDoc?.parentName || ''), email: sub ? sub.email : '', items, termsAccepted: true, termsText: termsLines().join(' | ').replace(/<[^>]+>/g, ''), returnBase: payReturnBase() }) });
     const j = await r.json(); if (j.code === 'not_approved') { alert(j.error); btn.disabled = false; btn.innerHTML = '<img src="../images/upayment.svg" class="upay-ic" alt=""/> <span>الدفع عبر <span class="upay-word">UPayment</span></span>'; return; }
     if (!j.ok || !j.link) throw new Error(j.error || 'فشل إنشاء الدفع');
-    location.href = j.link;
+    openPayLink(j.link);
   } catch (e) {
     const list = items.map(({ id, qty }) => { const i = payItems.find(x => x.id === id); return `• ${i.name}${qty > 1 ? ' ×' + qty : ''} — ${(itemPrice(i) * qty).toFixed(3)} د.ك`; }).join('\n');
     window.open('https://wa.me/96593000607?text=' + encodeURIComponent(`مرحباً، أريد الدفع${sub ? ' لـ ' + sub.childName : ''}:\n${list}\nالإجمالي: ${cartTotal().toFixed(3)} د.ك\nيرجى إرسال رابط الدفع.`), '_blank');
@@ -333,6 +337,17 @@ function setupClientNotifications() {
   kids.forEach(s => { if (s.status === 'active' && s.subscriptionEnd) { const days = Classes.left(s), key = 'expNotif-' + s.id + '-' + new Date().toDateString(); if (days <= 2 && days >= 1 && !localStorage.getItem(key)) { localStorage.setItem(key, '1'); Notif.show('⏳ اشتراك ينتهي قريباً', `${s.childName} — متبقٍ ${days === 1 ? 'حصة واحدة' : 'حصتان'} · جدد الآن`, 'dashboard.html'); } } });
 }
 
+// Account deletion (required by the App Store): sends a request to the academy; the admin deletes the data and confirms
+async function requestDeletion() {
+  if (!confirm('حذف الحساب؟\n\nسيتم إرسال طلب للإدارة لحذف حسابك وبيانات أبنائك (الاسم، الهاتف، الصور، الملاحظات الصحية) خلال 7 أيام، ولن تتمكن من الدخول بعدها.\nالسجلات المالية للمدفوعات السابقة تُحفظ فقط بالقدر الذي يتطلبه القانون.')) return;
+  const reason = prompt('سبب الحذف (اختياري):') || '';
+  try {
+    const r = await fetch(PAYMENT_API_URL + '/requestAccountDeletion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: PHONE, reason: reason.slice(0, 300) }) });
+    const j = await r.json(); if (!j.ok) throw new Error(j.error || 'error');
+    alert('✅ تم استلام طلب حذف الحساب. سيتم حذف بياناتك خلال 7 أيام وسنؤكد لك عبر واتساب.');
+    localStorage.removeItem('salamPhone'); location.href = 'login.html';
+  } catch (e) { alert('تعذر إرسال الطلب: ' + e.message + '\nيمكنك طلب الحذف عبر واتساب 93000607'); }
+}
 function logout() { if (confirm('تسجيل الخروج؟')) { localStorage.removeItem('salamPhone'); location.href = 'login.html'; } }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
 loadClientData(); loadPayItems();

@@ -422,3 +422,21 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
   await addNotif({ icon: '⏸️', title: adds.length ? `إيقاف ${adds.length > 1 ? adds.length + ' أيام' : 'يوم'}` : 'إلغاء إيقاف', body, page: 'paused' });
   if (TG_TOKEN) await tgcore.notifyAdmins(db, tg, `⏸️ <b>${adds.length ? 'إيقاف تلقائي' : 'إلغاء إيقاف'}</b>\n\n<b>${r.childName || ''}</b>${adds.length ? '\nأيام الإيقاف: ' + adds.join('، ') : ''}${cancels.length ? '\nأُلغي: ' + cancels.join('، ') : ''}${r.reason ? '\n📝 ' + r.reason : ''}\n👤 ${chg.after.data().parentName || ''} · ${chg.after.id}\n(تم تمديد الاشتراك تلقائياً)`);
 });
+
+// Account deletion request (App Store requirement). The parent asks from the app; admins get Telegram + 🔔 and delete by hand.
+exports.requestAccountDeletion = fx.https.onRequest(async (req, res) => {
+  if (CORS(req, res)) return;
+  try {
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' });
+    const phone = norm((req.body || {}).phone); if (!/^[569]\d{7}$/.test(phone)) throw new Error('رقم الهاتف غير صحيح');
+    const portal = await db.collection('portal').doc(phone).get(); if (!portal.exists) throw new Error('هذا الرقم غير مسجّل');
+    const ref = db.collection('deletionRequests').doc(phone); const prev = await ref.get();
+    if (prev.exists && prev.data().status === 'pending') return res.json({ ok: true, already: true });
+    const p = portal.data(); const reason = String((req.body || {}).reason || '').slice(0, 300);
+    const kids = (p.kids || p.subscriptions || []).map(k => k.childName).filter(Boolean).join('، ');
+    await ref.set({ phone, parentName: p.parentName || '', kids, reason, status: 'pending', createdAt: admin.firestore.FieldValue.serverTimestamp() });
+    await addNotif({ icon: '🗑️', title: 'طلب حذف حساب', body: `${p.parentName || ''} · ${phone}${reason ? ' — ' + reason : ''}`, page: 'review' });
+    if (TG_TOKEN) await tgcore.notifyAdmins(db, tg, `🗑️ <b>طلب حذف حساب</b>\n\n👤 ${p.parentName || '-'} · ${phone}${kids ? '\n👦 ' + kids : ''}${reason ? '\n📝 ' + reason : ''}\n\nاحذف الاشتراكات والصور من لوحة الإدارة خلال 7 أيام ثم أبلغ ولي الأمر.`);
+    res.json({ ok: true });
+  } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
