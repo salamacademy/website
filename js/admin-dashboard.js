@@ -221,7 +221,8 @@ async function confirmApprove() {
   try {
     await db.collection('subscriptions').doc(id).update({ status: 'approved', amount, adminNote: note, approvedAt: firebase.firestore.FieldValue.serverTimestamp(), plannedStart: firebase.firestore.Timestamp.fromDate(start), plannedEnd: firebase.firestore.Timestamp.fromDate(end) });
     closeApprove(); await PortalSync.syncPhone(db, s.phone);
-    const msg = `السلام عليكم ${s.parentName} 👋\n\nيسعدنا إبلاغكم بالموافقة على تسجيل ${s.childName} في أكاديمية سلام 🏆\n\nالباقة: ${s.packageName}\nالرسوم الشهرية: ${amount} د.ك\nبداية الاشتراك: ${start.toLocaleDateString('ar-KW')}${note ? '\n' + note : ''}\n\nلإتمام التسجيل يرجى سداد الرسوم عبر بوابة الأعضاء أو التحويل، وسيتم تفعيل الاشتراك فور استلام الدفع.\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
+    const payLink = `${SITE_BASE}client/login.html?phone=${s.phone}&go=pay`; // opens the pay page with this package already selected
+    const msg = `السلام عليكم ${s.parentName} 👋\n\nيسعدنا إبلاغكم بالموافقة على تسجيل ${s.childName} في أكاديمية سلام 🏆\n\n📦 الباقة: ${s.packageName}\n💰 الرسوم الشهرية: ${amount} د.ك\n📅 بداية الاشتراك: ${start.toLocaleDateString('ar-KW')}\n🔢 عدد الحصص: ${Classes.perMonth(s.packageType)} حصة${note ? '\n' + note : ''}\n\nلإتمام التسجيل ادفع الرسوم عبر كي نت من هذا الرابط (يفتح صفحة الدفع مباشرة):\n${payLink}\n\nسيتم تفعيل الاشتراك فور استلام الدفع.\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
     window.open('https://wa.me/965' + s.phone + '?text=' + encodeURIComponent(msg), '_blank');
     showToast('✅ تمت الموافقة'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
@@ -559,6 +560,8 @@ function sendRenewalLink(id) {
   const days = calcDaysLeft(s); const end = toD(s.subscriptionEnd), start = toD(s.subscriptionStart);
   const rn = Classes.renewal(s), newStart = Classes.toDate(rn.first), newEnd = Classes.toDate(rn.end); // next month of classes
   const link = `${SITE_BASE}client/login.html?phone=${s.phone}&go=pay`;
-  const msg = `السلام عليكم ${s.parentName} 👋\n\n${s.status === 'expired' || (days !== null && days < 0) ? `انتهى اشتراك ${s.childName} في أكاديمية سلام بتاريخ ${fmtDate(end)}.` : `اشتراك ${s.childName} في أكاديمية سلام ينتهي بعد ${days} يوم (${fmtDate(end)}).`}\n\n📦 الباقة: ${s.packageName || PKG_NAMES[s.packageType] || ''}\n💰 الرسوم: ${s.amount} د.ك\n📅 الاشتراك القادم: ${Classes.perMonth(s.packageType)} حصة متتالية من ${newStart.toLocaleDateString('ar-KW')} إلى ${newEnd.toLocaleDateString('ar-KW')} (مع ${Classes.pauses(s.packageType) === 1 ? 'إيقاف حصة واحدة' : Classes.pauses(s.packageType) + ' إيقافات'})\n\nللتجديد عبر كي نت اضغط الرابط (يفتح حسابك مباشرة):\n${link}\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
+  // no end dates in the message (admin request) — only how many classes are left, the next start date and the number of classes
+  const left = s.status === 'expired' || (days !== null && days < 0) ? 0 : Classes.left(s);
+  const msg = `السلام عليكم ${s.parentName} 👋\n\n${left === null ? `حان موعد تجديد اشتراك ${s.childName} في أكاديمية سلام.` : left <= 0 ? `انتهى اشتراك ${s.childName} في أكاديمية سلام.` : `متبقٍ في اشتراك ${s.childName} ${left === 1 ? 'حصة واحدة' : left === 2 ? 'حصتان' : left + ' حصص'} في أكاديمية سلام.`}\n\n📦 الباقة: ${s.packageName || PKG_NAMES[s.packageType] || ''}\n💰 الرسوم: ${s.amount} د.ك\n📅 بداية الاشتراك القادم: ${newStart.toLocaleDateString('ar-KW')}\n🔢 عدد الحصص: ${Classes.perMonth(s.packageType)} حصة (مع ${Classes.pauses(s.packageType) === 1 ? 'إيقاف حصة واحدة' : Classes.pauses(s.packageType) + ' إيقافات'})\n\nللتجديد عبر كي نت اضغط الرابط (يفتح حسابك مباشرة):\n${link}\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
   window.open('https://wa.me/965' + String(s.phone).replace(/\D/g, '') + '?text=' + encodeURIComponent(msg), '_blank');
 }
