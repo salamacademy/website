@@ -222,7 +222,7 @@ async function confirmApprove() {
     await db.collection('subscriptions').doc(id).update({ status: 'approved', amount, adminNote: note, approvedAt: firebase.firestore.FieldValue.serverTimestamp(), plannedStart: firebase.firestore.Timestamp.fromDate(start), plannedEnd: firebase.firestore.Timestamp.fromDate(end) });
     closeApprove(); await PortalSync.syncPhone(db, s.phone);
     const payLink = `${SITE_BASE}client/login.html?phone=${s.phone}&go=pay`; // opens the pay page with this package already selected
-    const msg = `السلام عليكم ${s.parentName} 👋\n\nيسعدنا إبلاغكم بالموافقة على تسجيل ${s.childName} في أكاديمية سلام 🏆\n\n📦 الباقة: ${s.packageName}\n💰 الرسوم الشهرية: ${amount} د.ك\n📅 بداية الاشتراك: ${start.toLocaleDateString('ar-KW')}\n🔢 عدد الحصص: ${Classes.perMonth(s.packageType)} حصة${note ? '\n' + note : ''}\n\nلإتمام التسجيل ادفع الرسوم عبر كي نت من هذا الرابط (يفتح صفحة الدفع مباشرة):\n${payLink}\n\nسيتم تفعيل الاشتراك فور استلام الدفع.\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
+    const msg = `السلام عليكم ${s.parentName} 👋\n\nيسعدنا إبلاغكم بالموافقة على تسجيل ${s.childName} في أكاديمية سلام 🏆\n\n📦 الباقة: ${s.packageName}\n💰 الرسوم الشهرية: ${amount} د.ك\n📅 بداية الاشتراك: ${start.toLocaleDateString('ar-KW')}\n🔢 عدد الحصص: ${classTxt(s.packageType)}\n⏸️ يمكنكم ${pauseTxt(s.packageType)} عبر حسابكم${note ? '\n' + note : ''}\n\nلإتمام التسجيل ادفع الرسوم عبر كي نت من هذا الرابط (يفتح صفحة الدفع مباشرة):\n${payLink}\n\nسيتم تفعيل الاشتراك فور استلام الدفع.\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
     window.open('https://wa.me/965' + s.phone + '?text=' + encodeURIComponent(msg), '_blank');
     showToast('✅ تمت الموافقة'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
@@ -239,12 +239,12 @@ async function rejectRequest(id) {
 }
 async function activateSubscription(id) {
   const s = allSubscriptions.find(x => x.id === id); if (!s) return;
-  if (!confirm(`تأكيد استلام الدفع وتفعيل اشتراك ${s.childName} (${Classes.perMonth(s.packageType)} حصة)؟`)) return;
+  if (!confirm(`تأكيد استلام الدفع وتفعيل اشتراك ${s.childName} (${classTxt(s.packageType)})؟`)) return;
   const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const pl = classPlan(Classes.key(start), s.packageType), end = Classes.toDate(pl.end);
   try {
     await db.collection('subscriptions').doc(id).update({ ...sportEndsTs(pl), status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauses: Classes.closurePauses(closedFor(s.packageType), Classes.key(start), Classes.key(end)), pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
     await recordIncomeForSub(s, s.amount); await PortalSync.syncPhone(db, s.phone);
-    sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, end); showToast('✅ تم التفعيل'); await loadAllData();
+    sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, start, s.packageType); showToast('✅ تم التفعيل'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
 }
 
@@ -392,7 +392,7 @@ async function saveSubscription(e) {
     pendingAddId = null;
     withTimeout(recordIncomeForSub({ id: ref.id, ...data }, data.amount, data.paymentMethod, 'inc_' + ref.id)).catch(e => console.warn('income', e));
     withTimeout(PortalSync.syncPhone(db, data.phone)).catch(e => console.warn('sync', e));
-    sendWelcomeWhatsApp(data.phone, data.childName, data.packageName, end); showToast('✅ تمت الإضافة — يمكنك تعديله من ✏️ تعديل'); clearAddForm(); loadAllData(); go('members');
+    sendWelcomeWhatsApp(data.phone, data.childName, data.packageName, new Date(sv + 'T00:00:00'), data.packageType); showToast('✅ تمت الإضافة — يمكنك تعديله من ✏️ تعديل'); clearAddForm(); loadAllData(); go('members');
   } catch (err) { showToast(err.message === 'timeout' ? SLOW_MSG : '❌ ' + err.message); }
   finally { btn.disabled = false; btn.textContent = '💾 حفظ وتفعيل الاشتراك'; }
 }
@@ -405,8 +405,11 @@ function sendWhatsAppReminder(phone, child, days) {
   const msg = `مرحباً 👋\n\nنود تذكيركم بأن اشتراك ${child} في أكاديمية سلام ${days <= 0 ? 'قد انتهى' : `سينتهي خلال ${days} يوم`}.\n\nللتجديد يرجى التواصل معنا أو الدفع عبر بوابة الأعضاء.\n\nأكاديمية سلام 🏆\n93000607`;
   window.open('https://wa.me/965' + String(phone).replace(/\D/g, '') + '?text=' + encodeURIComponent(msg), '_blank');
 }
-function sendWelcomeWhatsApp(phone, child, pkg, end) {
-  const msg = `مرحباً 👋\n\nيسعدنا انضمام ${child} إلى أكاديمية سلام! 🏆\n\nالباقة: ${pkg}\nتاريخ الانتهاء: ${end.toLocaleDateString('ar-KW')}\n\nتابع تفاصيل الاشتراك من بوابة الأعضاء.\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪`;
+const classTxt = type => { const n = Classes.perMonth(type); return n >= 3 && n <= 10 ? n + " حصص" : n + " حصة"; };
+const pauseTxt = type => { const n = Classes.pauses(type); return n === 1 ? 'إيقاف حصة واحدة' : n === 2 ? 'إيقاف حصتين' : `إيقاف ${n} حصص`; };
+// Sent after payment/activation — start date + classes + allowed pauses, no end date (admin's request)
+function sendWelcomeWhatsApp(phone, child, pkg, start, type) {
+  const msg = `مرحباً 👋\n\nيسعدنا انضمام ${child} إلى أكاديمية سلام! 🏆\n\n📦 الباقة: ${pkg}\n🔢 عدد الحصص: ${classTxt(type)}\n📅 من تاريخ: ${start.toLocaleDateString('ar-KW')}\n⏸️ يمكنكم ${pauseTxt(type)} عبر الحساب الخاص بكم 🕊️💐\n\nتابع تفاصيل الاشتراك من بوابة الأعضاء.\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪`;
   window.open('https://wa.me/965' + String(phone).replace(/\D/g, '') + '?text=' + encodeURIComponent(msg), '_blank');
 }
 function sendBulkWhatsApp() {
@@ -562,6 +565,6 @@ function sendRenewalLink(id) {
   const link = `${SITE_BASE}client/login.html?phone=${s.phone}&go=pay`;
   // no end dates in the message (admin request) — only how many classes are left, the next start date and the number of classes
   const left = s.status === 'expired' || (days !== null && days < 0) ? 0 : Classes.left(s);
-  const msg = `السلام عليكم ${s.parentName} 👋\n\n${left === null ? `حان موعد تجديد اشتراك ${s.childName} في أكاديمية سلام.` : left <= 0 ? `انتهى اشتراك ${s.childName} في أكاديمية سلام.` : `متبقٍ في اشتراك ${s.childName} ${left === 1 ? 'حصة واحدة' : left === 2 ? 'حصتان' : left + ' حصص'} في أكاديمية سلام.`}\n\n📦 الباقة: ${s.packageName || PKG_NAMES[s.packageType] || ''}\n💰 الرسوم: ${s.amount} د.ك\n📅 بداية الاشتراك القادم: ${newStart.toLocaleDateString('ar-KW')}\n🔢 عدد الحصص: ${Classes.perMonth(s.packageType)} حصة (مع ${Classes.pauses(s.packageType) === 1 ? 'إيقاف حصة واحدة' : Classes.pauses(s.packageType) + ' إيقافات'})\n\nللتجديد عبر كي نت اضغط الرابط (يفتح حسابك مباشرة):\n${link}\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
+  const msg = `السلام عليكم ${s.parentName} 👋\n\n${left === null ? `حان موعد تجديد اشتراك ${s.childName} في أكاديمية سلام.` : left <= 0 ? `انتهى اشتراك ${s.childName} في أكاديمية سلام.` : `متبقٍ في اشتراك ${s.childName} ${left === 1 ? 'حصة واحدة' : left === 2 ? 'حصتان' : left + ' حصص'} في أكاديمية سلام.`}\n\n📦 الباقة: ${s.packageName || PKG_NAMES[s.packageType] || ''}\n💰 الرسوم: ${s.amount} د.ك\n📅 بداية الاشتراك القادم: ${newStart.toLocaleDateString('ar-KW')}\n🔢 عدد الحصص: ${classTxt(s.packageType)}\n⏸️ يمكنكم ${pauseTxt(s.packageType)} عبر حسابكم\n\nللتجديد عبر كي نت اضغط الرابط (يفتح حسابك مباشرة):\n${link}\n\nأكاديمية سلام — معاً نحو بناء جيل واثق ومميز 💪\n93000607`;
   window.open('https://wa.me/965' + String(s.phone).replace(/\D/g, '') + '?text=' + encodeURIComponent(msg), '_blank');
 }
