@@ -12,7 +12,7 @@ let notifReady = false;
 async function loadAllData() {
   try {
     const snap = await db.collection('subscriptions').orderBy('createdAt', 'desc').get();
-    allSubscriptions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allSubscriptions = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.demo); // demo:true = App Store review family, hidden everywhere
     const ps = await db.collection('portal').get(); allPortals = ps.docs.map(d => ({ id: d.id, ...d.data() }));
     renderStats(); renderRecent(); filterSubscriptions(); renderExpiring(); renderPaused(); renderReview(); expiryAlert();
     syncPortalsIfNeeded();

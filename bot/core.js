@@ -79,19 +79,19 @@ const pausedNow = s => { const a = toD(s.pauseStart), b = toD(s.pauseEnd); if (!
 
 const PKG_LABEL = { confidence: '🥋 بناء الثقة والكيوكشن', football: '⚽ كرة القدم', excellence: '⚡ باقة التميز (قدم + كيوكشن)', excellence_loyal: '🏅 أسرة سلام' };
 async function subscribers(db) {
-  const snap = await db.collection('subscriptions').get(); const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await db.collection('subscriptions').get(); const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.demo);
   const act = all.filter(s => s.status === 'active'); const by = {}; act.forEach(s => { const k = PKG_LABEL[s.packageType] || s.packageName || s.packageType; by[k] = (by[k] || 0) + 1; }); // the 4 packages
   return `👥 <b>المشتركين</b>\n\n✅ نشط: <b>${act.length}</b>\n📝 بانتظار المراجعة: <b>${all.filter(s => s.status === 'pending_review').length}</b>\n💳 بانتظار الدفع: <b>${all.filter(s => s.status === 'approved').length}</b>\n⚠️ تنتهي خلال 7 أيام: <b>${act.filter(s => { const d = daysLeft(s); return d !== null && d >= 0 && d <= 7; }).length}</b>\n⏸️ متوقف مؤقتاً: <b>${all.filter(pausedNow).length}</b>\n❌ منتهي: <b>${all.filter(s => s.status === 'expired').length}</b>\n\n<b>حسب الباقة:</b>\n` + Object.entries(by).map(([k, v]) => `• ${k}: ${v}`).join('\n');
 }
 async function expiring(db) {
   const snap = await db.collection('subscriptions').where('status', '==', 'active').get();
-  const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => { const d = daysLeft(s); return d !== null && d >= 0 && d <= 7; }).sort((a, b) => daysLeft(a) - daysLeft(b));
+  const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.demo).filter(s => { const d = daysLeft(s); return d !== null && d >= 0 && d <= 7; }).sort((a, b) => daysLeft(a) - daysLeft(b));
   if (!list.length) return '✅ لا توجد اشتراكات تنتهي خلال 7 أيام';
   return '⚠️ <b>تنتهي خلال 7 أيام</b>\n\n' + list.map(s => `• <b>${s.childName}</b> — ${daysLeft(s)} يوم\n  👤 ${s.parentName} · <a href="https://wa.me/965${s.phone}">${s.phone}</a> · ${s.packageName || ''}`).join('\n');
 }
 async function pauses(db) {
   const snap = await db.collection('subscriptions').where('pauseUsed', '==', true).get();
-  const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.pauseStart && toD(s.pauseEnd) >= new Date());
+  const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.demo).filter(s => s.pauseStart && toD(s.pauseEnd) >= new Date());
   if (!list.length) return '⏸️ لا توجد إيقافات حالية أو قادمة';
   return '⏸️ <b>الإيقافات المؤقتة</b>\n\n' + list.map(s => `• <b>${s.childName}</b> ${pausedNow(s) ? '(جارٍ)' : '(قادم)'}\n  من ${fmtD(s.pauseStart)} إلى ${fmtD(s.pauseEnd)}${s.pauseReason ? ' · ' + s.pauseReason : ''}\n  👤 ${s.parentName} · ${s.phone}`).join('\n');
 }

@@ -18,7 +18,7 @@ async function buildReport(db, month) {
     db.collection('subscriptions').get(),
     db.collection('payments').where('status', '==', 'paid').get()]);
   const tx = txS.docs.map(d => ({ id: d.id, ...d.data() }));
-  const subs = {}; subS.docs.forEach(d => subs[d.id] = { id: d.id, ...d.data() });
+  const subs = {}; subS.docs.forEach(d => { if (!d.data().demo) subs[d.id] = { id: d.id, ...d.data() }; });
   const pays = {}; payS.docs.forEach(d => pays[d.id] = { id: d.id, ...d.data() });
   const sum = a => a.reduce((x, t) => x + (+t.amount || 0), 0);
   const inc = tx.filter(t => t.type === 'income'), exp = tx.filter(t => t.type === 'expense');
@@ -102,7 +102,7 @@ async function postRecurring(db, admin, month) {
   const cur = rec.filter(t => (t.date || '').startsWith(month));
   const todo = list.filter(f => f.active !== false && !cur.some(x => x.fixedId === f.id || (!x.fixedId && x.category === f.category && x.note === f.name)));
   if (!todo.length) return 0;
-  const subs = (await db.collection('subscriptions').get()).docs.map(d => ({ id: d.id, ...d.data() })), b = db.batch();
+  const subs = (await db.collection('subscriptions').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.demo), b = db.batch();
   // who counts: active subscribers of perHeadPkgs (e.g. الكبتن: kyokushin package only), minus skipIds, plus addIds — edited by the admin in المالية
   const headsOf = f => { const skip = f.skipIds || [], add = f.addIds || [];
     const startKey = s => { const d = s.subscriptionStart && s.subscriptionStart.toDate ? s.subscriptionStart.toDate() : null; return d ? new Date(d.getTime() + 3 * 3600e3).toISOString().slice(0, 10) : ''; };

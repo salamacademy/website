@@ -112,7 +112,7 @@ exports.dailyReminders = fx.pubsub.schedule('0 9 * * *').timeZone('Asia/Kuwait')
   const snap = await db.collection('subscriptions').where('status', '==', 'active').get();
   const soon = [];
   for (const doc of snap.docs) {
-    const s = doc.data(); if (!s.subscriptionEnd) continue;
+    const s = doc.data(); if (!s.subscriptionEnd || s.demo) continue;
     const days = Math.ceil((s.subscriptionEnd.toDate() - now) / 864e5);
     if (days >= 0 && days <= 3) soon.push([days, `• <b>${s.childName}</b> — ${days === 0 ? 'ينتهي اليوم' : `متبقٍ ${days} يوم`} · ${s.phone}`]);
     if (days === 3 || days === 1) await sendTo(s.fcmTokens, '⏳ اشتراكك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, '/website/client/dashboard.html');
@@ -415,7 +415,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
     const cutoff = new Date(Date.now() - 60 * 864e5).toISOString(); // keep history short
     t.update(portalRef, { pauseRequests: reqs.filter(r => r.status === 'pending' || !r.decidedAt || r.decidedAt > cutoff) });
   });
-  const ok = done.filter(d => d.ok); if (!ok.length) return; // syncPortal refreshes the parent's view after the subscription write
+  const ok = done.filter(d => d.ok); if (!ok.length || (chg.after.data().kids || []).some(k => k.demo)) return; // demo family: no admin alerts // syncPortal refreshes the parent's view after the subscription write
   const fd = k => `${['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][new Date(k + 'T00:00:00Z').getUTCDay()]} ${+k.slice(8)}/${+k.slice(5, 7)}`;
   const r = ok[0].r, adds = ok.filter(d => d.r.type !== 'cancel').map(d => fd(d.r.start)), cancels = ok.filter(d => d.r.type === 'cancel').map(d => fd(d.r.start));
   const body = `${r.childName || ''}${adds.length ? ' — إيقاف: ' + adds.join('، ') : ''}${cancels.length ? ' — إلغاء: ' + cancels.join('، ') : ''}${r.reason ? ' · ' + r.reason : ''}`;
@@ -433,6 +433,7 @@ exports.requestAccountDeletion = fx.https.onRequest(async (req, res) => {
     const ref = db.collection('deletionRequests').doc(phone); const prev = await ref.get();
     if (prev.exists && prev.data().status === 'pending') return res.json({ ok: true, already: true });
     const p = portal.data(); const reason = String((req.body || {}).reason || '').slice(0, 300);
+    if ((p.kids || []).some(k => k.demo)) return res.json({ ok: true }); // App Store review family: confirm, but keep the account and don't alert admins
     const kids = (p.kids || p.subscriptions || []).map(k => k.childName).filter(Boolean).join('، ');
     await ref.set({ phone, parentName: p.parentName || '', kids, reason, status: 'pending', createdAt: admin.firestore.FieldValue.serverTimestamp() });
     await addNotif({ icon: '🗑️', title: 'طلب حذف حساب', body: `${p.parentName || ''} · ${phone}${reason ? ' — ' + reason : ''}`, page: 'review' });
