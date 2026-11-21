@@ -53,7 +53,14 @@ function go(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page === page));
   document.querySelectorAll('.tab[data-page]').forEach(t => t.classList.toggle('on', t.dataset.page === page));
   $('pageTitle').textContent = TITLES[page] || '';
+  if (page === 'renew') return setTimeout(scrollToPayBtn, 60); // ادفع → straight down to the UPayment button
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+// bring total + terms + UPayment button into view, above the bottom tab bar
+function scrollToPayBtn() {
+  const b = $('payBtn'), bar = document.querySelector('.tabbar'); if (!b) return;
+  const y = b.getBoundingClientRect().bottom + window.scrollY - window.innerHeight + (bar ? bar.offsetHeight : 0) + 24;
+  window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
 }
 function showSection(n) { go(n); }
 
@@ -146,6 +153,7 @@ async function loadPayItems() {
   try { const snap = await db.collection('payItems').where('active', '==', true).get(); payItems = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0)); }
   catch (e) { console.warn('payItems', e); payItems = []; }
   renderPayGrid();
+  if (document.querySelector('.page.active')?.dataset.page === 'renew') scrollToPayBtn(); // grid arrived after ادفع → button moved down
 }
 function suggestedItem(sub) { if (!sub) return null; return payItems.find(i => i.packageType && sub.packageType && i.packageType === sub.packageType) || null; }
 // Payment only after the admin approves the registration (approved / active / expired renewals)
@@ -195,8 +203,9 @@ function renderTerms() {
   const lines = termsLines(), txt = lines.join('|');
   box.style.display = 'block';
   if (txt === termsShown) return; // keep the checkbox as it is while typing the amount
-  termsShown = txt; termsOk = false; // terms changed → accept again
-  box.innerHTML = `<b>📋 قبل الدفع — شروط الاشتراك</b><ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul><label><input type="checkbox" id="termsChk" onchange="termsOk=this.checked;updateTotal()"/> <span>قرأت الشروط وأوافق عليها</span></label>`;
+  // terms changed → accept again. Packages need an explicit tick; anything else (t-shirt, gear, other amount) comes pre-ticked
+  termsShown = txt; termsOk = !cartPackages().length;
+  box.innerHTML = `<b>📋 قبل الدفع — شروط الاشتراك</b><ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul><label><input type="checkbox" id="termsChk" ${termsOk ? 'checked' : ''} onchange="termsOk=this.checked;updateTotal()"/> <span>قرأت الشروط وأوافق عليها</span></label>`;
 }
 function setFor(id, val) { customFor[id] = val; if (!cart[id]) cart[id] = 1; renderPayGrid(); }
 function setAmt(id, val) { customAmt[id] = val; if (!cart[id]) cart[id] = 1; updateTotal(); } // no re-render → keyboard stays open
@@ -359,6 +368,7 @@ function renderKidSwitch() {
   const el = $('kidSwitch'); if (!el) return;
   const p = kids[0] || {}; const addHref = 'register.html?' + new URLSearchParams({ parent: p.parentName || portalDoc?.parentName || '', phone: PHONE, email: p.email || '' }).toString();
   const link = $('addKidLink'); if (link) link.href = addHref;
+  document.body.classList.toggle('has-kids', kids.length >= 2); // css: the home card stops tucking under the header so it can't cover the kid chips
   if (kids.length < 2) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
   el.innerHTML = kids.map((s, i) => `<button class="kid ${i === kidIdx ? 'on' : ''}" onclick="selectKid(${i})"><span class="av">${/^data:image\//.test(s.photo || '') ? `<img src="${s.photo}" alt="">` : '👦'}</span>${(s.childName || '').split(' ')[0]}<span class="st ${kidDot(s)}"></span></button>`).join('') + `<a class="kid add" href="${addHref}"><span class="av">➕</span>مشترك آخر</a>`;

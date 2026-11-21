@@ -415,3 +415,6 @@ body.app-body,body.app-body.admin{background:#EEF1EA}
 .idc-info{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:.82rem}
 .idc-info>b{font-size:1.05rem;font-weight:900}
 .idc-info .chip{align-self:flex-start;margin-top:2px}
+
+/* several kids: the chips row sits between the header and the home card, so the card must not tuck up over it */
+body.has-kids .ring-card{margin-top:12px}
