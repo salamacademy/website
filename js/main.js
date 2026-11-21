@@ -72,7 +72,7 @@ function animateCount(el, target, duration = 1800) {
     if (!start) start = timestamp;
     const progress = Math.min((timestamp - start) / duration, 1);
     const eased = 1 - Math.pow(1 - progress, 3);
-    el.textContent = Math.floor(eased * target).toLocaleString('ar');
+    el.textContent = (el.dataset.prefix || '') + Math.floor(eased * target).toLocaleString('ar'); // data-prefix="+" → "+3,400"
     if (progress < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
