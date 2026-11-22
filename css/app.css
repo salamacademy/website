@@ -418,3 +418,10 @@ body.app-body,body.app-body.admin{background:#EEF1EA}
 
 /* several kids: the chips row sits between the header and the home card, so the card must not tuck up over it */
 body.has-kids .ring-card{margin-top:12px}
+
+/* admin edit: extra pauses the parent can use (no date) */
+.extra-pauses{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:10px 12px;border-radius:14px;background:var(--green-xpale,#F1F8F1);border:1.5px dashed rgba(46,125,50,.35)}
+.extra-pauses small{display:block;color:var(--text-light);font-size:.75rem;font-weight:700;margin-top:2px}
+.extra-pauses .qty{display:flex;align-items:center;gap:10px}
+.extra-pauses .qty button{width:34px;height:34px;border-radius:50%;border:0;background:#fff;font-size:1.1rem;font-weight:800;color:var(--green,#1B5E20);box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.extra-pauses .qty b{min-width:18px;text-align:center;font-size:1.1rem}

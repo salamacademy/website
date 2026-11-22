@@ -77,7 +77,7 @@ async function applyClosure(btn) {
   btn.disabled = true; btn.textContent = '⏳ جاري التطبيق...';
   const TS = firebase.firestore.Timestamp, affected = plan.map(p => ({ subId: p.s.id, phone: p.s.phone || '', childName: p.s.childName || '', days: p.days.length, own: p.own.length }));
   const writes = [b => b.set(ref, { ...c, active: true, affected, createdAt: firebase.firestore.FieldValue.serverTimestamp(), by: auth.currentUser?.email || 'admin' })];
-  plan.forEach(p => writes.push(b => b.update(db.collection('subscriptions').doc(p.s.id), { pauses: p.pauses, pauseUsed: Classes.own(p.pauses).length >= Classes.pauses(p.s.packageType), ...(p.sportEnds ? { sportEnds: p.sportEnds } : {}), subscriptionEnd: TS.fromDate(Classes.toDate(p.end)), daysRemaining: Math.max(0, Math.ceil((Classes.toDate(p.end) - new Date()) / 864e5)) })));
+  plan.forEach(p => writes.push(b => b.update(db.collection('subscriptions').doc(p.s.id), { pauses: p.pauses, pauseUsed: Classes.own(p.pauses).length >= Classes.pauseLimit(p.s), ...(p.sportEnds ? { sportEnds: p.sportEnds } : {}), subscriptionEnd: TS.fromDate(Classes.toDate(p.end)), daysRemaining: Math.max(0, Math.ceil((Classes.toDate(p.end) - new Date()) / 864e5)) })));
   try { await commitChunks(writes); closeClosure(); showToast(`✅ تم الإيقاف العام — ${plan.length} مشترك`); loadAllData(); }
   catch (e) { showToast(e.message === 'timeout' ? SLOW_MSG : '❌ ' + e.message); }
   finally { btn.disabled = false; previewClosure(); }
@@ -94,7 +94,7 @@ async function undoClosure(id, btn) {
       if (p.wasOwn) { const { closure, closureId, wasOwn, ownReason, ...rest } = p; keep.push({ ...rest, reason: ownReason || '' }); } // back to the parent's own pause
       else st = Classes.move(st, s.packageType, Classes.sportOf(p.date, s.packageType), -1); // one class less at the end (of that sport)
     });
-    return b => b.update(db.collection('subscriptions').doc(s.id), { pauses: keep, pauseUsed: Classes.own(keep).length >= Classes.pauses(s.packageType), ...(st.end ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(Classes.toDate(st.end)), daysRemaining: Math.max(0, Math.ceil((Classes.toDate(st.end) - new Date()) / 864e5)), ...(st.sportEnds ? { sportEnds: st.sportEnds } : {}) } : {}) });
+    return b => b.update(db.collection('subscriptions').doc(s.id), { pauses: keep, pauseUsed: Classes.own(keep).length >= Classes.pauseLimit(s), ...(st.end ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(Classes.toDate(st.end)), daysRemaining: Math.max(0, Math.ceil((Classes.toDate(st.end) - new Date()) / 864e5)), ...(st.sportEnds ? { sportEnds: st.sportEnds } : {}) } : {}) });
   });
   writes.push(b => b.update(db.collection('closures').doc(id), { active: false, undoneAt: firebase.firestore.FieldValue.serverTimestamp() }));
   try { await commitChunks(writes); showToast('↩️ تم إلغاء الإيقاف العام'); loadAllData(); }

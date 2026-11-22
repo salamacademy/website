@@ -76,7 +76,7 @@ function memberCard(s, opts = {}) {
   const st = ST[s.status] || ['copper', s.status];
   const cl = s.status === 'active' && days !== null && days >= 0 ? clsLeft(s) : 0;
   const daysChip = s.status !== 'active' || days === null ? '' : days < 0 ? `<span class="chip bad">منتهي</span>` : `<span class="chip ${cl <= 2 ? 'bad' : cl <= 4 ? 'warn' : 'ok'}">🎯 ${cl} حصة متبقية</span>${sportChips(s)}`;
-  const paused = isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (Classes.own(pausesOf(s)).length ? `<span class="chip">⏸️ ${Classes.own(pausesOf(s)).length}/${Classes.pauses(s.packageType)}</span>` : '');
+  const paused = isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (Classes.own(pausesOf(s)).length ? `<span class="chip">⏸️ ${Classes.own(pausesOf(s)).length}/${Classes.pauseLimit(s)}</span>` : '');
   const actions = [];
   if (s.status === 'pending_review') actions.push(`<button class="abtn ok" onclick="openApprove('${s.id}')">✅ موافقة</button><button class="abtn bad" onclick="rejectRequest('${s.id}')">⛔ رفض</button>`);
   if (s.status === 'approved' || s.status === 'pending_payment') actions.push(`<button class="abtn ok" onclick="activateSubscription('${s.id}')">▶️ تفعيل</button>`);
@@ -131,23 +131,23 @@ function expiryAlert() {
 function pauseRequests() { const out = []; allPortals.forEach(p => (p.pauseRequests || []).forEach((r, i) => { if (r.status === 'pending') out.push({ ...r, phone: p.id, idx: i, parentName: p.parentName }); })); return out; }
 function renderPaused() {
   const reqs = pauseRequests();
-  const reqHtml = reqs.length ? `<div class="page-title" style="margin-top:0"><h3>🕒 طلبات إيقاف بانتظار الموافقة</h3><span>${reqs.length}</span></div>` + reqs.map(r => { const s = allSubscriptions.find(x => x.id === r.subId); const used = s ? Classes.own(pausesOf(s)).length : 0; return `<div class="mcard s-pending"><div class="mcard-top"><div><div class="mcard-name">${r.childName}</div><div class="mcard-sub">👤 ${r.parentName || ''} · <span dir="ltr">${r.phone}</span></div></div><span class="chip gold">🕒 طلب</span></div><div class="mcard-meta"><span class="chip info">📅 ${r.start}</span><span class="chip">يوم واحد</span><span class="chip ${used >= Classes.pauses(s?.packageType) ? 'bad' : ''}">مستخدم ${used}/${Classes.pauses(s?.packageType)}</span>${r.reason ? `<span class="chip">📝 ${r.reason}</span>` : ''}</div><div class="mcard-actions"><button class="abtn ok" style="flex:2" onclick="approvePause('${r.phone}',${r.idx})">✅ موافقة (+1 يوم)</button><button class="abtn bad" onclick="rejectPause('${r.phone}',${r.idx})">⛔ رفض</button><button class="abtn wa" onclick="window.open('https://wa.me/965${r.phone}','_blank')">💬</button></div></div>`; }).join('') + '<div class="page-title"><h3>⏸️ الإيقافات هذا الشهر</h3></div>' : '';
+  const reqHtml = reqs.length ? `<div class="page-title" style="margin-top:0"><h3>🕒 طلبات إيقاف بانتظار الموافقة</h3><span>${reqs.length}</span></div>` + reqs.map(r => { const s = allSubscriptions.find(x => x.id === r.subId); const used = s ? Classes.own(pausesOf(s)).length : 0; return `<div class="mcard s-pending"><div class="mcard-top"><div><div class="mcard-name">${r.childName}</div><div class="mcard-sub">👤 ${r.parentName || ''} · <span dir="ltr">${r.phone}</span></div></div><span class="chip gold">🕒 طلب</span></div><div class="mcard-meta"><span class="chip info">📅 ${r.start}</span><span class="chip">يوم واحد</span><span class="chip ${used >= Classes.pauseLimit(s) ? 'bad' : ''}">مستخدم ${used}/${Classes.pauseLimit(s)}</span>${r.reason ? `<span class="chip">📝 ${r.reason}</span>` : ''}</div><div class="mcard-actions"><button class="abtn ok" style="flex:2" onclick="approvePause('${r.phone}',${r.idx})">✅ موافقة (+1 يوم)</button><button class="abtn bad" onclick="rejectPause('${r.phone}',${r.idx})">⛔ رفض</button><button class="abtn wa" onclick="window.open('https://wa.me/965${r.phone}','_blank')">💬</button></div></div>`; }).join('') + '<div class="page-title"><h3>⏸️ الإيقافات هذا الشهر</h3></div>' : '';
   const list = allSubscriptions.filter(s => pausesOf(s).length).sort((a, b) => pausesOf(b).length - pausesOf(a).length);
-  document.getElementById('pausedList').innerHTML = reqHtml + (list.length ? list.map(s => `<div class="mcard ${isPausedNow(s) ? 's-paused' : ''}"><div class="mcard-top"><div><div class="mcard-name">${s.childName}</div><div class="mcard-sub">👤 ${s.parentName} · <span dir="ltr">${s.phone}</span></div></div>${isPausedNow(s) ? '<span class="chip info">⏸️ متوقف اليوم</span>' : `<span class="chip">${Classes.own(pausesOf(s)).length}/${Classes.pauses(s.packageType)}${pausesOf(s).some(p => p.closure) ? " · 🏖️" : ""}</span>`}</div>
+  document.getElementById('pausedList').innerHTML = reqHtml + (list.length ? list.map(s => `<div class="mcard ${isPausedNow(s) ? 's-paused' : ''}"><div class="mcard-top"><div><div class="mcard-name">${s.childName}</div><div class="mcard-sub">👤 ${s.parentName} · <span dir="ltr">${s.phone}</span></div></div>${isPausedNow(s) ? '<span class="chip info">⏸️ متوقف اليوم</span>' : `<span class="chip">${Classes.own(pausesOf(s)).length}/${Classes.pauseLimit(s)}${pausesOf(s).some(p => p.closure) ? " · 🏖️" : ""}</span>`}</div>
       <div class="mcard-meta">${pausesOf(s).map(p => `<span class="chip ${p.date === dayKey(new Date()) ? 'info' : p.date > dayKey(new Date()) ? 'gold' : 'ok'}">${p.closure ? '🏖️' : '📅'} ${p.date}${p.reason ? ' · ' + p.reason : ''}</span>`).join('')}<span class="chip copper">${PKG_NAMES[s.packageType] || ''}</span></div>
       <div class="mcard-actions"><button class="abtn primary" onclick="openEditModal('${s.id}',true)">✏️ تعديل الإيقافات</button><button class="abtn wa" onclick="window.open('https://wa.me/965${s.phone}','_blank')">💬 واتساب</button></div></div>`).join('') : emptyBox('⏸️', 'لا توجد إيقافات'));
 }
 async function approvePause(phone, idx) {
   const p = allPortals.find(x => x.id === phone); const r = p?.pauseRequests?.[idx]; if (!r) return;
   const s = allSubscriptions.find(x => x.id === r.subId); if (!s) return showToast('❌ الاشتراك غير موجود');
-  const used = pausesOf(s); if (Classes.own(used).length >= Classes.pauses(s.packageType)) return showToast(`❌ استنفد ${Classes.pauses(s.packageType)} إيقافات في هذا الاشتراك`);
+  const used = pausesOf(s); if (Classes.own(used).length >= Classes.pauseLimit(s)) return showToast(`❌ استنفد ${Classes.pauseLimit(s)} إيقافات في هذا الاشتراك`);
   if (!confirm(`الموافقة على إيقاف ${s.childName} يوم ${r.start}؟ ستُضاف حصة في نهاية الاشتراك.`)) return;
   const mv = s.subscriptionEnd ? Classes.move(Classes.stateOf(s), s.packageType, Classes.sportOf(r.start, s.packageType), 1) : null, ne = mv ? Classes.toDate(mv.end) : null; // +1 class of that day's sport
   const reqs = p.pauseRequests.slice(); reqs[idx] = { ...r, status: 'approved', decidedAt: new Date().toISOString() };
   try {
-    await db.collection('subscriptions').doc(s.id).update({ pauses: [...used, { date: r.start, reason: r.reason || '', approvedAt: new Date().toISOString() }], pauseUsed: Classes.own(used).length + 1 >= Classes.pauses(s.packageType), ...(ne ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne), ...(mv.sportEnds ? { sportEnds: mv.sportEnds } : {}) } : {}) });
+    await db.collection('subscriptions').doc(s.id).update({ pauses: [...used, { date: r.start, reason: r.reason || '', approvedAt: new Date().toISOString() }], pauseUsed: Classes.own(used).length + 1 >= Classes.pauseLimit(s), ...(ne ? { subscriptionEnd: firebase.firestore.Timestamp.fromDate(ne), ...(mv.sportEnds ? { sportEnds: mv.sportEnds } : {}) } : {}) });
     await db.collection('portal').doc(phone).update({ pauseRequests: reqs }); await PortalSync.syncPhone(db, phone);
-    window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`تمت الموافقة على إيقاف اشتراك ${s.childName} يوم ${r.start} ✅\nتمت إضافة حصة في نهاية الاشتراك${ne ? ' — آخر حصة الآن ' + ne.toLocaleDateString('ar-KW') : ''}.\nالمتبقي من الإيقافات هذا الشهر: ${Math.max(0, Classes.pauses(s.packageType) - 1 - Classes.own(used).length)}\nأكاديمية سلام`), '_blank');
+    window.open('https://wa.me/965' + phone + '?text=' + encodeURIComponent(`تمت الموافقة على إيقاف اشتراك ${s.childName} يوم ${r.start} ✅\nتمت إضافة حصة في نهاية الاشتراك${ne ? ' — آخر حصة الآن ' + ne.toLocaleDateString('ar-KW') : ''}.\nالمتبقي من الإيقافات هذا الشهر: ${Math.max(0, Classes.pauseLimit(s) - 1 - Classes.own(used).length)}\nأكاديمية سلام`), '_blank');
     showToast('✅ تمت الموافقة'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
 }
@@ -242,7 +242,7 @@ async function activateSubscription(id) {
   if (!confirm(`تأكيد استلام الدفع وتفعيل اشتراك ${s.childName} (${classTxt(s.packageType)})؟`)) return;
   const start = s.status === 'expired' ? new Date() : (toD(s.plannedStart) || new Date()); const pl = classPlan(Classes.key(start), s.packageType), end = Classes.toDate(pl.end);
   try {
-    await db.collection('subscriptions').doc(id).update({ ...sportEndsTs(pl), status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, pauses: Classes.closurePauses(closedFor(s.packageType), Classes.key(start), Classes.key(end)), pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
+    await db.collection('subscriptions').doc(id).update({ ...sportEndsTs(pl), status: 'active', subscriptionStart: firebase.firestore.Timestamp.fromDate(start), subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), daysRemaining: 30, paidAt: firebase.firestore.FieldValue.serverTimestamp(), pauseUsed: false, extraPauses: firebase.firestore.FieldValue.delete(), pauses: Classes.closurePauses(closedFor(s.packageType), Classes.key(start), Classes.key(end)), pauseStart: firebase.firestore.FieldValue.delete(), pauseEnd: firebase.firestore.FieldValue.delete() });
     await recordIncomeForSub(s, s.amount); await PortalSync.syncPhone(db, s.phone);
     sendWelcomeWhatsApp(s.phone, s.childName, s.packageName, start, s.packageType); showToast('✅ تم التفعيل'); await loadAllData();
   } catch (e) { showToast('❌ ' + e.message); }
@@ -287,7 +287,9 @@ function sportChips(s) {
   const c = Classes.leftBy(s) || {}; return Classes.sportsOf(s.packageType).map(sp => `<span class="chip">${Classes.SPORTS[sp].icon} ${c[sp] || 0} ${Classes.SPORTS[sp].name}</span>`).join('');
 }
 function shiftEditEnd(days) { const e = document.getElementById('editEndDate'); if (e.value) e.value = addDaysIso(e.value, days); }
-const editPauseMax = () => Classes.pauses(document.getElementById('editPackage').value);
+let editExtra = 0; // extra pauses for this subscription (no date — the parent chooses)
+const editPauseMax = () => Classes.pauses(document.getElementById('editPackage').value) + editExtra;
+function setEditExtra(d) { editExtra = Math.max(0, Math.min(10, editExtra + d)); document.getElementById('editExtra').textContent = editExtra; renderEditPauses(); }
 function addEditPause() {
   if (Classes.own(editPauses).length >= editPauseMax() && !confirm(`استخدم ${Classes.own(editPauses).length} من ${editPauseMax()} إيقاف هذا الشهر. إضافة إيقاف آخر على أي حال؟`)) return;
   editPauses.push({ date: todayIso(), reason: '', approvedAt: new Date().toISOString(), by: 'admin' }); editClassMove(editSportOf(todayIso()), 1); renderEditPauses();
@@ -302,7 +304,7 @@ function openEditModal(id, toPauses) {
   fillEditPackages(s); set('editAmount', s.amount);
   set('editStatus', s.status || 'active'); set('editNotes', s.notes);
   set('editStartDate', isoDate(s.subscriptionStart)); set('editEndDate', isoDate(s.subscriptionEnd));
-  editPauses = pausesOf(s).map(p => ({ ...p })); editSt = Classes.stateOf(s); renderEditPauses(); loadEditPhoto(s);
+  editPauses = pausesOf(s).map(p => ({ ...p })); editSt = Classes.stateOf(s); editExtra = Math.max(0, +s.extraPauses || 0); document.getElementById('editExtra').textContent = editExtra; renderEditPauses(); loadEditPhoto(s);
   document.getElementById('editModal').classList.add('open');
   const sh = document.querySelector('#editModal .sheet'); if (toPauses) setTimeout(() => document.getElementById('editPauses').scrollIntoView({ block: 'center' }), 50); else sh.scrollTop = 0;
 }
@@ -357,7 +359,8 @@ async function saveEdit(btn) {
   const est = editState(); if (ev) Object.assign(upd, est.sportEnds && est.end === ev ? { sportEnds: est.sportEnds } : { sportEnds: firebase.firestore.FieldValue.delete() }); // per-sport last classes
   if (ev) { upd.subscriptionEnd = tsFromIso(ev); upd.daysRemaining = Math.max(0, Math.ceil((new Date(ev + 'T00:00:00Z') - new Date()) / 864e5)); }
   const pauses = editPauses.filter(p => p.date).sort((a, b) => a.date.localeCompare(b.date));
-  if (JSON.stringify(pauses) !== JSON.stringify(pausesOf(s))) { upd.pauses = pauses; upd.pauseUsed = Classes.own(pauses).length >= Classes.pauses(document.getElementById('editPackage').value); upd.pauseStart = firebase.firestore.FieldValue.delete(); upd.pauseEnd = firebase.firestore.FieldValue.delete(); }
+  if (editExtra !== Math.max(0, +s.extraPauses || 0)) { upd.extraPauses = editExtra; upd.pauseUsed = Classes.own(pauses).length >= editPauseMax(); }
+  if (JSON.stringify(pauses) !== JSON.stringify(pausesOf(s))) { upd.pauses = pauses; upd.pauseUsed = Classes.own(pauses).length >= editPauseMax(); upd.pauseStart = firebase.firestore.FieldValue.delete(); upd.pauseEnd = firebase.firestore.FieldValue.delete(); }
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
   try {
     await withTimeout(db.collection('subscriptions').doc(id).update(upd));

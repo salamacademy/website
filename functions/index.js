@@ -271,7 +271,7 @@ async function renewSub(subRef, s, orderId, pkg) {
   const t = (pkg && pkg.packageType) || s.packageType, closed = Classes.closedDays(await upcomingClosures().catch(() => []), t);
   const now = new Date(), r = Classes.renewal({ ...s, ...(pkg || {}) }, 0, closed), end = Classes.toDate(r.end);
   const keep = Classes.closurePauses(closed, Classes.today(), r.end); // closure days inside the old + new period
-  await subRef.update({ status: 'active', ...(pkg || {}), subscriptionStart: admin.firestore.Timestamp.fromDate(Classes.toDate(r.start)), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: Math.ceil((end - now) / 864e5), classesPerMonth: Classes.perMonth((pkg && pkg.packageType) || s.packageType), paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', pauseUsed: false, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId, pauses: keep, sportEnds: r.sportEnds || admin.firestore.FieldValue.delete() });
+  await subRef.update({ status: 'active', ...(pkg || {}), subscriptionStart: admin.firestore.Timestamp.fromDate(Classes.toDate(r.start)), subscriptionEnd: admin.firestore.Timestamp.fromDate(end), daysRemaining: Math.ceil((end - now) / 864e5), classesPerMonth: Classes.perMonth((pkg && pkg.packageType) || s.packageType), paidAt: admin.firestore.FieldValue.serverTimestamp(), extraPauses: admin.firestore.FieldValue.delete(), paymentMethod: 'upayment', pauseUsed: false, pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), lastPaymentId: orderId, pauses: keep, sportEnds: r.sportEnds || admin.firestore.FieldValue.delete() });
 }
 // UPayment does not send its fee, so it is computed from the contract rates in settings/finance.upaymentFees
 // { knet: { fixed, pct }, card: { fixed, pct } } — KNET / Apple Pay (KNET) vs credit cards / Apple Pay (card)
@@ -400,7 +400,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
           else if (endKey && r.start > endKey) note = 'بعد نهاية الاشتراك';
           else if (!(TRAIN_DAYS[s.packageType] || [6, 0, 1, 2, 3, 4]).includes(dow)) note = 'ليس من أيام تدريب الباقة';
           else if (cur.pauses.some(p => p.date === r.start)) note = 'هذا اليوم موقوف مسبقاً';
-          else if (Classes.own(cur.pauses).length >= Classes.pauses(s.packageType)) note = s.packageType === 'football' ? 'كرة القدم: إيقاف واحد فقط في الشهر' : `استُخدمت الإيقافات المسموحة (${Classes.pauses(s.packageType)})`;
+          else if (Classes.own(cur.pauses).length >= Classes.pauseLimit(s)) note = Classes.pauseLimit(s) === 1 ? 'كرة القدم: إيقاف واحد فقط في الشهر' : `استُخدمت الإيقافات المسموحة (${Classes.pauseLimit(s)})`;
           else { cur.pauses.push({ date: r.start, reason: r.reason || '', approvedAt: now, by: 'parent' }); cur.st = Classes.move(cur.st, s.packageType, sp, 1); } // +1 class at the end
         }
         if (!note) upd[r.subId] = cur;
@@ -410,7 +410,7 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
     }
     for (const [id, u] of Object.entries(upd)) {
       const pauses = u.pauses.sort((a, b) => a.date.localeCompare(b.date));
-      t.update(subs[id].ref, { pauses, pauseUsed: Classes.own(pauses).length >= Classes.pauses(subs[id].s.packageType), pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.st.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(Classes.toDate(u.st.end)), daysRemaining: Math.max(0, Math.ceil((Classes.toDate(u.st.end) - new Date()) / 864e5)) } : {}), ...(u.st.sportEnds ? { sportEnds: u.st.sportEnds } : {}) });
+      t.update(subs[id].ref, { pauses, pauseUsed: Classes.own(pauses).length >= Classes.pauseLimit(subs[id].s), pauseStart: admin.firestore.FieldValue.delete(), pauseEnd: admin.firestore.FieldValue.delete(), ...(u.st.end ? { subscriptionEnd: admin.firestore.Timestamp.fromDate(Classes.toDate(u.st.end)), daysRemaining: Math.max(0, Math.ceil((Classes.toDate(u.st.end) - new Date()) / 864e5)) } : {}), ...(u.st.sportEnds ? { sportEnds: u.st.sportEnds } : {}) });
     }
     const cutoff = new Date(Date.now() - 60 * 864e5).toISOString(); // keep history short
     t.update(portalRef, { pauseRequests: reqs.filter(r => r.status === 'pending' || !r.decidedAt || r.decidedAt > cutoff) });

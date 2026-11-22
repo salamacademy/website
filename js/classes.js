@@ -9,6 +9,7 @@
   const days = t => TRAIN_DAYS[t] || [6, 0, 1, 2, 3, 4];
   const perMonth = t => days(t).length * 4;            // football 4 · confidence 12 · excellence 16
   const pauses = t => t === 'football' ? 1 : /^excellence/.test(t || '') ? 4 : 3; // football 1 · excellence 4 · others 3
+  const pauseLimit = s => pauses(s && s.packageType) + Math.max(0, Math.floor(+(s && s.extraPauses) || 0)); // + extra pauses the admin gave this subscription (parent picks the days)
   const key = d => { if (!d) return ''; if (typeof d === 'string') return d.slice(0, 10); const x = d.toDate ? d.toDate() : new Date(d); return new Date(x.getTime() + 3 * 3600e3).toISOString().slice(0, 10); }; // Kuwait date
   const today = () => key(new Date());
   const add = (k, n) => { const d = new Date(k + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -84,5 +85,5 @@
   const own = ps => (Array.isArray(ps) ? ps : []).filter(p => !p.closure);
   // closure pauses to store for the period first … end
   const closurePauses = (m, first, end) => [...m.entries()].filter(([k]) => k >= first && k <= end).sort().map(([k, c]) => ({ date: k, reason: c.reason || 'إغلاق الأكاديمية', closure: true, closureId: c.id, by: 'academy' }));
-  return { TRAIN_DAYS, SPORTS, perMonth, pauses, key, today, add, isTrain, toDate, nth, next, prev, left, leftBy, renewal, closedDays, own, closurePauses, sportsOf, isSplit, sportOf, ends, move, stateOf, plan };
+  return { TRAIN_DAYS, SPORTS, perMonth, pauses, pauseLimit, key, today, add, isTrain, toDate, nth, next, prev, left, leftBy, renewal, closedDays, own, closurePauses, sportsOf, isSplit, sportOf, ends, move, stateOf, plan };
 });

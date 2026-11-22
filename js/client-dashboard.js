@@ -237,7 +237,7 @@ async function startPayment() {
 }
 
 // ---------- PAUSE: one-day pauses per subscription month (football 1, other packages 3) ----------
-const pauseMax = sub => sub ? Classes.pauses(sub.packageType) : 3;
+const pauseMax = sub => sub ? Classes.pauseLimit(sub) : 3;
 const dayKey = d => (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0];
 function pausesOf(s) { return Array.isArray(s.pauses) ? s.pauses : (s.pauseStart ? [{ date: dayKey(toD(s.pauseStart)) }] : []); }
 function isPausedNow(s) { const t = dayKey(new Date()); return pausesOf(s).some(p => p.date === t); }
