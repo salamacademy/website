@@ -92,6 +92,9 @@
     <div id="scheduleDisplay"></div>
   </section>
 
+  <!-- in-page confirm/notice (replaces browser confirm/alert, which some Android browsers block or hide) -->
+  <div class="sheet-bg" id="askBg" onclick="if(event.target===this)askDone(false)"><div class="sheet" style="text-align:center"><div class="sheet-grip"></div><h3 id="askTitle"></h3><p id="askMsg" style="white-space:pre-line;color:var(--text-mid);line-height:1.9;margin:8px 0 18px;font-weight:700"></p><button class="btn primary" id="askOk" onclick="askDone(true)">تأكيد</button><button class="btn ghost" id="askNo" onclick="askDone(false)">رجوع</button></div></div>
+
   <!-- ===== PAUSE ===== -->
   <section class="page" data-page="pause">
     <div class="page-title"><h3>⏸️ إيقاف مؤقت</h3></div>

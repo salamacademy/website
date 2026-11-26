@@ -309,26 +309,42 @@ function renderPauseCal(sub) {
 function togglePick(k) {
   const sub = currentSubscription; if (!sub) return;
   if (pickDays.has(k)) pickDays.delete(k);
-  else { const left = pauseMax(sub) - Classes.own(pausesOf(sub)).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return alert(left <= 0 ? (pauseMax(sub) === 1 ? 'استخدمت الإيقاف المسموح لهذا الشهر' : 'استخدمت الإيقافات الثلاثة لهذا الشهر') : `يمكنك اختيار ${left} ${left === 1 ? 'حصة' : 'حصص'} فقط`); pickDays.add(k); }
+  else { const left = pauseMax(sub) - Classes.own(pausesOf(sub)).length - pendingPausesFor(sub.id).length; if (pickDays.size >= left) return notice('⏸️ الإيقاف', left <= 0 ? (pauseMax(sub) === 1 ? 'استخدمت الإيقاف المسموح لهذا الاشتراك' : 'استخدمت الإيقافات المسموحة لهذا الاشتراك') : `يمكنك اختيار ${left} ${left === 1 ? 'حصة' : 'حصص'} فقط`); pickDays.add(k); }
   renderPauseCal(sub);
+  if (pickDays.size) { const b = $('pauseBtn'), r = b.getBoundingClientRect(), tb = document.querySelector('.tabbar'), lim = (tb ? tb.getBoundingClientRect().top : innerHeight) - 12; if (r.bottom > lim) { const to = scrollY + r.bottom - lim; scrollTo({ top: to, behavior: 'smooth' }); setTimeout(() => { if (Math.abs(scrollY - to) > 30) scrollTo(0, to); }, 700); } } // keep the confirm button in view (instant fallback where smooth scroll is ignored)
 }
+// in-page dialog — browser confirm()/alert() can be blocked or silently skipped on some Android browsers (Samsung Internet), which looks like a stuck pause page
+let askResolve = null;
+function ask(title, msg, ok = 'تأكيد', cancel = 'رجوع') {
+  const bg = $('askBg'); if (bg.parentElement !== document.body) document.body.appendChild(bg); // a fixed overlay must not sit inside an animated page
+  if (askResolve) askResolve(false);
+  $('askTitle').textContent = title; $('askMsg').textContent = msg || ''; $('askOk').textContent = ok;
+  $('askNo').style.display = cancel ? '' : 'none'; $('askNo').textContent = cancel || '';
+  bg.classList.add('open');
+  return new Promise(res => { askResolve = res; });
+}
+function askDone(v) { $('askBg').classList.remove('open'); const r = askResolve; askResolve = null; if (r) r(v); }
+const notice = (title, msg) => ask(title, msg, 'حسناً', null);
+// a Firestore write waits forever on a weak connection — give up after 20s so the button never stays on "جاري..."
+const withTimeout = (p, ms = 20000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+const netMsg = e => e.message === 'timeout' ? 'الاتصال بالإنترنت ضعيف — تأكد من الاتصال وحاول مرة أخرى.' : e.message;
 // pauses are approved automatically by the server (Cloud Function) within seconds — no admin step
 async function cancelPause(k) {
-  const sub = currentSubscription; if (!sub || !confirm(`إلغاء إيقاف يوم ${dLabel(k)}؟\nستُحذف الحصة المضافة في نهاية الاشتراك ويمكنك اختيار يوم آخر.`)) return;
-  try { await db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion({ subId: sub.id, childName: sub.childName, start: k, end: k, type: 'cancel', status: 'pending', requestedAt: new Date().toISOString() }) }); }
-  catch (err) { alert('تعذر الإلغاء: ' + err.message); }
+  const sub = currentSubscription; if (!sub || !(await ask('إلغاء الإيقاف؟', `يوم ${dLabel(k)}\nستُحذف الحصة المضافة في نهاية الاشتراك ويمكنك اختيار يوم آخر.`, 'نعم، ألغِ الإيقاف'))) return;
+  try { await withTimeout(db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion({ subId: sub.id, childName: sub.childName, start: k, end: k, type: 'cancel', status: 'pending', requestedAt: new Date().toISOString() }) })); }
+  catch (err) { notice('تعذر الإلغاء', netMsg(err)); }
 }
 async function requestPause() {
   const sub = currentSubscription; if (!sub || sub.status !== 'active') return;
-  const picked = [...pickDays].sort(); if (!picked.length) return alert('اختر يوم الإيقاف من التقويم');
-  if (Classes.own(pausesOf(sub)).length + pendingPausesFor(sub.id).length + picked.length > pauseMax(sub)) return alert(`تجاوزت عدد الإيقافات المسموح (${pauseMax(sub)} شهرياً)`);
-  if (!confirm(`إيقاف اشتراك ${sub.childName}:\n${picked.map(dLabel).join('\n')}\n\nستُضاف ${picked.length === 1 ? 'حصة' : picked.length + ' حصص'} في نهاية الاشتراك بدلاً منها.`)) return;
+  const picked = [...pickDays].sort(); if (!picked.length) return notice('⏸️ الإيقاف', 'اضغط على يوم التدريب الذي تريد إيقافه في التقويم أولاً');
+  if (Classes.own(pausesOf(sub)).length + pendingPausesFor(sub.id).length + picked.length > pauseMax(sub)) return notice('⏸️ الإيقاف', `تجاوزت عدد الإيقافات المسموح (${pauseMax(sub)})`);
+  if (!(await ask(`إيقاف اشتراك ${sub.childName}`, `${picked.map(dLabel).join('\n')}\n\nستُضاف ${picked.length === 1 ? 'حصة' : picked.length + ' حصص'} في نهاية الاشتراك بدلاً منها.`, '⏸️ تأكيد الإيقاف'))) return;
   const btn = $('pauseBtn'); btn.disabled = true; btn.textContent = '⏳ جاري الإيقاف...';
   const reason = $('pauseReason').value.trim(), at = new Date().toISOString();
   try {
-    await db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion(...picked.map(k => ({ subId: sub.id, childName: sub.childName, start: k, end: k, days: 1, reason, status: 'pending', requestedAt: at }))) });
+    await withTimeout(db.collection('portal').doc(PHONE).update({ pauseRequests: firebase.firestore.FieldValue.arrayUnion(...picked.map(k => ({ subId: sub.id, childName: sub.childName, start: k, end: k, days: 1, reason, status: 'pending', requestedAt: at }))) }));
     pickDays = new Set(); $('pauseReason').value = ''; renderPauseCal(sub);
-  } catch (err) { alert('تعذر الإيقاف: ' + err.message); renderPauseCal(sub); }
+  } catch (err) { notice('تعذر الإيقاف', netMsg(err)); renderPauseCal(sub); }
 }
 
 // ---------- NOTIFICATIONS ----------
