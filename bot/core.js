@@ -74,7 +74,7 @@ async function lastTx(db) {
   return '📋 <b>آخر 10 عمليات</b>\n\n' + snap.docs.map(d => { const t = d.data(); return `${t.type === 'income' ? '💰' : '💸'} ${KD(t.amount)} — ${ICON[t.category] || ''} ${t.category}${t.note ? ' · ' + t.note : ''}\n<i>${t.date}${t.createdBy === 'telegram' ? ' · 🤖' : ''}</i>`; }).join('\n\n');
 }
 
-const daysLeft = s => { const e = toD(s.subscriptionEnd); return e ? Math.ceil((e - new Date()) / 864e5) : null; };
+const daysLeft = s => { const e = !s.frozen && toD(s.subscriptionEnd); return e ? Math.ceil((e - new Date()) / 864e5) : null; };
 const pausedNow = s => { const a = toD(s.pauseStart), b = toD(s.pauseEnd); if (!a || !b) return false; const n = new Date(); return n >= a && n <= b; };
 
 const PKG_LABEL = { confidence: '🥋 بناء الثقة والكيوكشن', football: '⚽ كرة القدم', excellence: '⚡ باقة التميز (قدم + كيوكشن)', excellence_loyal: '🏅 أسرة سلام' };

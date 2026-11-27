@@ -425,3 +425,8 @@ body.has-kids .ring-card{margin-top:12px}
 .extra-pauses .qty{display:flex;align-items:center;gap:10px}
 .extra-pauses .qty button{width:34px;height:34px;border-radius:50%;border:0;background:#fff;font-size:1.1rem;font-weight:800;color:var(--green,#1B5E20);box-shadow:0 2px 6px rgba(0,0,0,.08)}
 .extra-pauses .qty b{min-width:18px;text-align:center;font-size:1.1rem}
+
+/* open-ended freeze box (admin edit sheet) */
+.freeze-box{border:1.5px dashed #90A4AE;background:#F4F7F8;border-radius:16px;padding:12px;margin:10px 0 14px}
+.freeze-box>div:first-child b{display:block;font-weight:900;color:#37474F}.freeze-box>div:first-child small{display:block;color:var(--text-light);font-weight:700;margin:2px 0 10px;line-height:1.7}
+.freeze-box .fg{margin-bottom:8px}.freeze-box .btn{margin-top:4px}

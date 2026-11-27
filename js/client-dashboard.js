@@ -83,6 +83,10 @@ function renderDashboard(sub) {
   $('sportSplit').innerHTML = by ? Classes.sportsOf(sub.packageType).map(sp => `<span class="sp">${Classes.SPORTS[sp].icon} <b>${by[sp] || 0}</b> ${Classes.SPORTS[sp].name}</span>`).join('') : '';
   $('startDate').textContent = fmt(start); $('endDate').textContent = fmt(end);
   const alert = $('renewalAlert'); alert.classList.remove('show');
+  if (sub.frozen) { // frozen by the admin (e.g. injury): the classes left are kept, no end date until training resumes
+    setRing(days, days / total, '#546E7A'); $('endDate').textContent = 'بعد العودة';
+    status('🩹 الاشتراك مجمّد', `منذ ${fmt(toD(sub.frozen.since + 'T00:00:00'))} — ${cls(days)} محفوظة وتبدأ عند عودتكم للتدريب`); renderPause(sub); return;
+  }
   if (days <= 0 || sub.status === 'expired') { status('انتهى الاشتراك', 'يرجى التجديد للاستمرار في التدريب'); alertSet('انتهى الاشتراك', 'جدد الآن للعودة للتدريب', '🔄 تجديد'); }
   else if (days <= 2) { status('⚠️ اشتراكك على وشك الانتهاء', 'جدد الآن لتجنب الانقطاع'); alertSet('اشتراكك على وشك الانتهاء!', `متبقٍ ${cls(days)} فقط`, 'جدد الآن'); }
   else if (days <= 4) { status('اشتراك نشط', 'ينتهي قريباً، فكر في التجديد المبكر'); alertSet('ينتهي قريباً', `متبقٍ ${cls(days)}`, 'جدد الآن'); }
@@ -104,7 +108,7 @@ function renderRequestState(sub) {
   }
   else if (s === 'rejected') { ringIcon('✕', '#C62828', 1); status('لم يتم قبول الطلب', sub.adminNote || 'للاستفسار يرجى التواصل مع الإدارة.'); }
   else { ringIcon('•', '#A07050', 0); status('حالة غير معروفة', s); }
-  ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح بعد تفعيل الاشتراك.';
+  ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = 'ℹ️'; $('pauseUsed').querySelector('p').textContent = 'الإيقاف المؤقت متاح بعد تفعيل الاشتراك.';
 }
 function ringIcon(ch, color, ratio) { $('daysRemaining').textContent = ch; $('daysRemaining').style.fontSize = '1.8rem'; $('daysCircle').setAttribute('stroke', color); $('daysCircle').style.strokeDashoffset = 326.7 * (1 - ratio); document.querySelector('.days-label').textContent = ''; }
 
@@ -251,6 +255,7 @@ const dLabel = k => new Date(k + 'T00:00:00Z').toLocaleDateString('ar-KW', { wee
 let calMonth = null, calSubId = null, pickDays = new Set();
 function renderPause(sub) {
   ['pauseInfo', 'pauseActive', 'pauseUsed'].forEach(i => $(i).style.display = 'none'); $('pausedBanner').style.display = 'none';
+  if (sub.frozen) { $('pauseQuota').innerHTML = ''; $('pauseUsed').style.display = 'block'; $('pauseUsed').querySelector('div').textContent = '🩹'; $('pauseUsed').querySelector('p').textContent = 'الاشتراك مجمّد حالياً من الإدارة — الحصص المتبقية محفوظة. تواصل مع الأكاديمية عند الجاهزية للعودة.'; return; }
   const used = Classes.own(pausesOf(sub)), pend = pendingPausesFor(sub.id), left = pauseMax(sub) - used.length - pend.length;
   const quota = $('pauseQuota'); if (quota) quota.innerHTML = Array.from({ length: pauseMax(sub) }, (_, i) => `<span class="chip ${i < used.length ? 'info' : i < used.length + pend.length ? 'gold' : 'ok'}">${i < used.length ? '⏸️ ' + used[i].date : i < used.length + pend.length ? '🕒 ' + pend[i - used.length].start : '○ متاح'}</span>`).join('');
   if (sub.status !== 'active') {

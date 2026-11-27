@@ -51,6 +51,7 @@
   }
   // classes still to come per sport: { football: 3, kyokushin: 10 } (single-sport packages: { _: n })
   function leftBy(s, from) {
+    if (s.frozen && s.frozen.by) return { ...s.frozen.by }; // frozen (injury): the classes left are kept as they were on the freeze day
     const end = key(s.subscriptionEnd); if (!end) return null; from = from || today();
     const t = s.packageType, e = ends(s), off = new Set((Array.isArray(s.pauses) ? s.pauses : []).map(p => p.date)), c = {};
     if (e) sportsOf(t).forEach(sp => c[sp] = 0); else c._ = 0;
@@ -81,9 +82,26 @@
     (list || []).forEach(c => { if (c.active === false || (c.packages && c.packages.length && !c.packages.includes(t))) return; for (let k = c.from, i = 0; k && k <= c.to && i < 120; k = add(k, 1), i++) if (isTrain(k, t)) m.set(k, c); });
     return m;
   }
+  // ---- open-ended freeze (e.g. injury): s.frozen = { since, by, reason } until the admin resumes ----
+  const freeze = (s, since) => ({ since: since || today(), by: leftBy({ ...s, frozen: null }, since || today()) || {} });
+  // resume on `from`: the kept classes start again from the first training day on/after `from` → { end, sportEnds }
+  function resume(s, from) {
+    const t = s.packageType, by = (s.frozen && s.frozen.by) || {}; from = from || today();
+    if (!isSplit(t)) { const n = by._ || Object.values(by).reduce((a, b) => a + b, 0); return { end: n > 0 ? nth(from, n, t) : prev(from, t), sportEnds: null }; }
+    const o = {}; sportsOf(t).forEach(sp => o[sp] = by[sp] > 0 ? nthS(from, by[sp], sp) : prevS(from, sp));
+    return { end: lastOf(o), sportEnds: o };
+  }
+  // a paid renewal while frozen adds a month of classes to the kept ones (package may change)
+  function freezeAdd(fz, oldT, t) {
+    const by = {}, old = (fz && fz.by) || {}, tot = Object.values(old).reduce((a, b) => a + b, 0);
+    if (isSplit(t)) sportsOf(t).forEach(sp => by[sp] = (oldT === t ? old[sp] || 0 : 0) + SPORTS[sp].days.length * 4);
+    else by._ = (oldT === t ? old._ || 0 : 0) + perMonth(t);
+    if (oldT !== t) by[Object.keys(by)[0]] += tot; // package changed: the kept classes go to the first sport
+    return { ...fz, by };
+  }
   // pauses the parent chose (closure days don't use the parent's quota)
   const own = ps => (Array.isArray(ps) ? ps : []).filter(p => !p.closure);
   // closure pauses to store for the period first … end
   const closurePauses = (m, first, end) => [...m.entries()].filter(([k]) => k >= first && k <= end).sort().map(([k, c]) => ({ date: k, reason: c.reason || 'إغلاق الأكاديمية', closure: true, closureId: c.id, by: 'academy' }));
-  return { TRAIN_DAYS, SPORTS, perMonth, pauses, pauseLimit, key, today, add, isTrain, toDate, nth, next, prev, left, leftBy, renewal, closedDays, own, closurePauses, sportsOf, isSplit, sportOf, ends, move, stateOf, plan };
+  return { TRAIN_DAYS, SPORTS, perMonth, pauses, pauseLimit, key, today, add, isTrain, toDate, nth, next, prev, left, leftBy, renewal, closedDays, own, closurePauses, freeze, resume, freezeAdd, sportsOf, isSplit, sportOf, ends, move, stateOf, plan };
 });

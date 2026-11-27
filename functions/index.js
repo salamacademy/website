@@ -112,7 +112,7 @@ exports.dailyReminders = fx.pubsub.schedule('0 9 * * *').timeZone('Asia/Kuwait')
   const snap = await db.collection('subscriptions').where('status', '==', 'active').get();
   const soon = [];
   for (const doc of snap.docs) {
-    const s = doc.data(); if (!s.subscriptionEnd || s.demo) continue;
+    const s = doc.data(); if (!s.subscriptionEnd || s.demo || s.frozen) continue; // frozen (injury): no reminders, never expires
     const days = Math.ceil((s.subscriptionEnd.toDate() - now) / 864e5);
     if (days >= 0 && days <= 3) soon.push([days, `• <b>${s.childName}</b> — ${days === 0 ? 'ينتهي اليوم' : `متبقٍ ${days} يوم`} · ${s.phone}`]);
     if (days === 3 || days === 1) await sendTo(s.fcmTokens, '⏳ اشتراكك ينتهي قريباً', `${s.childName} — متبقٍ ${days} يوم · جدد الآن`, '/website/client/dashboard.html');
@@ -268,6 +268,10 @@ const PKG_NAME = { football: 'كرة القدم', confidence: 'بناء الثق
 // academy-wide closures still to come (holidays / emergencies) — their days don't count as classes
 async function upcomingClosures() { const q = await db.collection('closures').where('to', '>=', kwToday()).get(); return q.docs.map(d => ({ id: d.id, ...d.data() })); }
 async function renewSub(subRef, s, orderId, pkg) {
+  if (s.frozen) { // frozen (injury): the paid month is added to the kept classes; the dates are set when the admin resumes
+    const t = (pkg && pkg.packageType) || s.packageType;
+    return subRef.update({ ...(pkg || {}), frozen: Classes.freezeAdd(s.frozen, s.packageType, t), classesPerMonth: Classes.perMonth(t), paidAt: admin.firestore.FieldValue.serverTimestamp(), paymentMethod: 'upayment', lastPaymentId: orderId });
+  }
   const t = (pkg && pkg.packageType) || s.packageType, closed = Classes.closedDays(await upcomingClosures().catch(() => []), t);
   const now = new Date(), r = Classes.renewal({ ...s, ...(pkg || {}) }, 0, closed), end = Classes.toDate(r.end);
   const keep = Classes.closurePauses(closed, Classes.today(), r.end); // closure days inside the old + new period
@@ -391,11 +395,13 @@ exports.tgOnPauseRequest = fx.firestore.document('portal/{phone}').onUpdate(asyn
         const sp = Classes.sportOf(r.start || '', s.packageType), endKey = cur.st.sportEnds && sp ? cur.st.sportEnds[sp] : cur.st.end; // split packages: that sport's last class
         if (r.type === 'cancel') {
           const i = cur.pauses.findIndex(p => p.date === r.start);
-          if (i < 0) note = 'لا يوجد إيقاف في هذا اليوم'; else if (cur.pauses[i].closure) note = 'هذا يوم إغلاق من الأكاديمية'; else if (r.start < today) note = 'لا يمكن إلغاء يوم مضى';
+          if (s.frozen) note = 'الاشتراك مجمّد من الإدارة';
+          else if (i < 0) note = 'لا يوجد إيقاف في هذا اليوم'; else if (cur.pauses[i].closure) note = 'هذا يوم إغلاق من الأكاديمية'; else if (r.start < today) note = 'لا يمكن إلغاء يوم مضى';
           else { cur.pauses.splice(i, 1); cur.st = Classes.move(cur.st, s.packageType, sp, -1); } // last class (of that sport) moves back
         } else {
           const dow = new Date(r.start + 'T00:00:00Z').getUTCDay();
           if (s.status !== 'active') note = 'الاشتراك غير نشط';
+          else if (s.frozen) note = 'الاشتراك مجمّد من الإدارة';
           else if (!/^\d{4}-\d\d-\d\d$/.test(r.start || '') || r.start < today) note = 'لا يمكن إيقاف يوم مضى';
           else if (endKey && r.start > endKey) note = 'بعد نهاية الاشتراك';
           else if (!(TRAIN_DAYS[s.packageType] || [6, 0, 1, 2, 3, 4]).includes(dow)) note = 'ليس من أيام تدريب الباقة';

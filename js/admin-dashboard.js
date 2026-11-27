@@ -37,7 +37,7 @@ const clsLeft = s => Classes.left(s);
 // Firestore writes can hang on a weak connection — never leave a button spinning forever
 const withTimeout = (p, ms = 15000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 const SLOW_MSG = '❌ الاتصال ضعيف ولم يتأكد الحفظ — تحقق من الإنترنت واضغط حفظ مرة أخرى';
-function calcDaysLeft(s) { const e = toD(s.subscriptionEnd); return e ? Math.ceil((e - new Date()) / 864e5) : null; }
+function calcDaysLeft(s) { if (s.frozen) return null; /* frozen: no end date counting */ const e = toD(s.subscriptionEnd); return e ? Math.ceil((e - new Date()) / 864e5) : null; }
 const dayKey = d => (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0];
 const pausesOf = s => Array.isArray(s.pauses) ? s.pauses : (s.pauseStart ? [{ date: dayKey(toD(s.pauseStart)), end: dayKey(toD(s.pauseEnd || s.pauseStart)) }] : []);
 function isPausedNow(s) { const t = dayKey(new Date()); return pausesOf(s).some(p => p.date === t || (p.end && t >= p.date && t <= p.end)); }
@@ -65,7 +65,7 @@ function renderStats() {
   const rev = allSubscriptions.filter(s => { const c = toD(s.createdAt); return c && c.getMonth() === now.getMonth() && c.getFullYear() === now.getFullYear() && s.status === 'active'; }).reduce((a, s) => a + (+s.amount || 0), 0);
   set('statPending', pending); set('statActive', active.length); set('statExpiring', expiring.length);
   set('statExpired', allSubscriptions.filter(s => s.status === 'expired').length);
-  set('statPaused', allSubscriptions.filter(isPausedNow).length + (pauseRequests().length ? ' +' + pauseRequests().length : '')); if (typeof finNetNow === 'function') set('statRevenue', finNetNow()); else set('statRevenue', rev.toFixed(0));
+  set('statPaused', allSubscriptions.filter(s => s.frozen || isPausedNow(s)).length + (pauseRequests().length ? ' +' + pauseRequests().length : '')); if (typeof finNetNow === 'function') set('statRevenue', finNetNow()); else set('statRevenue', rev.toFixed(0));
   ['reviewBadge', 'tabReviewDot'].forEach(id => { const b = document.getElementById(id); if (b) { b.textContent = pending; b.style.display = pending ? 'inline-flex' : 'none'; } });
 }
 function set(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
@@ -76,7 +76,7 @@ function memberCard(s, opts = {}) {
   const st = ST[s.status] || ['copper', s.status];
   const cl = s.status === 'active' && days !== null && days >= 0 ? clsLeft(s) : 0;
   const daysChip = s.status !== 'active' || days === null ? '' : days < 0 ? `<span class="chip bad">منتهي</span>` : `<span class="chip ${cl <= 2 ? 'bad' : cl <= 4 ? 'warn' : 'ok'}">🎯 ${cl} حصة متبقية</span>${sportChips(s)}`;
-  const paused = isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (Classes.own(pausesOf(s)).length ? `<span class="chip">⏸️ ${Classes.own(pausesOf(s)).length}/${Classes.pauseLimit(s)}</span>` : '');
+  const paused = s.frozen ? `<span class="chip info">🩹 مجمّد منذ ${fmtIso(s.frozen.since)} · ${Classes.left(s)} حصة محفوظة</span>` : isPausedNow(s) ? `<span class="chip info">⏸️ متوقف اليوم</span>` : (Classes.own(pausesOf(s)).length ? `<span class="chip">⏸️ ${Classes.own(pausesOf(s)).length}/${Classes.pauseLimit(s)}</span>` : '');
   const actions = [];
   if (s.status === 'pending_review') actions.push(`<button class="abtn ok" onclick="openApprove('${s.id}')">✅ موافقة</button><button class="abtn bad" onclick="rejectRequest('${s.id}')">⛔ رفض</button>`);
   if (s.status === 'approved' || s.status === 'pending_payment') actions.push(`<button class="abtn ok" onclick="activateSubscription('${s.id}')">▶️ تفعيل</button>`);
@@ -304,9 +304,45 @@ function openEditModal(id, toPauses) {
   fillEditPackages(s); set('editAmount', s.amount);
   set('editStatus', s.status || 'active'); set('editNotes', s.notes);
   set('editStartDate', isoDate(s.subscriptionStart)); set('editEndDate', isoDate(s.subscriptionEnd));
-  editPauses = pausesOf(s).map(p => ({ ...p })); editSt = Classes.stateOf(s); editExtra = Math.max(0, +s.extraPauses || 0); document.getElementById('editExtra').textContent = editExtra; renderEditPauses(); loadEditPhoto(s);
+  editPauses = pausesOf(s).map(p => ({ ...p })); editSt = Classes.stateOf(s); editExtra = Math.max(0, +s.extraPauses || 0); document.getElementById('editExtra').textContent = editExtra; renderEditPauses(); renderEditFreeze(s); loadEditPhoto(s);
   document.getElementById('editModal').classList.add('open');
   const sh = document.querySelector('#editModal .sheet'); if (toPauses) setTimeout(() => document.getElementById('editPauses').scrollIntoView({ block: 'center' }), 50); else sh.scrollTop = 0;
+}
+// ---------- OPEN-ENDED FREEZE (injury): no end date — the classes left are kept until the admin resumes ----------
+function renderEditFreeze(s) {
+  const el = document.getElementById('editFreeze'); if (!el) return;
+  if (s.frozen) { el.innerHTML = `<div><b>🩹 الاشتراك مجمّد منذ ${fmtIso(s.frozen.since)}</b><small>${s.frozen.reason ? s.frozen.reason + ' · ' : ''}الحصص المحفوظة: ${Classes.left(s)} — لا ينتهي الاشتراك ولا تُحسب الحصص حتى الاستئناف</small></div><button type="button" class="btn ok" onclick="resumeSub('${s.id}', this)">▶️ استئناف الاشتراك من اليوم</button>`; return; }
+  if (s.status !== 'active') { el.innerHTML = '<div><b>🩹 تجميد مفتوح</b><small>متاح للاشتراكات النشطة فقط</small></div>'; return; }
+  el.innerHTML = `<div><b>🩹 تجميد حتى إشعار آخر</b><small>مثلاً عند الإصابة — تُحفظ الحصص المتبقية ولا ينتهي الاشتراك حتى تضغط استئناف</small></div>
+    <div class="fg2"><div class="fg"><label>من تاريخ</label><input type="date" id="freezeSince" value="${todayIso()}"/></div><div class="fg"><label>السبب</label><input type="text" id="freezeReason" placeholder="مثال: إصابة"/></div></div>
+    <button type="button" class="btn bad" onclick="freezeSub('${s.id}', this)">🩹 تجميد الاشتراك</button>`;
+}
+async function freezeSub(id, btn) {
+  const s = allSubscriptions.find(x => x.id === id); if (!s) return;
+  const since = v('freezeSince') || todayIso(), reason = v('freezeReason').trim();
+  const fz = { ...Classes.freeze(s, since), reason, at: new Date().toISOString() }, n = Object.values(fz.by).reduce((a, b) => a + b, 0);
+  if (!confirm(`تجميد اشتراك ${s.childName} من ${fmtIso(since)}؟
+
+تُحفظ ${n} حصة، ولا ينتهي الاشتراك حتى تضغط "استئناف".
+الإيقافات بعد هذا التاريخ تُلغى.`)) return;
+  btn.disabled = true; btn.textContent = '⏳ جاري التجميد...';
+  try {
+    await withTimeout(db.collection('subscriptions').doc(id).update({ frozen: fz, pauses: pausesOf(s).filter(p => p.date < since) }));
+    closeEditModal(); showToast('🩹 تم تجميد الاشتراك'); withTimeout(PortalSync.syncPhone(db, s.phone)).catch(e => console.warn('sync', e)); loadAllData();
+  } catch (e) { showToast(e.message === 'timeout' ? SLOW_MSG : '❌ ' + e.message); btn.disabled = false; btn.textContent = '🩹 تجميد الاشتراك'; }
+}
+async function resumeSub(id, btn) {
+  const s = allSubscriptions.find(x => x.id === id); if (!s || !s.frozen) return;
+  const r = Classes.resume(s, todayIso()), n = Classes.left(s);
+  if (!confirm(`استئناف اشتراك ${s.childName} من اليوم؟
+
+${n} حصة محفوظة — آخر حصة: ${fmtIso(r.end)}`)) return;
+  btn.disabled = true; btn.textContent = '⏳ جاري الاستئناف...';
+  const end = Classes.toDate(r.end);
+  try {
+    await withTimeout(db.collection('subscriptions').doc(id).update({ subscriptionEnd: firebase.firestore.Timestamp.fromDate(end), sportEnds: r.sportEnds || firebase.firestore.FieldValue.delete(), daysRemaining: Math.max(0, Math.ceil((end - new Date()) / 864e5)), frozen: firebase.firestore.FieldValue.delete(), freezeHistory: firebase.firestore.FieldValue.arrayUnion({ since: s.frozen.since, until: todayIso(), reason: s.frozen.reason || '' }) }));
+    closeEditModal(); showToast('▶️ تم استئناف الاشتراك — آخر حصة ' + fmtIso(r.end)); withTimeout(PortalSync.syncPhone(db, s.phone)).catch(e => console.warn('sync', e)); loadAllData();
+  } catch (e) { showToast(e.message === 'timeout' ? SLOW_MSG : '❌ ' + e.message); btn.disabled = false; btn.textContent = '▶️ استئناف الاشتراك من اليوم'; }
 }
 function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
 // ---------- SUBSCRIBER PHOTO: photos/{subId}.data = small JPEG (360×450); subscriptions.photoAt marks it; PortalSync copies it to the parent as kids[].photo ----------
