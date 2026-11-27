@@ -26,7 +26,7 @@
           <label>رقم الهاتف</label>
           <div class="phone-input-wrap">
             <span class="phone-prefix">🇰🇼 +965</span>
-            <input type="tel" id="loginPhone" placeholder="XXXXXXXX" maxlength="8" inputmode="numeric" autocomplete="tel" autofocus/>
+            <input type="tel" id="loginPhone" placeholder="XXXXXXXX" maxlength="12" inputmode="numeric" autocomplete="tel" autofocus/>
           </div>
         </div>
         <button class="btn-portal-primary" id="enterBtn" onclick="enter()">دخول ←</button>
@@ -50,7 +50,8 @@
     const saved = localStorage.getItem('salamPhone');
     if (saved && /^\d{8}$/.test(saved)) location.replace('dashboard.html' + (qp.get('go') ? '#' + qp.get('go') : ''));
     const inp = document.getElementById('loginPhone');
-    inp.addEventListener('input', () => { inp.value = inp.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '').slice(0, 8); });
+    // only rewrite the field when it really has non-digits (Arabic digits, spaces, +965…) — rewriting on every keystroke can drop fast-typed digits on iPad
+    inp.addEventListener('input', () => { const v = inp.value, c = v.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '').replace(/^965(?=\d{8}$)/, '').slice(0, 8); if (c !== v) inp.value = c; });
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') enter(); });
     function showMsg(t) { const m = document.getElementById('msgBox'); m.textContent = t; m.style.display = 'block'; m.style.background = '#ffebee'; m.style.color = '#c62828'; }
     async function enter() {
